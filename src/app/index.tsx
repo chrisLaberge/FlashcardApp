@@ -1,11 +1,19 @@
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Button, Text, View } from "react-native";
+import CardComponent from "../components/CardComponent";
 import { Card } from "../models/Card";
+import { Deck } from "../models/Deck";
 
-const card = new Card("你好", "Hello");
+const deck = new Deck([
+  new Card("你好", "Hello"),
+  new Card("谢谢", "Thank you"),
+  new Card("再见", "Goodbye"),
+]);
+
+const completedDeck = new Deck();
 
 export default function HomeScreen() {
-  const [flipped, setFlipped] = useState(false);
+  const [currentCard, setCurrentCard] = useState(deck.getNextCard());
 
   return (
     <View
@@ -15,21 +23,31 @@ export default function HomeScreen() {
         alignItems: "center",
       }}
     >
-      <Pressable
-        onPress={() => setFlipped(!flipped)}
-        style={{
-          width: 300,
-          height: 200,
-          backgroundColor: "white",
-          borderRadius: 15,
-          justifyContent: "center",
-          alignItems: "center",
-        }}
-      >
-        <Text style={{ fontSize: 40 }}>
-          {flipped ? card.front : card.back}
-        </Text>
-      </Pressable>
+      {/* Check if there are more cards in the deck */}
+      {currentCard ? (
+        <>
+          {/* Current Card Component */}
+          <CardComponent
+            cardData={currentCard}
+            onSwipe={(direction) => {
+              if (direction === "left") {
+                deck.addToBack(currentCard);
+              } else {
+                completedDeck.addToBack(currentCard);
+              }
+
+              setCurrentCard(deck.getNextCard());
+            }}
+          />
+
+          <Button
+            title="Next"
+            onPress={() => setCurrentCard(deck.getNextCard())}
+          />
+        </>
+      ) : (
+        <Text>Done!</Text>
+      )}
     </View>
   );
 }

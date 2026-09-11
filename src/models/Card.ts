@@ -6,4 +6,7 @@ export class Card{
         this.front = front;
         this.back = back;
     }
+
+
+
 }
