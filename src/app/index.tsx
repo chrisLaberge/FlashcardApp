@@ -18,11 +18,8 @@ export default function HomeScreen() {
 
   const advance = () => {
     setCurrentCard(deck.getNextCard());
-    if (deck.size === 0) {
-      setNextCard(undefined);
-    } else {
-      setNextCard(deck.peekNext());
-    }
+    setNextCard(deck.peekNext());
+
   };
 
   return (
@@ -33,7 +30,9 @@ export default function HomeScreen() {
           nextCard={nextCard}
           onSwipe={(direction) => {
             if (direction === "left") {
-              deck.addToBack(currentCard);
+              if (deck.size > 0) {
+                deck.addToBack(currentCard);
+              }
             } else {
               completedDeck.addToBack(currentCard);
             }
