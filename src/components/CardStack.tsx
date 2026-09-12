@@ -143,7 +143,7 @@ const styles = {
         position: "absolute" as const,
         width: 300,
         height: 200,
-        backgroundColor: "white",
+        backgroundColor: "#aca696",
         borderRadius: 15,
         justifyContent: "center" as const,
         alignItems: "center" as const,

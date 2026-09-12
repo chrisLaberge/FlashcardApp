@@ -1,16 +1,8 @@
+import NavigationButton from "@/components/NavigationButton";
 import { useState } from "react";
-import { Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import CardStack from "../components/CardStack";
-import { Card } from "../models/Card";
-import { Deck } from "../models/Deck";
-
-const deck = new Deck([
-  new Card("你好", "Hello"),
-  new Card("谢谢", "Thank you"),
-  new Card("再见", "Goodbye"),
-]);
-
-const completedDeck = new Deck();
+import { completedDeck, deck } from "../models/DeckManager";
 
 export default function HomeScreen() {
   const [currentCard, setCurrentCard] = useState(deck.getNextCard());
@@ -19,11 +11,10 @@ export default function HomeScreen() {
   const advance = () => {
     setCurrentCard(deck.getNextCard());
     setNextCard(deck.peekNext());
-
   };
 
   return (
-    <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+    <View style={styles.container}>
       {currentCard ? (
         <CardStack
           currentCard={currentCard}
@@ -36,12 +27,30 @@ export default function HomeScreen() {
             } else {
               completedDeck.addToBack(currentCard);
             }
+
             advance();
           }}
         />
       ) : (
-        <Text>Done!</Text>
+        <Text style={styles.doneText}>Done!</Text>
       )}
+
+      <NavigationButton />
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#282828",
+  },
+
+  doneText: {
+    color: "#ebdbb2",
+    fontSize: 28,
+    fontWeight: "bold",
+  },
+});
