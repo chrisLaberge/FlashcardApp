@@ -11,6 +11,10 @@ export class Deck {
         return this.cards.shift();
     }
 
+    peekNext(): Card | undefined {
+        return this.cards[0];
+    }
+
     addToBack(card: Card): void {
         this.cards.push(card);
     }

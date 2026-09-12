@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Button, Text, View } from "react-native";
-import CardComponent from "../components/CardComponent";
+import { Text, View } from "react-native";
+import CardStack from "../components/CardStack";
 import { Card } from "../models/Card";
 import { Deck } from "../models/Deck";
 
@@ -14,37 +14,32 @@ const completedDeck = new Deck();
 
 export default function HomeScreen() {
   const [currentCard, setCurrentCard] = useState(deck.getNextCard());
+  const [nextCard, setNextCard] = useState(deck.peekNext());
+
+  const advance = () => {
+    setCurrentCard(deck.getNextCard());
+    if (deck.size === 0) {
+      setNextCard(undefined);
+    } else {
+      setNextCard(deck.peekNext());
+    }
+  };
 
   return (
-    <View
-      style={{
-        flex: 1,
-        justifyContent: "center",
-        alignItems: "center",
-      }}
-    >
-      {/* Check if there are more cards in the deck */}
+    <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
       {currentCard ? (
-        <>
-          {/* Current Card Component */}
-          <CardComponent
-            cardData={currentCard}
-            onSwipe={(direction) => {
-              if (direction === "left") {
-                deck.addToBack(currentCard);
-              } else {
-                completedDeck.addToBack(currentCard);
-              }
-
-              setCurrentCard(deck.getNextCard());
-            }}
-          />
-
-          <Button
-            title="Next"
-            onPress={() => setCurrentCard(deck.getNextCard())}
-          />
-        </>
+        <CardStack
+          currentCard={currentCard}
+          nextCard={nextCard}
+          onSwipe={(direction) => {
+            if (direction === "left") {
+              deck.addToBack(currentCard);
+            } else {
+              completedDeck.addToBack(currentCard);
+            }
+            advance();
+          }}
+        />
       ) : (
         <Text>Done!</Text>
       )}
