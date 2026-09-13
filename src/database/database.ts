@@ -168,13 +168,13 @@ export async function markCardIncorrect(cardId: number) {
         return;
     }
 
-    const result = getFailedReview();
+    const result = getFailedReview(progress.reviewCount);
 
     await updateCardProgress(
         cardId,
-        progress.reviewCount,
+        result.reviewCount,
         result.nextReviewAt,
-        false
+        result.mastered
     );
 }
 

@@ -39,10 +39,16 @@ export function getNextReview(
     };
 }
 
-export function getFailedReview(): {
+export function getFailedReview(
+    reviewCount: number
+): {
+    reviewCount: number;
     nextReviewAt: number;
+    mastered: boolean;
 } {
     return {
+        reviewCount: Math.max(0, reviewCount - 2),
         nextReviewAt: Date.now(),
+        mastered: false,
     };
 }

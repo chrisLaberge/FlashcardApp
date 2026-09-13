@@ -9,9 +9,12 @@ import {
 } from "react-native";
 import {
     deleteCard,
+    getCardProgress,
     getCards,
     updateCard,
 } from "../database/database";
+
+import { CardProgress } from "../models/CardProgress";
 
 export default function EditCardScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
@@ -19,6 +22,8 @@ export default function EditCardScreen() {
 
     const [front, setFront] = useState("");
     const [back, setBack] = useState("");
+    const [progress, setProgress] = useState<CardProgress>();
+
 
     useEffect(() => {
         const loadCard = async () => {
@@ -31,6 +36,12 @@ export default function EditCardScreen() {
             if (card) {
                 setFront(card.front);
                 setBack(card.back);
+            }
+
+            const cardProgress = await getCardProgress(cardId);
+
+            if (cardProgress) {
+                setProgress(cardProgress);
             }
         };
 
@@ -51,37 +62,79 @@ export default function EditCardScreen() {
         <View style={styles.container}>
             <Text style={styles.title}>Edit Card</Text>
 
-            <Text style={styles.label}>Front</Text>
+            <View style={styles.form}>
+                <Text style={styles.label}>Front</Text>
 
-            <TextInput
-                style={styles.input}
-                value={front}
-                onChangeText={setFront}
-                placeholder="Enter the word or phrase"
-                placeholderTextColor="#a89984"
-            />
+                <TextInput
+                    style={styles.input}
+                    value={front}
+                    onChangeText={setFront}
+                    placeholder="Enter the word or phrase"
+                    placeholderTextColor="#a89984"
+                />
 
-            <Text style={styles.label}>Back</Text>
+                <Text style={styles.label}>Back</Text>
 
-            <TextInput
-                style={styles.input}
-                value={back}
-                onChangeText={setBack}
-                placeholder="Enter the meaning"
-                placeholderTextColor="#a89984"
-            />
+                <TextInput
+                    style={styles.input}
+                    value={back}
+                    onChangeText={setBack}
+                    placeholder="Enter the meaning"
+                    placeholderTextColor="#a89984"
+                />
 
-            <Pressable
-                style={({ pressed }) => [
-                    styles.saveButton,
-                    pressed && styles.buttonPressed,
-                ]}
-                onPress={saveChanges}
-            >
-                <Text style={styles.saveButtonText}>
-                    Save Changes
+                <Pressable
+                    style={({ pressed }) => [
+                        styles.saveButton,
+                        pressed && styles.buttonPressed,
+                    ]}
+                    onPress={saveChanges}
+                >
+                    <Text style={styles.saveButtonText}>
+                        Save Changes
+                    </Text>
+                </Pressable>
+            </View>
+
+            <View style={styles.progressSection}>
+                <Text style={styles.sectionTitle}>
+                    Learning Progress
                 </Text>
-            </Pressable>
+
+                <View style={styles.statsContainer}>
+                    <View style={styles.statCard}>
+                        <Text style={styles.statNumber}>
+                            {progress?.reviewCount ?? 0}
+                        </Text>
+
+                        <Text style={styles.statLabel}>
+                            Level
+                        </Text>
+                    </View>
+
+                    <View style={styles.statCard}>
+                        <Text style={styles.statNumber}>
+                            {formatTimeRemaining(
+                                progress?.nextReviewAt
+                            )}
+                        </Text>
+
+                        <Text style={styles.statLabel}>
+                            Next Review
+                        </Text>
+                    </View>
+
+                    <View style={styles.statCard}>
+                        <Text style={styles.statNumber}>
+                            {progress?.mastered ? "Yes" : "No"}
+                        </Text>
+
+                        <Text style={styles.statLabel}>
+                            Mastered
+                        </Text>
+                    </View>
+                </View>
+            </View>
 
             <Pressable
                 style={({ pressed }) => [
@@ -96,6 +149,34 @@ export default function EditCardScreen() {
             </Pressable>
         </View>
     );
+}
+
+function formatTimeRemaining(nextReviewAt?: number): string {
+    if (!nextReviewAt) {
+        return "Now";
+    }
+
+    const remaining = nextReviewAt - Date.now();
+
+    if (remaining <= 0) {
+        return "Now";
+    }
+
+    const minutes = Math.ceil(remaining / (60 * 1000));
+
+    if (minutes < 60) {
+        return `${minutes} min`;
+    }
+
+    const hours = Math.ceil(minutes / 60);
+
+    if (hours < 24) {
+        return `${hours} hr`;
+    }
+
+    const days = Math.ceil(hours / 24);
+
+    return `${days} day${days === 1 ? "" : "s"}`;
 }
 
 const styles = StyleSheet.create({
@@ -113,11 +194,15 @@ const styles = StyleSheet.create({
         marginBottom: 30,
     },
 
+    form: {
+        gap: 4,
+    },
+
     label: {
         color: "#ebdbb2",
-        fontSize: 16,
+        fontSize: 15,
         fontWeight: "600",
-        marginBottom: 10,
+        marginBottom: 8,
     },
 
     input: {
@@ -128,7 +213,7 @@ const styles = StyleSheet.create({
         borderRadius: 10,
         borderWidth: 1,
         borderColor: "#504945",
-        marginBottom: 20,
+        marginBottom: 16,
     },
 
     saveButton: {
@@ -136,13 +221,53 @@ const styles = StyleSheet.create({
         padding: 16,
         borderRadius: 10,
         alignItems: "center",
-        marginTop: 10,
+        marginTop: 8,
     },
 
     saveButtonText: {
         color: "#282828",
         fontSize: 17,
         fontWeight: "bold",
+    },
+
+    progressSection: {
+        marginTop: 30,
+    },
+
+    sectionTitle: {
+        color: "#ebdbb2",
+        fontSize: 20,
+        fontWeight: "bold",
+        marginBottom: 12,
+    },
+
+    statsContainer: {
+        flexDirection: "row",
+        gap: 10,
+    },
+
+    statCard: {
+        flex: 1,
+        backgroundColor: "#3c3836",
+        borderWidth: 1,
+        borderColor: "#504945",
+        borderRadius: 12,
+        paddingVertical: 16,
+        paddingHorizontal: 8,
+        alignItems: "center",
+    },
+
+    statNumber: {
+        color: "#d79921",
+        fontSize: 21,
+        fontWeight: "bold",
+        marginBottom: 5,
+    },
+
+    statLabel: {
+        color: "#a89984",
+        fontSize: 13,
+        textAlign: "center",
     },
 
     deleteButton: {
@@ -152,7 +277,7 @@ const styles = StyleSheet.create({
         padding: 16,
         borderRadius: 10,
         alignItems: "center",
-        marginTop: 15,
+        marginTop: 30,
     },
 
     deleteButtonText: {
