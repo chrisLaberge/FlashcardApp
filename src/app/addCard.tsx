@@ -6,16 +6,14 @@ import {
     TextInput,
     View,
 } from "react-native";
-import { Card } from "../models/Card";
-import { deck } from "../models/DeckManager";
+import { addCard } from "../database/database";
 
 export default function AddCardScreen() {
     const [front, setFront] = useState("");
     const [back, setBack] = useState("");
 
-    const addCard = () => {
-        const card = new Card(front, back);
-        deck.addToBack(card);
+    const addCardToDatabase = async () => {
+        await addCard(front, back);
 
         setFront("");
         setBack("");
@@ -24,10 +22,14 @@ export default function AddCardScreen() {
     return (
         <View style={styles.container}>
             <Text style={styles.title}>Add Card</Text>
-            <Text style={styles.subtitle}>Create a new flashcard</Text>
+
+            <Text style={styles.subtitle}>
+                Create a new flashcard
+            </Text>
 
             <View style={styles.form}>
                 <Text style={styles.label}>Front</Text>
+
                 <TextInput
                     style={styles.input}
                     value={front}
@@ -37,6 +39,7 @@ export default function AddCardScreen() {
                 />
 
                 <Text style={styles.label}>Back</Text>
+
                 <TextInput
                     style={styles.input}
                     value={back}
@@ -50,7 +53,7 @@ export default function AddCardScreen() {
                         styles.button,
                         pressed && styles.buttonPressed,
                     ]}
-                    onPress={addCard}
+                    onPress={addCardToDatabase}
                 >
                     <Text style={styles.buttonText}>Add Card</Text>
                 </Pressable>
@@ -64,7 +67,7 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: "#282828",
         padding: 20,
-        paddingTop: 60,
+        paddingTop: 40,
     },
 
     title: {
@@ -119,3 +122,4 @@ const styles = StyleSheet.create({
         fontWeight: "bold",
     },
 });
+

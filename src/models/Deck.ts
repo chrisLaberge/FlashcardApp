@@ -19,6 +19,10 @@ export class Deck {
         this.cards.push(card);
     }
 
+    clear(): void {
+        this.cards = [];
+    }
+
     addAtPosition(card: Card, position: number): void {
         this.cards.splice(position, 0, card);
     }
@@ -26,4 +30,6 @@ export class Deck {
     get size(): number {
         return this.cards.length;
     }
+
+
 }
