@@ -7,19 +7,24 @@ import {
     Text,
     View,
 } from "react-native";
-import { getCards } from "../database/database";
+import { getProgressCounts } from "../database/database";
 
 export default function HomeScreen() {
-    const [cardCount, setCardCount] = useState(0);
+    const [dueCount, setDueCount] = useState(0);
+    const [practicedCount, setPracticedCount] = useState(0);
+    const [masteredCount, setMasteredCount] = useState(0);
 
     useFocusEffect(
         useCallback(() => {
-            const loadCardCount = async () => {
-                const cards = await getCards();
-                setCardCount(cards.length);
+            const loadProgress = async () => {
+                const counts = await getProgressCounts();
+
+                setDueCount(counts.due);
+                setPracticedCount(counts.practiced);
+                setMasteredCount(counts.mastered);
             };
 
-            loadCardCount();
+            loadProgress();
         }, [])
     );
 
@@ -41,19 +46,29 @@ export default function HomeScreen() {
                 <Text style={styles.startButtonText}>Start Learning</Text>
             </Pressable>
 
+            <Pressable
+                style={({ pressed }) => [
+                    styles.secondaryButton,
+                    pressed && styles.buttonPressed,
+                ]}
+                onPress={() => router.push("/cardList")}
+            >
+                <Text style={styles.secondaryButtonText}>My Cards</Text>
+            </Pressable>
+
             <View style={styles.statsContainer}>
                 <View style={styles.statCard}>
-                    <Text style={styles.statNumber}>{cardCount}</Text>
+                    <Text style={styles.statNumber}>{dueCount}</Text>
                     <Text style={styles.statLabel}>Cards to Learn</Text>
                 </View>
 
                 <View style={styles.statCard}>
-                    <Text style={styles.statNumber}>0</Text>
+                    <Text style={styles.statNumber}>{practicedCount}</Text>
                     <Text style={styles.statLabel}>Cards Practiced</Text>
                 </View>
 
                 <View style={styles.statCard}>
-                    <Text style={styles.statNumber}>0</Text>
+                    <Text style={styles.statNumber}>{masteredCount}</Text>
                     <Text style={styles.statLabel}>Cards Mastered</Text>
                 </View>
             </View>
@@ -125,5 +140,21 @@ const styles = StyleSheet.create({
     statLabel: {
         color: "#ebdbb2",
         fontSize: 16,
+    },
+
+    secondaryButton: {
+        backgroundColor: "#3c3836",
+        borderWidth: 1,
+        borderColor: "#504945",
+        paddingVertical: 15,
+        borderRadius: 12,
+        alignItems: "center",
+        marginBottom: 35,
+    },
+
+    secondaryButtonText: {
+        color: "#ebdbb2",
+        fontSize: 17,
+        fontWeight: "bold",
     },
 });

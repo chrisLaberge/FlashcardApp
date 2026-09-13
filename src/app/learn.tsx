@@ -3,9 +3,12 @@ import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import CardStack from "../components/CardStack";
+
 import {
   deleteCard,
-  getCards,
+  getDueCards,
+  markCardCorrect,
+  markCardIncorrect,
 } from "../database/database";
 import { Card } from "../models/Card";
 import {
@@ -21,8 +24,7 @@ export default function LearnScreen() {
     useState<Card | undefined>();
 
   const loadCards = useCallback(async () => {
-    const cards = await getCards();
-
+    const cards = await getDueCards();
     deck.clear();
 
     for (const card of cards) {
@@ -60,12 +62,18 @@ export default function LearnScreen() {
         <CardStack
           currentCard={currentCard}
           nextCard={nextCard}
-          onSwipe={(direction) => {
+          onSwipe={async (direction) => {
+            if (currentCard.id === undefined) {
+              return;
+            }
+
             if (direction === "left") {
-              if (deck.size > 0) {
-                deck.addToBack(currentCard);
-              }
+              await markCardIncorrect(currentCard.id);
+
+              deck.addToBack(currentCard);
             } else {
+              await markCardCorrect(currentCard.id);
+
               completedDeck.addToBack(currentCard);
             }
 
