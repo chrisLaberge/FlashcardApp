@@ -25,6 +25,8 @@ export default function LearnScreen() {
   const [nextCard, setNextCard] =
     useState<Card | undefined>();
 
+  const [noCardsDue, setNoCardsDue] = useState(false);
+
   const loadCards = useCallback(async () => {
     const cards = await getDueCards();
     deck.clear();
@@ -32,6 +34,15 @@ export default function LearnScreen() {
     for (const card of cards) {
       deck.addToBack(card);
     }
+
+    if (deck.size === 0) {
+      setNoCardsDue(true);
+      return;
+    }
+
+    setNoCardsDue(false);
+
+
 
     setCurrentCard(deck.getNextCard());
     setNextCard(deck.peekNext());
@@ -64,7 +75,17 @@ export default function LearnScreen() {
 
   return (
     <View style={styles.container}>
-      {currentCard ? (
+      {noCardsDue ? (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyTitle}>
+            🎉 You're caught up!
+          </Text>
+
+          <Text style={styles.emptySubtitle}>
+            Come back when your next cards are ready.
+          </Text>
+        </View>
+      ) : currentCard ? (
         <>
           <CardStack
             currentCard={currentCard}
@@ -240,5 +261,25 @@ const styles = StyleSheet.create({
     color: "#a89984",
     fontSize: 13,
     textAlign: "center",
+  },
+
+  emptyContainer: {
+    width: "90%",
+    alignItems: "center",
+  },
+
+  emptyTitle: {
+    color: "#ebdbb2",
+    fontSize: 28,
+    fontWeight: "bold",
+    textAlign: "center",
+    marginBottom: 10,
+  },
+
+  emptySubtitle: {
+    color: "#a89984",
+    fontSize: 16,
+    textAlign: "center",
+    lineHeight: 24,
   },
 });
