@@ -1,16 +1,18 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import {
+    Modal,
     Pressable,
     StyleSheet,
     Text,
     TextInput,
-    View,
+    View
 } from "react-native";
 import {
     deleteCard,
     getCardProgress,
     getCards,
+    resetCardProgress,
     updateCard,
 } from "../database/database";
 
@@ -23,7 +25,8 @@ export default function EditCardScreen() {
     const [front, setFront] = useState("");
     const [back, setBack] = useState("");
     const [progress, setProgress] = useState<CardProgress>();
-
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [showResetModal, setShowResetModal] = useState(false);
 
     useEffect(() => {
         const loadCard = async () => {
@@ -57,6 +60,17 @@ export default function EditCardScreen() {
         await deleteCard(cardId);
         router.back();
     };
+
+    const resetCard = async () => {
+        await resetCardProgress(cardId);
+        const cardProgress = await getCardProgress(cardId);
+
+        if (cardProgress) {
+            setProgress(cardProgress);
+        }
+
+    };
+
 
     return (
         <View style={styles.container}>
@@ -138,15 +152,114 @@ export default function EditCardScreen() {
 
             <Pressable
                 style={({ pressed }) => [
+                    styles.resetButton,
+                    pressed && styles.buttonPressed,
+                ]}
+                onPress={() => setShowResetModal(true)}
+            >
+                <Text style={styles.resetButtonText}>
+                    Reset Card
+                </Text>
+            </Pressable>
+
+            <Pressable
+                style={({ pressed }) => [
                     styles.deleteButton,
                     pressed && styles.buttonPressed,
                 ]}
-                onPress={removeCard}
+                onPress={() => setShowDeleteModal(true)}
             >
                 <Text style={styles.deleteButtonText}>
                     Delete Card
                 </Text>
             </Pressable>
+
+            <Modal
+                visible={showResetModal}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setShowResetModal(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modal}>
+                        <Text style={styles.modalTitle}>
+                            Reset Card Progress?
+                        </Text>
+
+                        <Text style={styles.modalText}>
+                            This will reset this card's learning progress
+                            back to the beginning.
+                        </Text>
+
+                        <View style={styles.modalButtons}>
+                            <Pressable
+                                style={styles.cancelButton}
+                                onPress={() => setShowResetModal(false)}
+                            >
+                                <Text style={styles.cancelButtonText}>
+                                    Cancel
+                                </Text>
+                            </Pressable>
+
+                            <Pressable
+                                style={styles.resetConfirmButton}
+                                onPress={async () => {
+                                    await resetCard();
+                                    setShowResetModal(false);
+                                }}
+                            >
+                                <Text style={styles.resetConfirmText}>
+                                    Reset
+                                </Text>
+                            </Pressable>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
+            <Modal
+                visible={showDeleteModal}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setShowDeleteModal(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modal}>
+                        <Text style={styles.modalTitle}>
+                            Delete Card?
+                        </Text>
+
+                        <Text style={styles.modalText}>
+                            Are you sure you want to permanently delete
+                            this card?
+                        </Text>
+
+                        <View style={styles.modalButtons}>
+                            <Pressable
+                                style={styles.cancelButton}
+                                onPress={() => setShowDeleteModal(false)}
+                            >
+                                <Text style={styles.cancelButtonText}>
+                                    Cancel
+                                </Text>
+                            </Pressable>
+
+                            <Pressable
+                                style={styles.deleteConfirmButton}
+                                onPress={async () => {
+                                    await removeCard();
+                                }}
+                            >
+                                <Text style={styles.deleteConfirmText}>
+                                    Delete
+                                </Text>
+                            </Pressable>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
+
         </View>
     );
 }
@@ -286,7 +399,100 @@ const styles = StyleSheet.create({
         fontWeight: "bold",
     },
 
+    resetButton: {
+        backgroundColor: "#3c3836",
+        borderWidth: 1,
+        borderColor: "#5992b1",
+        padding: 16,
+        borderRadius: 10,
+        alignItems: "center",
+        marginTop: 30,
+    },
+
+    resetButtonText: {
+        color: "#5992b1",
+        fontSize: 17,
+        fontWeight: "bold",
+    },
+
     buttonPressed: {
         opacity: 0.7,
+    },
+
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: "rgba(0, 0, 0, 0.65)",
+        justifyContent: "center",
+        alignItems: "center",
+    },
+
+    modal: {
+        width: "85%",
+        backgroundColor: "#3c3836",
+        borderWidth: 1,
+        borderColor: "#504945",
+        borderRadius: 15,
+        padding: 22,
+    },
+
+    modalTitle: {
+        color: "#ebdbb2",
+        fontSize: 22,
+        fontWeight: "bold",
+        marginBottom: 10,
+    },
+
+    modalText: {
+        color: "#a89984",
+        fontSize: 15,
+        lineHeight: 22,
+        marginBottom: 24,
+    },
+
+    modalButtons: {
+        flexDirection: "row",
+        gap: 10,
+    },
+
+    cancelButton: {
+        flex: 1,
+        backgroundColor: "#504945",
+        padding: 14,
+        borderRadius: 10,
+        alignItems: "center",
+    },
+
+    cancelButtonText: {
+        color: "#ebdbb2",
+        fontSize: 16,
+        fontWeight: "bold",
+    },
+
+    resetConfirmButton: {
+        flex: 1,
+        backgroundColor: "#5992b1",
+        padding: 14,
+        borderRadius: 10,
+        alignItems: "center",
+    },
+
+    resetConfirmText: {
+        color: "#282828",
+        fontSize: 16,
+        fontWeight: "bold",
+    },
+
+    deleteConfirmButton: {
+        flex: 1,
+        backgroundColor: "#cc241d",
+        padding: 14,
+        borderRadius: 10,
+        alignItems: "center",
+    },
+
+    deleteConfirmText: {
+        color: "#ebdbb2",
+        fontSize: 16,
+        fontWeight: "bold",
     },
 });

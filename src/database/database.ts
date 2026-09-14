@@ -91,6 +91,20 @@ export async function updateCard(
     );
 }
 
+export async function resetCardProgress(cardId: number) {
+    const database = await getDatabase();
+    await database.runAsync(
+        `
+        UPDATE card_progress
+        SET review_count = 0,
+            next_review_at = NULL,
+            mastered = 0
+        WHERE card_id = ?
+        `,
+        cardId
+    );
+}
+
 export async function getCardProgress(
     cardId: number
 ): Promise<CardProgress | undefined> {
@@ -238,8 +252,11 @@ export async function getProgressCounts(): Promise<{
         SELECT
             SUM(
                 CASE
-                    WHEN next_review_at IS NULL
-                      OR next_review_at <= ?
+                    WHEN mastered = 0
+                     AND (
+                        next_review_at IS NULL
+                        OR next_review_at <= ?
+                     )
                     THEN 1
                     ELSE 0
                 END
@@ -248,7 +265,8 @@ export async function getProgressCounts(): Promise<{
             SUM(
                 CASE
                     WHEN review_count > 0
-                      AND mastered = 0
+                     AND mastered = 0
+                     AND next_review_at > ?
                     THEN 1
                     ELSE 0
                 END
@@ -264,6 +282,7 @@ export async function getProgressCounts(): Promise<{
 
         FROM card_progress
         `,
+        Date.now(),
         Date.now()
     );
 
