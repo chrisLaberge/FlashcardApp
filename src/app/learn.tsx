@@ -1,7 +1,8 @@
 import NavigationButton from "@/components/NavigationButton";
-import { useFocusEffect } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import CardStack from "../components/CardStack";
 
 import {
@@ -11,21 +12,26 @@ import {
   markCardIncorrect,
 } from "../database/database";
 import { Card } from "../models/Card";
-import {
-  completedDeck,
-  deck,
-} from "../models/DeckManager";
+import { completedDeck, deck } from "../models/DeckManager";
 
 export default function LearnScreen() {
+  const insets = useSafeAreaInsets();
+
   const [sessionStart] = useState(Date.now());
 
-  const [currentCard, setCurrentCard] =
-    useState<Card | undefined>();
-
-  const [nextCard, setNextCard] =
-    useState<Card | undefined>();
-
+  const [currentCard, setCurrentCard] = useState<Card | undefined>();
+  const [nextCard, setNextCard] = useState<Card | undefined>();
   const [noCardsDue, setNoCardsDue] = useState(false);
+
+  const [reviewedCount, setReviewedCount] = useState(0);
+  const [correctCount, setCorrectCount] = useState(0);
+
+  /* --------------------------------- Loading -------------------------------- */
+
+  const advance = () => {
+    setCurrentCard(deck.getNextCard());
+    setNextCard(deck.peekNext());
+  };
 
   const loadCards = useCallback(async () => {
     const cards = await getDueCards();
@@ -41,9 +47,6 @@ export default function LearnScreen() {
     }
 
     setNoCardsDue(false);
-
-
-
     setCurrentCard(deck.getNextCard());
     setNextCard(deck.peekNext());
   }, []);
@@ -54,91 +57,73 @@ export default function LearnScreen() {
     }, [loadCards])
   );
 
-  const advance = () => {
-    setCurrentCard(deck.getNextCard());
-    setNextCard(deck.peekNext());
-  };
+  /* -------------------------------- Handlers -------------------------------- */
 
-  const handleDelete = async () => {
-    if (!currentCard?.id) {
-      return;
+  const handleSwipe = async (direction: "left" | "right") => {
+    if (currentCard?.id === undefined) return;
+
+    setReviewedCount((count) => count + 1);
+
+    if (direction === "left") {
+      await markCardIncorrect(currentCard.id);
+      deck.addToBack(currentCard);
+    } else {
+      setCorrectCount((count) => count + 1);
+      await markCardCorrect(currentCard.id);
+      completedDeck.addToBack(currentCard);
     }
-
-    await deleteCard(currentCard.id);
 
     advance();
   };
 
-  const [reviewedCount, setReviewedCount] = useState(0);
-  const [correctCount, setCorrectCount] = useState(0);
-  const [incorrectCount, setIncorrectCount] = useState(0);
+  const handleDelete = async () => {
+    if (!currentCard?.id) return;
 
-  return (
-    <View style={styles.container}>
-      {noCardsDue ? (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyTitle}>
-            🎉 You're caught up!
-          </Text>
+    await deleteCard(currentCard.id);
+    advance();
+  };
 
+  const handleEdit = () => {
+    if (!currentCard) return;
+
+    router.push({
+      pathname: "/editCard",
+      params: { id: currentCard.id },
+    });
+  };
+
+  /* --------------------------------- Screens -------------------------------- */
+
+  if (noCardsDue) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <View style={styles.messageContainer}>
+          <Text style={styles.emptyTitle}>🎉 You're caught up!</Text>
           <Text style={styles.emptySubtitle}>
             Come back when your next cards are ready.
           </Text>
         </View>
-      ) : currentCard ? (
-        <>
-          <CardStack
-            currentCard={currentCard}
-            nextCard={nextCard}
-            onSwipe={async (direction) => {
-              if (currentCard.id === undefined) {
-                return;
-              }
+      </View>
+    );
+  }
 
-              setReviewedCount((count) => count + 1);
+  if (!currentCard) {
+    const accuracy =
+      reviewedCount === 0
+        ? 0
+        : Math.round((correctCount / reviewedCount) * 100);
 
-              if (direction === "left") {
-                setIncorrectCount((count) => count + 1);
-
-                await markCardIncorrect(currentCard.id);
-                deck.addToBack(currentCard);
-              } else {
-                setCorrectCount((count) => count + 1);
-
-                await markCardCorrect(currentCard.id);
-                completedDeck.addToBack(currentCard);
-              }
-
-              advance();
-            }}
-            onDelete={handleDelete}
-          />
-
-          <NavigationButton />
-        </>
-      ) : (
-        <View style={styles.resultsContainer}>
-          <Text style={styles.resultsTitle}>
-            Session Complete
-          </Text>
-
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <View style={styles.messageContainer}>
+          <Text style={styles.resultsTitle}>Session Complete</Text>
           <Text style={styles.resultsSubtitle}>
             Nice work. Here's how you did.
           </Text>
 
           <View style={styles.mainStatCard}>
-            <Text style={styles.mainStatNumber}>
-              {reviewedCount === 0
-                ? 0
-                : Math.round(
-                  (correctCount / reviewedCount) * 100
-                )}
-              %
-            </Text>
-
-            <Text style={styles.mainStatLabel}>
-              Accuracy
-            </Text>
+            <Text style={styles.mainStatNumber}>{accuracy}%</Text>
+            <Text style={styles.mainStatLabel}>Accuracy</Text>
           </View>
 
           <View style={styles.statsRow}>
@@ -146,24 +131,51 @@ export default function LearnScreen() {
               <Text style={styles.statNumber}>
                 {formatStudyTime(Date.now() - sessionStart)}
               </Text>
-
-              <Text style={styles.statLabel}>
-                Time Spent
-              </Text>
+              <Text style={styles.statLabel}>Time Spent</Text>
             </View>
 
             <View style={styles.statCard}>
-              <Text style={styles.statNumber}>
-                {reviewedCount}
-              </Text>
-
-              <Text style={styles.statLabel}>
-                Total Reviews
-              </Text>
+              <Text style={styles.statNumber}>{reviewedCount}</Text>
+              <Text style={styles.statLabel}>Total Reviews</Text>
             </View>
           </View>
         </View>
-      )}
+      </View>
+    );
+  }
+
+  return (
+    <View
+      style={[
+        styles.container,
+        {
+          paddingTop: insets.top + 16,
+          paddingBottom: insets.bottom + 16,
+        },
+      ]}
+    >
+      {/* The card takes all the space left over by the controls below it */}
+      <View style={styles.cardArea}>
+        <CardStack
+          currentCard={currentCard}
+          nextCard={nextCard}
+          onSwipe={handleSwipe}
+          onDelete={handleDelete}
+        />
+      </View>
+
+      <Pressable
+        style={({ pressed }) => [
+          styles.editButton,
+          pressed && styles.editButtonPressed,
+        ]}
+        hitSlop={8}
+        onPress={handleEdit}
+      >
+        <Text style={styles.editText}>Edit card</Text>
+      </Pressable>
+
+      <NavigationButton />
     </View>
   );
 }
@@ -175,47 +187,102 @@ function formatStudyTime(milliseconds: number): string {
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
 
-  if (hours > 0) {
-    return `${hours}h ${minutes}m ${seconds}s`;
-  }
-
-  if (minutes > 0) {
-    return `${minutes}m ${seconds}s`;
-  }
-
+  if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
+  if (minutes > 0) return `${minutes}m ${seconds}s`;
   return `${seconds}s`;
 }
+
+/* -------------------------------------------------------------------------- */
+/*                                   Styles                                   */
+/* -------------------------------------------------------------------------- */
+
+const COLORS = {
+  background: "#282828",
+  surface: "#3c3836",
+  border: "#504945",
+  text: "#ebdbb2",
+  muted: "#a89984",
+  accent: "#d79921",
+  link: "#83a598",
+};
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: COLORS.background,
+  },
+
+  centered: {
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#282828",
   },
-  resultsContainer: {
+
+  messageContainer: {
     width: "90%",
     alignItems: "center",
   },
 
+  /* Study view */
+  cardArea: {
+    flex: 1,
+    marginHorizontal: 20,
+  },
+
+  editButton: {
+    alignSelf: "center",
+    marginTop: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  editButtonPressed: {
+    opacity: 0.5,
+  },
+
+  editText: {
+    color: COLORS.link,
+    fontSize: 14,
+    fontWeight: "500",
+  },
+
+  /* Empty state */
+  emptyTitle: {
+    color: COLORS.text,
+    fontSize: 28,
+    fontWeight: "bold",
+    textAlign: "center",
+    marginBottom: 10,
+  },
+
+  emptySubtitle: {
+    color: COLORS.muted,
+    fontSize: 16,
+    textAlign: "center",
+    lineHeight: 24,
+  },
+
+  /* Results */
   resultsTitle: {
-    color: "#ebdbb2",
+    color: COLORS.text,
     fontSize: 32,
     fontWeight: "bold",
     marginBottom: 6,
   },
 
   resultsSubtitle: {
-    color: "#a89984",
+    color: COLORS.muted,
     fontSize: 16,
     marginBottom: 30,
   },
 
   mainStatCard: {
     width: "100%",
-    backgroundColor: "#3c3836",
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: "#504945",
+    borderColor: COLORS.border,
     borderRadius: 15,
     paddingVertical: 25,
     alignItems: "center",
@@ -223,13 +290,13 @@ const styles = StyleSheet.create({
   },
 
   mainStatNumber: {
-    color: "#d79921",
+    color: COLORS.accent,
     fontSize: 48,
     fontWeight: "bold",
   },
 
   mainStatLabel: {
-    color: "#a89984",
+    color: COLORS.muted,
     fontSize: 15,
     marginTop: 4,
   },
@@ -242,44 +309,24 @@ const styles = StyleSheet.create({
 
   statCard: {
     flex: 1,
-    backgroundColor: "#3c3836",
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: "#504945",
+    borderColor: COLORS.border,
     borderRadius: 15,
     paddingVertical: 20,
     alignItems: "center",
   },
 
   statNumber: {
-    color: "#ebdbb2",
+    color: COLORS.text,
     fontSize: 22,
     fontWeight: "bold",
     marginBottom: 5,
   },
 
   statLabel: {
-    color: "#a89984",
+    color: COLORS.muted,
     fontSize: 13,
     textAlign: "center",
-  },
-
-  emptyContainer: {
-    width: "90%",
-    alignItems: "center",
-  },
-
-  emptyTitle: {
-    color: "#ebdbb2",
-    fontSize: 28,
-    fontWeight: "bold",
-    textAlign: "center",
-    marginBottom: 10,
-  },
-
-  emptySubtitle: {
-    color: "#a89984",
-    fontSize: 16,
-    textAlign: "center",
-    lineHeight: 24,
   },
 });
