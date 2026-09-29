@@ -5,7 +5,8 @@ import {
     ScrollView,
     StyleSheet,
     Text,
-    View,
+    TextInput,
+    View
 } from "react-native";
 import { getCards } from "../database/database";
 import { Card } from "../models/Card";
@@ -18,6 +19,13 @@ export default function CardsScreen() {
         setCards(loadedCards);
     }, []);
 
+    const [search, setSearch] = useState("");
+
+    const filteredCards = cards.filter((card) =>
+        card.front.toLowerCase().includes(search.toLowerCase()) ||
+        card.back.toLowerCase().includes(search.toLowerCase())
+    );
+
     useFocusEffect(
         useCallback(() => {
             loadCards();
@@ -28,6 +36,21 @@ export default function CardsScreen() {
         <View style={styles.container}>
             <Text style={styles.title}>My Cards</Text>
 
+            <View style={styles.searchContainer}>
+                <TextInput
+                    style={styles.searchInput}
+                    placeholder="Search cards..."
+                    placeholderTextColor="#a89984"
+                    value={search}
+                    onChangeText={setSearch}
+                />
+
+                <Text style={styles.searchCount}>
+                    {filteredCards.length}
+                </Text>
+            </View>
+
+
             <ScrollView
                 style={styles.list}
                 contentContainerStyle={styles.listContent}
@@ -37,7 +60,7 @@ export default function CardsScreen() {
                         You don't have any cards yet.
                     </Text>
                 ) : (
-                    cards.map((card) => (
+                    filteredCards.map((card) => (
                         <Pressable
                             key={card.id}
                             style={({ pressed }) => [
@@ -137,5 +160,29 @@ const styles = StyleSheet.create({
         fontSize: 16,
         textAlign: "center",
         marginTop: 40,
+    },
+
+
+    searchInput: {
+        flex: 1,
+        color: "#ebdbb2",
+        padding: 14,
+        fontSize: 16,
+    },
+
+    searchCount: {
+        color: "#83a598", // Gruvbox light blue
+        fontSize: 16,
+        fontWeight: "bold",
+        marginRight: 14,
+    },
+    searchContainer: {
+        flexDirection: "row",
+        alignItems: "center",
+        backgroundColor: "#3c3836",
+        borderWidth: 1,
+        borderColor: "#504945",
+        borderRadius: 12,
+        marginBottom: 20,
     },
 });
