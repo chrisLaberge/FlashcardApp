@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import {
@@ -6,25 +7,34 @@ import {
     StyleSheet,
     Text,
     TextInput,
-    View
+    View,
 } from "react-native";
 import { getCards } from "../database/database";
 import { Card } from "../models/Card";
 
 export default function CardsScreen() {
     const [cards, setCards] = useState<Card[]>([]);
+    const [search, setSearch] = useState("");
+    const [deckId, setDeckId] = useState<string | null>(null);
 
     const loadCards = useCallback(async () => {
-        const loadedCards = await getCards();
+        const lastDeckId =
+            await AsyncStorage.getItem("lastDeckId");
+
+        if (!lastDeckId) {
+            setDeckId(null);
+            setCards([]);
+            return;
+        }
+
+        setDeckId(lastDeckId);
+
+        const loadedCards = await getCards(
+            Number(lastDeckId)
+        );
+
         setCards(loadedCards);
     }, []);
-
-    const [search, setSearch] = useState("");
-
-    const filteredCards = cards.filter((card) =>
-        card.front.toLowerCase().includes(search.toLowerCase()) ||
-        card.back.toLowerCase().includes(search.toLowerCase())
-    );
 
     useFocusEffect(
         useCallback(() => {
@@ -32,9 +42,21 @@ export default function CardsScreen() {
         }, [loadCards])
     );
 
+    const filteredCards = cards.filter(
+        (card) =>
+            card.front
+                .toLowerCase()
+                .includes(search.toLowerCase()) ||
+            card.back
+                .toLowerCase()
+                .includes(search.toLowerCase())
+    );
+
     return (
         <View style={styles.container}>
-            <Text style={styles.title}>My Cards</Text>
+            <Text style={styles.title}>
+                My Cards
+            </Text>
 
             <View style={styles.searchContainer}>
                 <TextInput
@@ -49,7 +71,6 @@ export default function CardsScreen() {
                     {filteredCards.length}
                 </Text>
             </View>
-
 
             <ScrollView
                 style={styles.list}
@@ -71,7 +92,7 @@ export default function CardsScreen() {
                                 router.push({
                                     pathname: "/editCard",
                                     params: {
-                                        id: card.id,
+                                        id: String(card.id),
                                     },
                                 })
                             }
@@ -86,7 +107,9 @@ export default function CardsScreen() {
                                 </Text>
                             </View>
 
-                            <Text style={styles.arrow}>›</Text>
+                            <Text style={styles.arrow}>
+                                ›
+                            </Text>
                         </Pressable>
                     ))
                 )}
@@ -162,7 +185,6 @@ const styles = StyleSheet.create({
         marginTop: 40,
     },
 
-
     searchInput: {
         flex: 1,
         color: "#ebdbb2",
@@ -171,11 +193,12 @@ const styles = StyleSheet.create({
     },
 
     searchCount: {
-        color: "#83a598", // Gruvbox light blue
+        color: "#83a598",
         fontSize: 16,
         fontWeight: "bold",
         marginRight: 14,
     },
+
     searchContainer: {
         flexDirection: "row",
         alignItems: "center",

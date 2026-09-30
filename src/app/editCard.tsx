@@ -10,8 +10,8 @@ import {
 } from "react-native";
 import {
     deleteCard,
+    getCard,
     getCardProgress,
-    getCards,
     resetCardProgress,
     updateCard,
 } from "../database/database";
@@ -30,11 +30,7 @@ export default function EditCardScreen() {
 
     useEffect(() => {
         const loadCard = async () => {
-            const cards = await getCards();
-
-            const card = cards.find(
-                (card) => card.id === cardId
-            );
+            const card = await getCard(cardId);
 
             if (card) {
                 setFront(card.front);

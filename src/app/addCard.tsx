@@ -1,3 +1,4 @@
+import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import {
     Pressable,
@@ -9,14 +10,28 @@ import {
 import { addCard } from "../database/database";
 
 export default function AddCardScreen() {
+    const { deckId } = useLocalSearchParams<{ deckId?: string }>();
+
     const [front, setFront] = useState("");
     const [back, setBack] = useState("");
 
     const addCardToDatabase = async () => {
-        await addCard(front, back);
+        console.log("deckId:", deckId);
+        console.log("front:", front);
+        console.log("back:", back);
+
+        if (!deckId) return;
+
+        await addCard(
+            front,
+            back,
+            Number(deckId)
+        );
 
         setFront("");
         setBack("");
+
+        router.back();
     };
 
     return (
@@ -122,4 +137,3 @@ const styles = StyleSheet.create({
         fontWeight: "bold",
     },
 });
-

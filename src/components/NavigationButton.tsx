@@ -1,14 +1,21 @@
 import { router } from "expo-router";
 import { Pressable, StyleSheet, Text } from "react-native";
 
-export default function NavigationButton() {
+export default function NavigationButton({ deckId }: { deckId?: string }) {
     return (
         <Pressable
             style={({ pressed }) => [
                 styles.button,
                 pressed && styles.buttonPressed,
             ]}
-            onPress={() => router.push("/addCard")}
+            onPress={() => {
+                router.push({
+                    pathname: "/addCard",
+                    params: {
+                        deckId: String(deckId),
+                    },
+                });
+            }}
         >
             <Text style={styles.text}>+ Add Card</Text>
         </Pressable>

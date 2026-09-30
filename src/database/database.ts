@@ -12,10 +12,23 @@ async function getDatabase() {
         await db.execAsync(`
             PRAGMA foreign_keys = ON;
 
+
+             CREATE TABLE IF NOT EXISTS decks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                language TEXT NOT NULL
+            );
+
+
             CREATE TABLE IF NOT EXISTS cards (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                deck_id INTEGER NOT NULL,
                 front TEXT NOT NULL,
-                back TEXT NOT NULL
+                back TEXT NOT NULL,
+
+                FOREIGN KEY (deck_id)   
+                    REFERENCES decks(id)
+                     ON DELETE CASCADE
             );
 
             CREATE TABLE IF NOT EXISTS card_progress (
@@ -37,14 +50,16 @@ async function getDatabase() {
 
 export async function addCard(
     front: string,
-    back: string
+    back: string,
+    deckId: number
 ) {
     const database = await getDatabase();
 
     const result = await database.runAsync(
-        "INSERT INTO cards (front, back) VALUES (?, ?)",
+        "INSERT INTO cards (front, back, deck_id) VALUES (?, ?, ?)",
         front,
-        back
+        back,
+        deckId
     );
 
     await database.runAsync(
@@ -53,14 +68,14 @@ export async function addCard(
     );
 }
 
-export async function getCards(): Promise<Card[]> {
+export async function getCards(deckId: number): Promise<Card[]> {
     const database = await getDatabase();
 
     const rows = await database.getAllAsync<{
         id: number;
         front: string;
         back: string;
-    }>("SELECT * FROM cards");
+    }>("SELECT * FROM cards WHERE deck_id = ?", deckId);
 
     return rows.map(
         (row) => new Card(row.front, row.back, row.id)
@@ -192,7 +207,9 @@ export async function markCardIncorrect(cardId: number) {
     );
 }
 
-export async function getDueCards(): Promise<Card[]> {
+export async function getDueCards(
+    deckId: number
+): Promise<Card[]> {
     const database = await getDatabase();
 
     const rows = await database.getAllAsync<{
@@ -205,9 +222,13 @@ export async function getDueCards(): Promise<Card[]> {
         FROM cards
         JOIN card_progress
             ON cards.id = card_progress.card_id
-        WHERE card_progress.next_review_at IS NULL
-           OR card_progress.next_review_at <= ?
+        WHERE cards.deck_id = ?
+          AND (
+              card_progress.next_review_at IS NULL
+              OR card_progress.next_review_at <= ?
+          )
         `,
+        deckId,
         Date.now()
     );
 
@@ -236,7 +257,9 @@ export async function getDueCardCount(): Promise<number> {
     return row?.count ?? 0;
 }
 
-export async function getProgressCounts(): Promise<{
+export async function getProgressCounts(
+    deckId: number
+): Promise<{
     due: number;
     practiced: number;
     mastered: number;
@@ -244,18 +267,18 @@ export async function getProgressCounts(): Promise<{
     const database = await getDatabase();
 
     const row = await database.getFirstAsync<{
-        due: number;
-        practiced: number;
-        mastered: number;
+        due: number | null;
+        practiced: number | null;
+        mastered: number | null;
     }>(
         `
         SELECT
             SUM(
                 CASE
-                    WHEN mastered = 0
+                    WHEN card_progress.mastered = 0
                      AND (
-                        next_review_at IS NULL
-                        OR next_review_at <= ?
+                        card_progress.next_review_at IS NULL
+                        OR card_progress.next_review_at <= ?
                      )
                     THEN 1
                     ELSE 0
@@ -264,9 +287,9 @@ export async function getProgressCounts(): Promise<{
 
             SUM(
                 CASE
-                    WHEN review_count > 0
-                     AND mastered = 0
-                     AND next_review_at > ?
+                    WHEN card_progress.review_count > 0
+                     AND card_progress.mastered = 0
+                     AND card_progress.next_review_at > ?
                     THEN 1
                     ELSE 0
                 END
@@ -274,16 +297,20 @@ export async function getProgressCounts(): Promise<{
 
             SUM(
                 CASE
-                    WHEN mastered = 1
+                    WHEN card_progress.mastered = 1
                     THEN 1
                     ELSE 0
                 END
             ) AS mastered
 
-        FROM card_progress
+        FROM cards
+        JOIN card_progress
+            ON cards.id = card_progress.card_id
+        WHERE cards.deck_id = ?
         `,
         Date.now(),
-        Date.now()
+        Date.now(),
+        deckId
     );
 
     return {
@@ -291,4 +318,65 @@ export async function getProgressCounts(): Promise<{
         practiced: row?.practiced ?? 0,
         mastered: row?.mastered ?? 0,
     };
+}
+
+export async function addDeck(name: string, language: string) {
+    const database = await getDatabase();
+
+    const result = await database.runAsync(
+        "INSERT INTO decks (name, language) VALUES (?, ?)",
+        name,
+        language
+    );
+
+    return result.lastInsertRowId;
+}
+
+export async function getDecks() {
+    const database = await getDatabase();
+    return await database.getAllAsync<{
+        id: number;
+        name: string;
+        language: string;
+        card_count: number;
+    }>(`SELECT
+    decks.id,
+    decks.name,
+    decks.language,
+    COUNT(cards.id) AS card_count
+ FROM decks
+ LEFT JOIN cards ON cards.deck_id = decks.id
+ GROUP BY decks.id
+ ORDER BY decks.id`);
+
+
+}
+export async function deleteDeck(id: number) {
+    const database = await getDatabase();
+
+    await database.runAsync(
+        "DELETE FROM decks WHERE id = ?",
+        id
+    );
+}
+
+export async function getCard(id: number): Promise<Card | undefined> {
+    const database = await getDatabase();
+
+    const row = await database.getFirstAsync<{
+        id: number;
+        front: string;
+        back: string;
+    }>(
+        "SELECT * FROM cards WHERE id = ?",
+        id
+    );
+
+    if (!row) return undefined;
+
+    return new Card(
+        row.front,
+        row.back,
+        row.id
+    );
 }

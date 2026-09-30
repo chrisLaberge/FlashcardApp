@@ -1,4 +1,5 @@
 import NavigationButton from "@/components/NavigationButton";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
@@ -26,7 +27,10 @@ export default function LearnScreen() {
   const [reviewedCount, setReviewedCount] = useState(0);
   const [correctCount, setCorrectCount] = useState(0);
 
+  const [selectedDeckId, setSelectedDeckId] = useState<string | undefined>();
+
   /* --------------------------------- Loading -------------------------------- */
+
 
   const advance = () => {
     setCurrentCard(deck.getNextCard());
@@ -34,7 +38,20 @@ export default function LearnScreen() {
   };
 
   const loadCards = useCallback(async () => {
-    const cards = await getDueCards();
+    const lastDeckId =
+      await AsyncStorage.getItem("lastDeckId");
+
+    if (!lastDeckId) {
+      setNoCardsDue(true);
+      return;
+    }
+
+    setSelectedDeckId(lastDeckId);
+
+    const cards = await getDueCards(
+      Number(lastDeckId)
+    );
+
     deck.clear();
 
     for (const card of cards) {
@@ -56,7 +73,6 @@ export default function LearnScreen() {
       loadCards();
     }, [loadCards])
   );
-
   /* -------------------------------- Handlers -------------------------------- */
 
   const handleSwipe = async (direction: "left" | "right") => {
@@ -88,7 +104,7 @@ export default function LearnScreen() {
 
     router.push({
       pathname: "/editCard",
-      params: { id: currentCard.id },
+      params: { id: String(currentCard.id) },
     });
   };
 
@@ -99,10 +115,13 @@ export default function LearnScreen() {
       <View style={[styles.container, styles.centered]}>
         <View style={styles.messageContainer}>
           <Text style={styles.emptyTitle}>🎉 You're caught up!</Text>
+
           <Text style={styles.emptySubtitle}>
             Come back when your next cards are ready.
           </Text>
         </View>
+
+        <NavigationButton deckId={selectedDeckId} />
       </View>
     );
   }
@@ -116,30 +135,50 @@ export default function LearnScreen() {
     return (
       <View style={[styles.container, styles.centered]}>
         <View style={styles.messageContainer}>
-          <Text style={styles.resultsTitle}>Session Complete</Text>
+          <Text style={styles.resultsTitle}>
+            Session Complete
+          </Text>
+
           <Text style={styles.resultsSubtitle}>
             Nice work. Here's how you did.
           </Text>
 
           <View style={styles.mainStatCard}>
-            <Text style={styles.mainStatNumber}>{accuracy}%</Text>
-            <Text style={styles.mainStatLabel}>Accuracy</Text>
+            <Text style={styles.mainStatNumber}>
+              {accuracy}%
+            </Text>
+
+            <Text style={styles.mainStatLabel}>
+              Accuracy
+            </Text>
           </View>
 
           <View style={styles.statsRow}>
             <View style={styles.statCard}>
               <Text style={styles.statNumber}>
-                {formatStudyTime(Date.now() - sessionStart)}
+                {formatStudyTime(
+                  Date.now() - sessionStart
+                )}
               </Text>
-              <Text style={styles.statLabel}>Time Spent</Text>
+
+              <Text style={styles.statLabel}>
+                Time Spent
+              </Text>
             </View>
 
             <View style={styles.statCard}>
-              <Text style={styles.statNumber}>{reviewedCount}</Text>
-              <Text style={styles.statLabel}>Total Reviews</Text>
+              <Text style={styles.statNumber}>
+                {reviewedCount}
+              </Text>
+
+              <Text style={styles.statLabel}>
+                Total Reviews
+              </Text>
             </View>
           </View>
         </View>
+
+        <NavigationButton deckId={selectedDeckId} />
       </View>
     );
   }
@@ -154,7 +193,6 @@ export default function LearnScreen() {
         },
       ]}
     >
-      {/* The card takes all the space left over by the controls below it */}
       <View style={styles.cardArea}>
         <CardStack
           currentCard={currentCard}
@@ -172,10 +210,12 @@ export default function LearnScreen() {
         hitSlop={8}
         onPress={handleEdit}
       >
-        <Text style={styles.editText}>Edit card</Text>
+        <Text style={styles.editText}>
+          Edit card
+        </Text>
       </Pressable>
 
-      <NavigationButton />
+      <NavigationButton deckId={selectedDeckId} />
     </View>
   );
 }
@@ -187,14 +227,16 @@ function formatStudyTime(milliseconds: number): string {
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
 
-  if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
-  if (minutes > 0) return `${minutes}m ${seconds}s`;
+  if (hours > 0) {
+    return `${hours}h ${minutes}m ${seconds}s`;
+  }
+
+  if (minutes > 0) {
+    return `${minutes}m ${seconds}s`;
+  }
+
   return `${seconds}s`;
 }
-
-/* -------------------------------------------------------------------------- */
-/*                                   Styles                                   */
-/* -------------------------------------------------------------------------- */
 
 const COLORS = {
   background: "#282828",
@@ -222,7 +264,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 
-  /* Study view */
   cardArea: {
     flex: 1,
     marginHorizontal: 20,
@@ -248,7 +289,6 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
 
-  /* Empty state */
   emptyTitle: {
     color: COLORS.text,
     fontSize: 28,
@@ -264,7 +304,6 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
 
-  /* Results */
   resultsTitle: {
     color: COLORS.text,
     fontSize: 32,
