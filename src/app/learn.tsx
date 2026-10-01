@@ -5,9 +5,11 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import CardStack from "../components/CardStack";
 
+import { getTTSLanguageCode } from "@/constants/languages";
 import {
   deleteCard,
   getCardProgress,
+  getDecks,
   getDueCards,
   markCardCorrect,
   markCardIncorrect,
@@ -36,6 +38,7 @@ export default function LearnScreen() {
   const [correctCount, setCorrectCount] = useState(0);
 
   const [selectedDeckId, setSelectedDeckId] = useState<string | undefined>();
+  const [ttsCode, setTtsCode] = useState<string | undefined>();
 
   // Bumped whenever the visible card changes so CardStack remounts cleanly
   const [cardKey, setCardKey] = useState(0);
@@ -74,7 +77,15 @@ export default function LearnScreen() {
       setNoCardsDue(true);
       return;
     }
+  const decks = await getDecks();
 
+  const selectedDeck = decks.find(
+      (d) => d.id === Number(lastDeckId)
+  );
+
+  const ttsCode = getTTSLanguageCode(selectedDeck?.language ?? "");
+    
+    setTtsCode(ttsCode);
     setNoCardsDue(false);
     setHistory([]);
     isProcessing.current = false;
@@ -281,6 +292,7 @@ export default function LearnScreen() {
           cardKey={cardKey}
           onSwipe={handleSwipe}
           onDelete={handleDelete}
+          ttsCode={ttsCode}
         />
       </View>
 

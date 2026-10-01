@@ -1,9 +1,11 @@
-import { useRef, useState } from "react";
+import * as Speech from "expo-speech";
+import { useEffect, useRef, useState } from "react";
 import {
     Animated,
     Dimensions,
     PanResponder,
     PanResponderGestureState,
+    Pressable,
     StyleSheet,
     Text,
     View,
@@ -42,6 +44,7 @@ const randomPromptSide = (): PromptSide =>
 const textFor = (card: Card, side: PromptSide) =>
     side === "front" ? card.front : card.back;
 
+
 /* -------------------------------------------------------------------------- */
 /*                                   Wrapper                                  */
 /* -------------------------------------------------------------------------- */
@@ -49,6 +52,7 @@ const textFor = (card: Card, side: PromptSide) =>
 interface CardStackProps {
     currentCard: Card;
     nextCard?: Card;
+    ttsCode?: string;
     /** Change this whenever the visible card changes (advance, undo, reload). */
     cardKey: number;
     onSwipe: (direction: Direction) => void;
@@ -63,6 +67,7 @@ export default function CardStack({
     currentCard,
     nextCard,
     cardKey,
+    ttsCode,
     onSwipe,
     onDelete,
 }: CardStackProps) {
@@ -94,6 +99,7 @@ export default function CardStack({
                 initialNextSide={nextCard ? getSide(nextCard) : "front"}
                 onSwipe={handleSwipe}
                 onDelete={onDelete}
+                ttsCode={ttsCode}
             />
         </View>
     );
@@ -108,6 +114,7 @@ interface ActiveCardsProps {
     nextCard?: Card;
     initialPromptSide: PromptSide;
     initialNextSide: PromptSide;
+    ttsCode?: string;
     onSwipe: (direction: Direction) => void;
     onDelete: () => void;
 }
@@ -117,6 +124,7 @@ function ActiveCards({
     nextCard,
     initialPromptSide,
     initialNextSide,
+    ttsCode,
     onSwipe,
     onDelete,
 }: ActiveCardsProps) {
@@ -267,6 +275,40 @@ function ActiveCards({
         promptSide === "front" ? "back" : "front"
     );
 
+    const visibleText = hasFlipped ? answerText : promptText;
+
+   /* const speak = async () => {
+        console.log("Speak button pressed");
+        console.log("Text:", visibleText);
+        console.log("TTS code:", ttsCode);
+
+        const voices = await Speech.getAvailableVoicesAsync();
+        console.log("Voices:", voices);
+
+        Speech.stop();
+        Speech.speak(visibleText, {
+            language: ttsCode,
+            rate: 0.9,
+        });
+        
+
+    }; */
+
+    const speak = () => {
+        console.log("visibleText:", JSON.stringify(visibleText));
+        console.log("ttsCode:", JSON.stringify(ttsCode));
+
+        Speech.stop();
+
+        Speech.speak(visibleText, {
+            language: ttsCode,
+            rate: 1.0,
+        });
+    };
+
+// Stop audio when this card goes away (swipe, delete, undo)
+useEffect(() => () => { Speech.stop(); }, []);
+
     return (
         <>
             {/* NEXT CARD - now shows its real prompt */}
@@ -341,6 +383,11 @@ function ActiveCards({
                     <Text style={styles.hintText}>{promptText}</Text>
                     <Text style={styles.cardText}>{answerText}</Text>
                 </Animated.View>
+
+                <Pressable style={styles.speakButton} onPress={speak} hitSlop={10}>
+
+                    <Text style={styles.speakIcon}>🔊</Text>
+                </Pressable>
             </Animated.View>
         </>
     );
@@ -431,4 +478,20 @@ const styles = StyleSheet.create({
         fontSize: 17,
         fontWeight: "bold",
     },
+    speakButton: {
+        position: "absolute",
+        bottom: 16,
+        right: 16,
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: COLORS.cardBorder,
+        zIndex: 5,
+    },
+
+    speakIcon: {
+        fontSize: 18,
+},
 });

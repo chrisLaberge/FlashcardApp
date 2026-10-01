@@ -5,7 +5,6 @@ import { useCallback, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { getLanguage } from "../constants/languages";
 import { getDecks, getProgressCounts } from "../database/database";
-
 export default function HomeScreen() {
     const [dueCount, setDueCount] = useState(0);
     const [practicedCount, setPracticedCount] = useState(0);
