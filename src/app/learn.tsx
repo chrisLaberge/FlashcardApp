@@ -1,19 +1,27 @@
-import NavigationButton from "@/components/NavigationButton";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import CardStack from "../components/CardStack";
 
 import {
   deleteCard,
+  getCardProgress,
   getDueCards,
   markCardCorrect,
   markCardIncorrect,
+  updateCardProgress,
 } from "../database/database";
 import { Card } from "../models/Card";
+import { CardProgress } from "../models/CardProgress";
 import { completedDeck, deck } from "../models/DeckManager";
+
+type HistoryEntry = {
+  card: Card;
+  direction: "left" | "right";
+  previousProgress?: CardProgress;
+};
 
 export default function LearnScreen() {
   const insets = useSafeAreaInsets();
@@ -29,17 +37,22 @@ export default function LearnScreen() {
 
   const [selectedDeckId, setSelectedDeckId] = useState<string | undefined>();
 
-  /* --------------------------------- Loading -------------------------------- */
+  // Bumped whenever the visible card changes so CardStack remounts cleanly
+  const [cardKey, setCardKey] = useState(0);
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const isProcessing = useRef(false);
 
+  /* --------------------------------- Loading -------------------------------- */
 
   const advance = () => {
     setCurrentCard(deck.getNextCard());
     setNextCard(deck.peekNext());
+    setCardKey((k) => k + 1);
+    isProcessing.current = false;
   };
 
   const loadCards = useCallback(async () => {
-    const lastDeckId =
-      await AsyncStorage.getItem("lastDeckId");
+    const lastDeckId = await AsyncStorage.getItem("lastDeckId");
 
     if (!lastDeckId) {
       setNoCardsDue(true);
@@ -48,11 +61,10 @@ export default function LearnScreen() {
 
     setSelectedDeckId(lastDeckId);
 
-    const cards = await getDueCards(
-      Number(lastDeckId)
-    );
+    const cards = await getDueCards(Number(lastDeckId));
 
     deck.clear();
+    completedDeck.clear();
 
     for (const card of cards) {
       deck.addToBack(card);
@@ -64,6 +76,9 @@ export default function LearnScreen() {
     }
 
     setNoCardsDue(false);
+    setHistory([]);
+    isProcessing.current = false;
+    setCardKey((k) => k + 1);
     setCurrentCard(deck.getNextCard());
     setNextCard(deck.peekNext());
   }, []);
@@ -73,10 +88,19 @@ export default function LearnScreen() {
       loadCards();
     }, [loadCards])
   );
+
   /* -------------------------------- Handlers -------------------------------- */
 
   const handleSwipe = async (direction: "left" | "right") => {
     if (currentCard?.id === undefined) return;
+    isProcessing.current = true;
+
+    // Snapshot progress so the swipe can be undone
+    const previousProgress = await getCardProgress(currentCard.id);
+    setHistory((h) => [
+      ...h,
+      { card: currentCard, direction, previousProgress },
+    ]);
 
     setReviewedCount((count) => count + 1);
 
@@ -92,10 +116,55 @@ export default function LearnScreen() {
     advance();
   };
 
+  const handleUndo = async () => {
+    if (isProcessing.current) return;
+
+    const last = history[history.length - 1];
+    if (!last) return;
+
+    isProcessing.current = true;
+    setHistory((h) => h.slice(0, -1));
+
+    const { card, direction, previousProgress } = last;
+
+    // Restore the DB progress to what it was before the swipe
+    if (card.id !== undefined && previousProgress) {
+      await updateCardProgress(
+        card.id,
+        previousProgress.reviewCount,
+        previousProgress.nextReviewAt,
+        previousProgress.mastered
+      );
+    }
+
+    // Take the card back out of wherever the swipe put it
+    if (direction === "left") {
+      deck.removeById(card.id);
+    } else {
+      completedDeck.removeById(card.id);
+      setCorrectCount((c) => c - 1);
+    }
+    setReviewedCount((c) => c - 1);
+
+    // Put the card we were looking at back in line
+    if (currentCard && currentCard.id !== card.id) {
+      deck.addToFront(currentCard);
+    }
+
+    setNoCardsDue(false);
+    setCurrentCard(card);
+    setNextCard(deck.peekNext());
+    setCardKey((k) => k + 1);
+    isProcessing.current = false;
+  };
+
   const handleDelete = async () => {
     if (!currentCard?.id) return;
 
-    await deleteCard(currentCard.id);
+    const deletedId = currentCard.id;
+
+    await deleteCard(deletedId);
+    setHistory((h) => h.filter((entry) => entry.card.id !== deletedId));
     advance();
   };
 
@@ -108,6 +177,27 @@ export default function LearnScreen() {
     });
   };
 
+  const handleAdd = () => {
+    router.push({
+      pathname: "/addCard",
+      params: { deckId: String(selectedDeckId) },
+    });
+  };
+
+  /* --------------------------------- Buttons -------------------------------- */
+
+  const undoDisabled = history.length === 0;
+
+  const undoButton = (
+    <ActionButton
+      label="↩ Undo"
+      onPress={handleUndo}
+      disabled={undoDisabled}
+    />
+  );
+  const editButton = <ActionButton label="Edit card" onPress={handleEdit} />;
+  const addButton = <ActionButton label="+ Add" onPress={handleAdd} />;
+
   /* --------------------------------- Screens -------------------------------- */
 
   if (noCardsDue) {
@@ -119,9 +209,11 @@ export default function LearnScreen() {
           <Text style={styles.emptySubtitle}>
             Come back when your next cards are ready.
           </Text>
-        </View>
 
-        <NavigationButton deckId={selectedDeckId} />
+          <View style={[styles.actionsRow, styles.singleAction]}>
+            {addButton}
+          </View>
+        </View>
       </View>
     );
   }
@@ -135,50 +227,39 @@ export default function LearnScreen() {
     return (
       <View style={[styles.container, styles.centered]}>
         <View style={styles.messageContainer}>
-          <Text style={styles.resultsTitle}>
-            Session Complete
-          </Text>
+          <Text style={styles.resultsTitle}>Session Complete</Text>
 
           <Text style={styles.resultsSubtitle}>
             Nice work. Here's how you did.
           </Text>
 
           <View style={styles.mainStatCard}>
-            <Text style={styles.mainStatNumber}>
-              {accuracy}%
-            </Text>
+            <Text style={styles.mainStatNumber}>{accuracy}%</Text>
 
-            <Text style={styles.mainStatLabel}>
-              Accuracy
-            </Text>
+            <Text style={styles.mainStatLabel}>Accuracy</Text>
           </View>
 
           <View style={styles.statsRow}>
             <View style={styles.statCard}>
               <Text style={styles.statNumber}>
-                {formatStudyTime(
-                  Date.now() - sessionStart
-                )}
+                {formatStudyTime(Date.now() - sessionStart)}
               </Text>
 
-              <Text style={styles.statLabel}>
-                Time Spent
-              </Text>
+              <Text style={styles.statLabel}>Time Spent</Text>
             </View>
 
             <View style={styles.statCard}>
-              <Text style={styles.statNumber}>
-                {reviewedCount}
-              </Text>
+              <Text style={styles.statNumber}>{reviewedCount}</Text>
 
-              <Text style={styles.statLabel}>
-                Total Reviews
-              </Text>
+              <Text style={styles.statLabel}>Total Reviews</Text>
             </View>
           </View>
-        </View>
 
-        <NavigationButton deckId={selectedDeckId} />
+          <View style={[styles.actionsRow, styles.resultsActions]}>
+            {undoButton}
+            {addButton}
+          </View>
+        </View>
       </View>
     );
   }
@@ -197,26 +278,46 @@ export default function LearnScreen() {
         <CardStack
           currentCard={currentCard}
           nextCard={nextCard}
+          cardKey={cardKey}
           onSwipe={handleSwipe}
           onDelete={handleDelete}
         />
       </View>
 
-      <Pressable
-        style={({ pressed }) => [
-          styles.editButton,
-          pressed && styles.editButtonPressed,
-        ]}
-        hitSlop={8}
-        onPress={handleEdit}
-      >
-        <Text style={styles.editText}>
-          Edit card
-        </Text>
-      </Pressable>
-
-      <NavigationButton deckId={selectedDeckId} />
+      <View style={[styles.actionsRow, styles.mainActions]}>
+        {undoButton}
+        {editButton}
+        {addButton}
+      </View>
     </View>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*                                   Helpers                                  */
+/* -------------------------------------------------------------------------- */
+
+function ActionButton({
+  label,
+  onPress,
+  disabled = false,
+}: {
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <Pressable
+      disabled={disabled}
+      onPress={onPress}
+      hitSlop={8}
+      style={({ pressed }) => [
+        styles.actionButton,
+        (pressed || disabled) && styles.actionButtonPressed,
+      ]}
+    >
+      <Text style={styles.actionText}>{label}</Text>
+    </Pressable>
   );
 }
 
@@ -269,21 +370,41 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
   },
 
-  editButton: {
-    alignSelf: "center",
+  /* Action row: every button gets an equal share of the width */
+  actionsRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+
+  mainActions: {
     marginTop: 16,
-    paddingVertical: 8,
-    paddingHorizontal: 20,
+    marginHorizontal: 20,
+  },
+
+  resultsActions: {
+    width: "100%",
+    marginTop: 24,
+  },
+
+  singleAction: {
+    width: "50%",
+    marginTop: 24,
+  },
+
+  actionButton: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 10,
     borderRadius: 999,
     borderWidth: 1,
     borderColor: COLORS.border,
   },
 
-  editButtonPressed: {
+  actionButtonPressed: {
     opacity: 0.5,
   },
 
-  editText: {
+  actionText: {
     color: COLORS.link,
     fontSize: 14,
     fontWeight: "500",

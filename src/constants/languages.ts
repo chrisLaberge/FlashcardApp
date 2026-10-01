@@ -18,7 +18,7 @@ export const languages: Language[] = [
     { name: "Marathi", nativeName: "मराठी", code: "mr", flag: "🇮🇳" },
     { name: "Vietnamese", nativeName: "Tiếng Việt", code: "vi", flag: "🇻🇳" },
     { name: "Telugu", nativeName: "తెలుగు", code: "te", flag: "🇮🇳" },
-    { name: "Turkish", nativeName: "Türkçe", code: "tr", flag: "🇹🇷" },
+
     { name: "Tamil", nativeName: "தமிழ்", code: "ta", flag: "🇮🇳" },
     { name: "Cantonese", nativeName: "廣東話", code: "yue", flag: "🇭🇰" },
     { name: "Korean", nativeName: "한국어", code: "ko", flag: "🇰🇷" },
@@ -57,7 +57,6 @@ export const languages: Language[] = [
     { name: "Hebrew", nativeName: "עברית", code: "he", flag: "🇮🇱" },
 
     { name: "Finnish", nativeName: "Suomi", code: "fi", flag: "🇫🇮" },
-    { name: "Azerbaijani", nativeName: "Azərbaycan dili", code: "az", flag: "🇦🇿" },
     { name: "Serbian", nativeName: "Српски", code: "sr", flag: "🇷🇸" },
     { name: "Bulgarian", nativeName: "Български", code: "bg", flag: "🇧🇬" },
     { name: "Danish", nativeName: "Dansk", code: "da", flag: "🇩🇰" },

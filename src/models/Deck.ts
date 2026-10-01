@@ -19,6 +19,15 @@ export class Deck {
         this.cards.push(card);
     }
 
+    addToFront(card: Card): void {
+    this.cards.unshift(card);
+}
+
+removeById(id?: number): void {
+    const i = this.cards.findIndex((c) => c.id === id);
+    if (i !== -1) this.cards.splice(i, 1);
+}
+
     clear(): void {
         this.cards = [];
     }

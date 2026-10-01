@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import {
     Animated,
     Dimensions,
@@ -9,10 +9,6 @@ import {
     View,
 } from "react-native";
 import { Card } from "../models/Card";
-
-/* -------------------------------------------------------------------------- */
-/*                                  Constants                                 */
-/* -------------------------------------------------------------------------- */
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } =
     Dimensions.get("window");
@@ -27,10 +23,6 @@ const FLIP_DURATION = 500;
 
 type Direction = "left" | "right";
 type PromptSide = "front" | "back";
-
-/* -------------------------------------------------------------------------- */
-/*                               Gesture helpers                              */
-/* -------------------------------------------------------------------------- */
 
 const isMostlyVertical = (g: PanResponderGestureState) =>
     Math.abs(g.dy) > Math.abs(g.dx);
@@ -47,69 +39,107 @@ const isTap = (g: PanResponderGestureState) =>
 const randomPromptSide = (): PromptSide =>
     Math.random() < 0.5 ? "front" : "back";
 
+const textFor = (card: Card, side: PromptSide) =>
+    side === "front" ? card.front : card.back;
+
 /* -------------------------------------------------------------------------- */
-/*                                  Component                                 */
+/*                                   Wrapper                                  */
 /* -------------------------------------------------------------------------- */
 
 interface CardStackProps {
     currentCard: Card;
     nextCard?: Card;
+    /** Change this whenever the visible card changes (advance, undo, reload). */
+    cardKey: number;
     onSwipe: (direction: Direction) => void;
     onDelete: () => void;
 }
 
 /**
- * Fills whatever space its parent gives it.
- *
- * Each card starts by showing ONE side (randomly front or back) - the prompt.
- * Tapping flips it to reveal the other side (the answer), with the original
- * prompt kept as small text above it. The next card starts fresh again.
+ * Decides which side each card starts on, so the card waiting behind the
+ * current one can already show the same prompt it will have once it's on top.
  */
 export default function CardStack({
     currentCard,
     nextCard,
+    cardKey,
     onSwipe,
     onDelete,
 }: CardStackProps) {
-    /* ------------------------------ State / refs ------------------------------ */
+    const sides = useRef(new Map<number, PromptSide>()).current;
 
-    const [promptSide, setPromptSide] = useState<PromptSide>("front");
+    const getSide = (card: Card): PromptSide => {
+        const id = card.id ?? -1;
+        let side = sides.get(id);
+        if (!side) {
+            side = randomPromptSide();
+            sides.set(id, side);
+        }
+        return side;
+    };
+
+    const handleSwipe = (direction: Direction) => {
+        // Forget the side so a repeated card gets a fresh random one
+        sides.delete(currentCard.id ?? -1);
+        onSwipe(direction);
+    };
+
+    return (
+        <View style={styles.container}>
+            <ActiveCards
+                key={cardKey}
+                currentCard={currentCard}
+                nextCard={nextCard}
+                initialPromptSide={getSide(currentCard)}
+                initialNextSide={nextCard ? getSide(nextCard) : "front"}
+                onSwipe={handleSwipe}
+                onDelete={onDelete}
+            />
+        </View>
+    );
+}
+
+/* -------------------------------------------------------------------------- */
+/*                      Current + next card (remounted per card)              */
+/* -------------------------------------------------------------------------- */
+
+interface ActiveCardsProps {
+    currentCard: Card;
+    nextCard?: Card;
+    initialPromptSide: PromptSide;
+    initialNextSide: PromptSide;
+    onSwipe: (direction: Direction) => void;
+    onDelete: () => void;
+}
+
+function ActiveCards({
+    currentCard,
+    nextCard,
+    initialPromptSide,
+    initialNextSide,
+    onSwipe,
+    onDelete,
+}: ActiveCardsProps) {
+    // Frozen for the lifetime of this mount, so re-renders can't change them
+    const [promptSide] = useState(initialPromptSide);
+    const [nextSide] = useState(initialNextSide);
+
     const [hasFlipped, setHasFlipped] = useState(false);
     const [deletePreview, setDeletePreview] = useState(false);
 
+    // Fresh values on every mount, so no reset step is needed
     const position = useRef(new Animated.ValueXY()).current;
     const nextCardProgress = useRef(new Animated.Value(0)).current;
-
-    // 0 = prompt face showing, 1 = answer face showing
     const flipAnimation = useRef(new Animated.Value(0)).current;
 
-    // Blocks touches while a swipe/delete animation is running
     const isLocked = useRef(false);
 
-    // The PanResponder is created once, so it calls through this ref to always
-    // reach the latest handlers instead of stale state.
     const latest = useRef({
         flipCard: () => { },
         forceSwipe: (_: Direction) => { },
         forceDelete: () => { },
         resetPosition: () => { },
     });
-
-    /* ------------------------- Reset when the card changes ------------------------- */
-
-    // useLayoutEffect so the new card never paints in the old card's position.
-    useLayoutEffect(() => {
-        position.setValue({ x: 0, y: 0 });
-        nextCardProgress.setValue(0);
-        flipAnimation.setValue(0);
-
-        setPromptSide(randomPromptSide());
-        setHasFlipped(false);
-        setDeletePreview(false);
-        isLocked.current = false;
-    }, [currentCard.id]);
-
-    /* -------------------------------- Animations -------------------------------- */
 
     const slideOut = (toValue: { x: number; y: number }, done: () => void) => {
         isLocked.current = true;
@@ -162,8 +192,6 @@ export default function CardStack({
     };
 
     latest.current = { flipCard, forceSwipe, forceDelete, resetPosition };
-
-    /* -------------------------------- Pan handling -------------------------------- */
 
     const panResponder = useRef(
         PanResponder.create({
@@ -233,16 +261,15 @@ export default function CardStack({
         outputRange: [12, 0],
     });
 
-    /* ---------------------------------- Render ---------------------------------- */
-
-    const promptText =
-        promptSide === "front" ? currentCard.front : currentCard.back;
-    const answerText =
-        promptSide === "front" ? currentCard.back : currentCard.front;
+    const promptText = textFor(currentCard, promptSide);
+    const answerText = textFor(
+        currentCard,
+        promptSide === "front" ? "back" : "front"
+    );
 
     return (
-        <View style={styles.container}>
-            {/* NEXT CARD - left blank because its starting side is random */}
+        <>
+            {/* NEXT CARD - now shows its real prompt */}
             {nextCard && (
                 <Animated.View
                     style={[
@@ -255,7 +282,11 @@ export default function CardStack({
                             ],
                         },
                     ]}
-                />
+                >
+                    <Text style={styles.cardText}>
+                        {textFor(nextCard, nextSide)}
+                    </Text>
+                </Animated.View>
             )}
 
             {/* CURRENT CARD */}
@@ -280,7 +311,6 @@ export default function CardStack({
                     </View>
                 )}
 
-                {/* PROMPT FACE: only the starting side */}
                 <Animated.View
                     style={[
                         styles.cardFace,
@@ -296,7 +326,6 @@ export default function CardStack({
                     <Text style={styles.cardText}>{promptText}</Text>
                 </Animated.View>
 
-                {/* ANSWER FACE: the other side, with the prompt kept small above */}
                 <Animated.View
                     style={[
                         styles.cardFace,
@@ -313,7 +342,7 @@ export default function CardStack({
                     <Text style={styles.cardText}>{answerText}</Text>
                 </Animated.View>
             </Animated.View>
-        </View>
+        </>
     );
 }
 
@@ -331,7 +360,6 @@ const COLORS = {
 };
 
 const styles = StyleSheet.create({
-    // Fills the parent; cards stretch to fill this
     container: {
         flex: 1,
         width: "100%",
