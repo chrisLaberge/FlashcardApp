@@ -1,5 +1,7 @@
-import { router, useLocalSearchParams } from "expo-router";
-import { useState } from "react";
+
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { useCallback, useState } from "react";
 import {
     Pressable,
     StyleSheet,
@@ -7,29 +9,58 @@ import {
     TextInput,
     View,
 } from "react-native";
-import { addCard } from "../database/database";
+import { getLanguage } from "../constants/languages";
+import { addCard, getDecks } from "../database/database";
 
 export default function AddCardScreen() {
     const { deckId } = useLocalSearchParams<{ deckId?: string }>();
 
-    const [front, setFront] = useState("");
-    const [back, setBack] = useState("");
+    const [learningLanguageFlag, setLearningLanguageFlag] = useState("🌐");
+    const [localizedLanguageFlag, setLocalizedLanguageFlag] = useState("🇬🇧");
+
+    const [learningText, setLearningText] = useState("");
+    const [localizedText, setLocalizedText] = useState("");
+
+    useFocusEffect(
+        useCallback(() => {
+            const loadDeck = async () => {
+                const lastDeckId = await AsyncStorage.getItem("lastDeckId");
+
+                const reset = () => {
+                    setLearningLanguageFlag("🌐");
+                };
+
+                if (!lastDeckId) return reset();
+
+                const decks = await getDecks();
+                const deck = decks.find((d) => d.id === Number(lastDeckId));
+
+                if (!deck) return reset();
+
+                setLearningLanguageFlag(
+                    getLanguage(deck.language)?.flag ?? "🌐"
+                );
+            };
+
+            loadDeck();
+        }, [deckId])
+    );
 
     const addCardToDatabase = async () => {
         console.log("deckId:", deckId);
-        console.log("front:", front);
-        console.log("back:", back);
+        console.log("learningText:", learningText);
+        console.log("localizedText:", localizedText);
 
         if (!deckId) return;
 
         await addCard(
-            front,
-            back,
+            learningText,
+            localizedText,
             Number(deckId)
         );
 
-        setFront("");
-        setBack("");
+        setLearningText("");
+        setLocalizedText("");
 
         router.back();
     };
@@ -43,22 +74,23 @@ export default function AddCardScreen() {
             </Text>
 
             <View style={styles.form}>
-                <Text style={styles.label}>Front</Text>
+
+                <Text style={styles.flag}>{learningLanguageFlag}</Text>
 
                 <TextInput
                     style={styles.input}
-                    value={front}
-                    onChangeText={setFront}
+                    value={learningText}
+                    onChangeText={setLearningText}
                     placeholder="Enter the word or phrase"
                     placeholderTextColor="#a89984"
                 />
 
-                <Text style={styles.label}>Back</Text>
+                <Text style={styles.flag}>{localizedLanguageFlag}</Text>
 
                 <TextInput
                     style={styles.input}
-                    value={back}
-                    onChangeText={setBack}
+                    value={localizedText}
+                    onChangeText={setLocalizedText}
                     placeholder="Enter the meaning"
                     placeholderTextColor="#a89984"
                 />
@@ -72,6 +104,7 @@ export default function AddCardScreen() {
                 >
                     <Text style={styles.buttonText}>Add Card</Text>
                 </Pressable>
+
             </View>
         </View>
     );
@@ -136,4 +169,10 @@ const styles = StyleSheet.create({
         fontSize: 17,
         fontWeight: "bold",
     },
+
+    flag: {
+        fontSize: 20,
+        marginLeft: 8,
+    },
 });
+
