@@ -70,8 +70,8 @@ export const languages: Language[] = [
     { name: "Norwegian", nativeName: "Norsk", code: "no", ttsCode: "nb-NO", flag: "🇳🇴" },
     { name: "Slovak", nativeName: "Slovenčina", code: "sk", ttsCode: "sk-SK", flag: "🇸🇰" },
     { name: "Georgian", nativeName: "ქართული", code: "ka", ttsCode: "ka-GE", flag: "🇬🇪" },
-    { name: "Armenian (Eastern)", nativeName: "Հայերեն", code: "hye", ttsCode: "hy-AM", flag: "🇦🇲" },
-    { name: "Armenian (Western)", nativeName: "Արևմտահայերեն", code: "hyw", ttsCode: "hy-AM", flag: "🇦🇲" },
+    { name: "Armenian (Eastern)", nativeName: "Հայերեն", code: "hy", ttsCode: "hy-AM", flag: "🇦🇲" },
+    //{ name: "Armenian (Western)", nativeName: "Արևմտահայերեն", code: "hy", ttsCode: "hy-AM", flag: "🇦🇲" },
 
     { name: "Lithuanian", nativeName: "Lietuvių", code: "lt", ttsCode: "lt-LT", flag: "🇱🇹" },
     { name: "Catalan", nativeName: "Català", code: "ca", ttsCode: "ca-ES", flag: "🇪🇸" },

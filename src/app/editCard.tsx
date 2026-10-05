@@ -1,22 +1,44 @@
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import {
+    ActivityIndicator,
     Modal,
     Pressable,
     StyleSheet,
     Text,
     TextInput,
-    View
+    View,
 } from "react-native";
+
+import { translateText } from "@/services/api";
+import { getLanguage } from "../constants/languages";
 import {
     deleteCard,
     getCard,
     getCardProgress,
+    getDecks,
     resetCardProgress,
     updateCard,
 } from "../database/database";
 
 import { CardProgress } from "../models/CardProgress";
+
+type TranslationDirection = "learningToLocalized" | "localizedToLearning" | null;
+
+// Gruvbox palette
+const COLORS = {
+    bg0: "#282828",
+    bg1: "#3c3836",
+    bg2: "#504945",
+    fg: "#ebdbb2",
+    gray: "#a89984",
+    yellow: "#fabd2f",
+    yellowDark: "#d79921",
+    red: "#cc241d",
+    blue: "#5992b1",
+};
 
 export default function EditCardScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
@@ -27,6 +49,16 @@ export default function EditCardScreen() {
     const [progress, setProgress] = useState<CardProgress>();
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [showResetModal, setShowResetModal] = useState(false);
+
+    const [learningLanguageCode, setLearningLanguageCode] = useState("en");
+    const [learningLanguageFlag, setLearningLanguageFlag] = useState("🌐");
+
+    // TODO: Replace these when localized language becomes selectable
+    const localizedLanguageCode = "en";
+    const localizedLanguageFlag = "🇬🇧";
+
+    const [translating, setTranslating] =
+        useState<TranslationDirection>(null);
 
     useEffect(() => {
         const loadCard = async () => {
@@ -41,6 +73,22 @@ export default function EditCardScreen() {
 
             if (cardProgress) {
                 setProgress(cardProgress);
+            }
+
+            // Load deck language (same approach as AddCardScreen)
+            const lastDeckId = await AsyncStorage.getItem("lastDeckId");
+
+            if (lastDeckId) {
+                const decks = await getDecks();
+                const deck = decks.find(
+                    (deck) => deck.id === Number(lastDeckId)
+                );
+
+                if (deck) {
+                    const language = getLanguage(deck.language);
+                    setLearningLanguageCode(language?.code ?? "en");
+                    setLearningLanguageFlag(language?.flag ?? "🌐");
+                }
             }
         };
 
@@ -64,34 +112,130 @@ export default function EditCardScreen() {
         if (cardProgress) {
             setProgress(cardProgress);
         }
-
     };
 
+    // --------------------------------------------------
+    // Translation
+    // --------------------------------------------------
+
+    const translate = async (
+        direction: Exclude<TranslationDirection, null>
+    ) => {
+        if (translating !== null) {
+            return;
+        }
+
+        const isLearningSource = direction === "learningToLocalized";
+
+        const sourceText = isLearningSource ? front : back;
+
+        const targetLanguage = isLearningSource
+            ? localizedLanguageCode
+            : learningLanguageCode;
+
+        if (!sourceText.trim()) {
+            return;
+        }
+
+        if (
+            isLearningSource &&
+            learningLanguageCode === localizedLanguageCode
+        ) {
+            return;
+        }
+
+        setTranslating(direction);
+
+        try {
+            const translation = await translateText(
+                sourceText,
+                targetLanguage
+            );
+
+            if (isLearningSource) {
+                setBack(translation);
+            } else {
+                setFront(translation);
+            }
+        } catch (error) {
+            console.error("Translation failed:", error);
+        } finally {
+            setTranslating(null);
+        }
+    };
+
+    // --------------------------------------------------
+    // Translate button
+    // --------------------------------------------------
+
+    const renderTranslateButton = (
+        direction: Exclude<TranslationDirection, null>
+    ) => {
+        const isLoading = translating === direction;
+        const isDisabled = translating !== null;
+
+        return (
+            <Pressable
+                style={({ pressed }) => [
+                    styles.translateButton,
+                    pressed && styles.translateButtonPressed,
+                    isDisabled && !isLoading && styles.translateButtonDisabled,
+                ]}
+                onPress={() => translate(direction)}
+                disabled={isDisabled}
+                hitSlop={8}
+            >
+                {isLoading ? (
+                    <ActivityIndicator size="small" color={COLORS.yellow} />
+                ) : (
+                    <MaterialCommunityIcons
+                        name="translate"
+                        size={18}
+                        color={COLORS.yellow}
+                    />
+                )}
+            </Pressable>
+        );
+    };
+
+    // --------------------------------------------------
+    // UI
+    // --------------------------------------------------
 
     return (
         <View style={styles.container}>
             <Text style={styles.title}>Edit Card</Text>
 
             <View style={styles.form}>
-                <Text style={styles.label}>Front</Text>
+                <Text style={styles.flag}>{learningLanguageFlag}</Text>
 
-                <TextInput
-                    style={styles.input}
-                    value={front}
-                    onChangeText={setFront}
-                    placeholder="Enter the word or phrase"
-                    placeholderTextColor="#a89984"
-                />
+                <View style={styles.inputContainer}>
+                    <TextInput
+                        style={styles.input}
+                        value={front}
+                        onChangeText={setFront}
+                        placeholder="Enter the word or phrase"
+                        placeholderTextColor={COLORS.gray}
+                        multiline
+                    />
 
-                <Text style={styles.label}>Back</Text>
+                    {renderTranslateButton("learningToLocalized")}
+                </View>
 
-                <TextInput
-                    style={styles.input}
-                    value={back}
-                    onChangeText={setBack}
-                    placeholder="Enter the meaning"
-                    placeholderTextColor="#a89984"
-                />
+                <Text style={styles.flag}>{localizedLanguageFlag}</Text>
+
+                <View style={styles.inputContainer}>
+                    <TextInput
+                        style={styles.input}
+                        value={back}
+                        onChangeText={setBack}
+                        placeholder="Enter the meaning"
+                        placeholderTextColor={COLORS.gray}
+                        multiline
+                    />
+
+                    {renderTranslateButton("localizedToLearning")}
+                </View>
 
                 <Pressable
                     style={({ pressed }) => [
@@ -100,16 +244,12 @@ export default function EditCardScreen() {
                     ]}
                     onPress={saveChanges}
                 >
-                    <Text style={styles.saveButtonText}>
-                        Save Changes
-                    </Text>
+                    <Text style={styles.saveButtonText}>Save Changes</Text>
                 </Pressable>
             </View>
 
             <View style={styles.progressSection}>
-                <Text style={styles.sectionTitle}>
-                    Learning Progress
-                </Text>
+                <Text style={styles.sectionTitle}>Learning Progress</Text>
 
                 <View style={styles.statsContainer}>
                     <View style={styles.statCard}>
@@ -117,21 +257,15 @@ export default function EditCardScreen() {
                             {progress?.reviewCount ?? 0}
                         </Text>
 
-                        <Text style={styles.statLabel}>
-                            Level
-                        </Text>
+                        <Text style={styles.statLabel}>Level</Text>
                     </View>
 
                     <View style={styles.statCard}>
                         <Text style={styles.statNumber}>
-                            {formatTimeRemaining(
-                                progress?.nextReviewAt
-                            )}
+                            {formatTimeRemaining(progress?.nextReviewAt)}
                         </Text>
 
-                        <Text style={styles.statLabel}>
-                            Next Review
-                        </Text>
+                        <Text style={styles.statLabel}>Next Review</Text>
                     </View>
 
                     <View style={styles.statCard}>
@@ -139,9 +273,7 @@ export default function EditCardScreen() {
                             {progress?.mastered ? "Yes" : "No"}
                         </Text>
 
-                        <Text style={styles.statLabel}>
-                            Mastered
-                        </Text>
+                        <Text style={styles.statLabel}>Mastered</Text>
                     </View>
                 </View>
             </View>
@@ -153,9 +285,7 @@ export default function EditCardScreen() {
                 ]}
                 onPress={() => setShowResetModal(true)}
             >
-                <Text style={styles.resetButtonText}>
-                    Reset Card
-                </Text>
+                <Text style={styles.resetButtonText}>Reset Card</Text>
             </Pressable>
 
             <Pressable
@@ -165,9 +295,7 @@ export default function EditCardScreen() {
                 ]}
                 onPress={() => setShowDeleteModal(true)}
             >
-                <Text style={styles.deleteButtonText}>
-                    Delete Card
-                </Text>
+                <Text style={styles.deleteButtonText}>Delete Card</Text>
             </Pressable>
 
             <Modal
@@ -221,9 +349,7 @@ export default function EditCardScreen() {
             >
                 <View style={styles.modalOverlay}>
                     <View style={styles.modal}>
-                        <Text style={styles.modalTitle}>
-                            Delete Card?
-                        </Text>
+                        <Text style={styles.modalTitle}>Delete Card?</Text>
 
                         <Text style={styles.modalText}>
                             Are you sure you want to permanently delete
@@ -254,8 +380,6 @@ export default function EditCardScreen() {
                     </View>
                 </View>
             </Modal>
-
-
         </View>
     );
 }
@@ -291,13 +415,13 @@ function formatTimeRemaining(nextReviewAt?: number): string {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: "#282828",
+        backgroundColor: COLORS.bg0,
         padding: 20,
         paddingTop: 40,
     },
 
     title: {
-        color: "#ebdbb2",
+        color: COLORS.fg,
         fontSize: 32,
         fontWeight: "bold",
         marginBottom: 30,
@@ -307,26 +431,55 @@ const styles = StyleSheet.create({
         gap: 4,
     },
 
-    label: {
-        color: "#ebdbb2",
-        fontSize: 15,
-        fontWeight: "600",
+    flag: {
+        fontSize: 20,
+        marginLeft: 8,
         marginBottom: 8,
     },
 
-    input: {
-        backgroundColor: "#3c3836",
-        color: "#ebdbb2",
-        fontSize: 18,
-        padding: 15,
-        borderRadius: 10,
-        borderWidth: 1,
-        borderColor: "#504945",
+    inputContainer: {
+        position: "relative",
         marginBottom: 16,
     },
 
+    input: {
+        backgroundColor: COLORS.bg1,
+        color: COLORS.fg,
+        fontSize: 18,
+        padding: 15,
+        paddingRight: 56,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: COLORS.bg2,
+        minHeight: 55,
+        textAlignVertical: "top",
+    },
+
+    // Tinted circle, sits at the top-right of the field
+    translateButton: {
+        position: "absolute",
+        right: 10,
+        top: 9,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: "rgba(250,189,47,0.12)",
+        borderWidth: 1,
+        borderColor: "rgba(250,189,47,0.35)",
+    },
+
+    translateButtonPressed: {
+        opacity: 0.6,
+    },
+
+    translateButtonDisabled: {
+        opacity: 0.4,
+    },
+
     saveButton: {
-        backgroundColor: "#d79921",
+        backgroundColor: COLORS.yellowDark,
         padding: 16,
         borderRadius: 10,
         alignItems: "center",
@@ -334,7 +487,7 @@ const styles = StyleSheet.create({
     },
 
     saveButtonText: {
-        color: "#282828",
+        color: COLORS.bg0,
         fontSize: 17,
         fontWeight: "bold",
     },
@@ -344,7 +497,7 @@ const styles = StyleSheet.create({
     },
 
     sectionTitle: {
-        color: "#ebdbb2",
+        color: COLORS.fg,
         fontSize: 20,
         fontWeight: "bold",
         marginBottom: 12,
@@ -357,9 +510,9 @@ const styles = StyleSheet.create({
 
     statCard: {
         flex: 1,
-        backgroundColor: "#3c3836",
+        backgroundColor: COLORS.bg1,
         borderWidth: 1,
-        borderColor: "#504945",
+        borderColor: COLORS.bg2,
         borderRadius: 12,
         paddingVertical: 16,
         paddingHorizontal: 8,
@@ -367,22 +520,22 @@ const styles = StyleSheet.create({
     },
 
     statNumber: {
-        color: "#d79921",
+        color: COLORS.yellowDark,
         fontSize: 21,
         fontWeight: "bold",
         marginBottom: 5,
     },
 
     statLabel: {
-        color: "#a89984",
+        color: COLORS.gray,
         fontSize: 13,
         textAlign: "center",
     },
 
     deleteButton: {
-        backgroundColor: "#3c3836",
+        backgroundColor: COLORS.bg1,
         borderWidth: 1,
-        borderColor: "#cc241d",
+        borderColor: COLORS.red,
         padding: 16,
         borderRadius: 10,
         alignItems: "center",
@@ -390,15 +543,15 @@ const styles = StyleSheet.create({
     },
 
     deleteButtonText: {
-        color: "#cc241d",
+        color: COLORS.red,
         fontSize: 17,
         fontWeight: "bold",
     },
 
     resetButton: {
-        backgroundColor: "#3c3836",
+        backgroundColor: COLORS.bg1,
         borderWidth: 1,
-        borderColor: "#5992b1",
+        borderColor: COLORS.blue,
         padding: 16,
         borderRadius: 10,
         alignItems: "center",
@@ -406,7 +559,7 @@ const styles = StyleSheet.create({
     },
 
     resetButtonText: {
-        color: "#5992b1",
+        color: COLORS.blue,
         fontSize: 17,
         fontWeight: "bold",
     },
@@ -424,22 +577,22 @@ const styles = StyleSheet.create({
 
     modal: {
         width: "85%",
-        backgroundColor: "#3c3836",
+        backgroundColor: COLORS.bg1,
         borderWidth: 1,
-        borderColor: "#504945",
+        borderColor: COLORS.bg2,
         borderRadius: 15,
         padding: 22,
     },
 
     modalTitle: {
-        color: "#ebdbb2",
+        color: COLORS.fg,
         fontSize: 22,
         fontWeight: "bold",
         marginBottom: 10,
     },
 
     modalText: {
-        color: "#a89984",
+        color: COLORS.gray,
         fontSize: 15,
         lineHeight: 22,
         marginBottom: 24,
@@ -452,42 +605,42 @@ const styles = StyleSheet.create({
 
     cancelButton: {
         flex: 1,
-        backgroundColor: "#504945",
+        backgroundColor: COLORS.bg2,
         padding: 14,
         borderRadius: 10,
         alignItems: "center",
     },
 
     cancelButtonText: {
-        color: "#ebdbb2",
+        color: COLORS.fg,
         fontSize: 16,
         fontWeight: "bold",
     },
 
     resetConfirmButton: {
         flex: 1,
-        backgroundColor: "#5992b1",
+        backgroundColor: COLORS.blue,
         padding: 14,
         borderRadius: 10,
         alignItems: "center",
     },
 
     resetConfirmText: {
-        color: "#282828",
+        color: COLORS.bg0,
         fontSize: 16,
         fontWeight: "bold",
     },
 
     deleteConfirmButton: {
         flex: 1,
-        backgroundColor: "#cc241d",
+        backgroundColor: COLORS.red,
         padding: 14,
         borderRadius: 10,
         alignItems: "center",
     },
 
     deleteConfirmText: {
-        color: "#ebdbb2",
+        color: COLORS.fg,
         fontSize: 16,
         fontWeight: "bold",
     },
