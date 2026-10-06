@@ -13,6 +13,7 @@ import {
 } from "react-native";
 
 import { translateText } from "@/services/api";
+import { getRomanization } from "@/utils/romanization";
 import { getLanguage } from "../constants/languages";
 import { addCard, getDecks } from "../database/database";
 
@@ -138,15 +139,37 @@ export default function AddCardScreen() {
     // --------------------------------------------------
 
     const addCardToDatabase = async () => {
-        if (!deckId) {
+        const lastDeckId = await AsyncStorage.getItem("lastDeckId");
+        const decks = await getDecks();
+
+
+
+        if (!lastDeckId) {
+            console.error("No selected deck");
             return;
         }
+
+        const id = Number(lastDeckId);
+        console.log("lastDeckId:", id);
+        console.log("existing decks:", decks);
 
         if (!learningText.trim() || !localizedText.trim()) {
             return;
         }
 
-        await addCard(learningText, localizedText, exampleSentence, Number(deckId));
+        const romanization =
+            (await getRomanization(
+                learningText,
+                learningLanguageCode
+            )) ?? "";
+
+        await addCard(
+            learningText,
+            localizedText,
+            exampleSentence,
+            romanization,
+            id
+        );
 
         setLearningText("");
         setLocalizedText("");

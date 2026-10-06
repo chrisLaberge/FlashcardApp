@@ -12,6 +12,7 @@ import {
     TextInput,
     View,
 } from "react-native";
+import { getRomanization } from "../utils/romanization";
 
 import { translateText } from "@/services/api";
 import { getLanguage } from "../constants/languages";
@@ -100,7 +101,17 @@ export default function EditCardScreen() {
     }, [cardId]);
 
     const saveChanges = async () => {
-        await updateCard(cardId, learningText, localizedText, exampleSentence);
+        const romanization =
+            (await getRomanization(learningText, learningLanguageCode)) ?? "";
+
+        await updateCard(
+            cardId,
+            learningText,
+            localizedText,
+            exampleSentence,
+            romanization
+        );
+
         router.back();
     };
 

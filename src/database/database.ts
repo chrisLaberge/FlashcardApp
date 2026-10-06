@@ -24,6 +24,7 @@ async function getDatabase() {
     learning_text TEXT NOT NULL,
     localized_text TEXT NOT NULL,
     example_sentence TEXT,
+    romanization TEXT,
 
     FOREIGN KEY(deck_id)
                     REFERENCES decks(id)
@@ -47,29 +48,7 @@ async function getDatabase() {
     return db;
 }
 
-export async function addCard(
-    learningText: string,
-    localizedText: string,
-    exampleSentence: string,
-    deckId: number
-) {
-    const database = await getDatabase();
 
-    const result = await database.runAsync(
-        `INSERT INTO cards
-    (learning_text, localized_text, example_sentence, deck_id)
-VALUES(?, ?, ?, ?)`,
-        learningText,
-        localizedText,
-        exampleSentence,
-        deckId
-    );
-
-    await database.runAsync(
-        "INSERT INTO card_progress (card_id) VALUES (?)",
-        result.lastInsertRowId
-    );
-}
 
 export async function getCards(deckId: number): Promise<Card[]> {
     const database = await getDatabase();
@@ -79,6 +58,7 @@ export async function getCards(deckId: number): Promise<Card[]> {
         learning_text: string;
         localized_text: string;
         example_sentence: string;
+        romanization: string;
     }>(
         "SELECT * FROM cards WHERE deck_id = ?",
         deckId
@@ -90,10 +70,40 @@ export async function getCards(deckId: number): Promise<Card[]> {
                 row.learning_text,
                 row.localized_text,
                 row.example_sentence,
-                row.id,
+                row.romanization,
+                row.id
             )
 
     );
+}
+
+export async function addCard(
+    learningText: string,
+    localizedText: string,
+    exampleSentence: string,
+    romanization: string,
+    deckId: number
+) {
+    const database = await getDatabase();
+
+
+    const result = await database.runAsync(
+        `INSERT INTO cards
+        (learning_text, localized_text, example_sentence, romanization, deck_id)
+        VALUES (?, ?, ?, ?, ?)`,
+        learningText,
+        localizedText,
+        exampleSentence,
+        romanization,
+        deckId
+    );
+
+
+    await database.runAsync(
+        "INSERT INTO card_progress (card_id) VALUES (?)",
+        result.lastInsertRowId
+    );
+
 }
 
 export async function deleteCard(id: number) {
@@ -109,7 +119,8 @@ export async function updateCard(
     id: number,
     learningText: string,
     localizedText: string,
-    exampleSentence: string
+    exampleSentence: string,
+    romanization: string
 ) {
     const database = await getDatabase();
 
@@ -117,11 +128,13 @@ export async function updateCard(
         `UPDATE cards
          SET learning_text = ?,
     localized_text = ?,
-    example_sentence = ?
+    example_sentence = ?,
+    romanization = ?
         WHERE id = ? `,
         learningText,
         localizedText,
         exampleSentence,
+        romanization,
         id
     );
 }
@@ -238,13 +251,15 @@ export async function getDueCards(
         learning_text: string;
         localized_text: string;
         example_sentence: string;
+        romanization: string;
     }>(
         `
         SELECT
 cards.id,
     cards.learning_text,
     cards.localized_text,
-    cards.example_sentence
+    cards.example_sentence,
+    cards.romanization
         FROM cards
         JOIN card_progress
             ON cards.id = card_progress.card_id
@@ -264,6 +279,7 @@ cards.id,
                 row.learning_text,
                 row.localized_text,
                 row.example_sentence,
+                row.romanization,
                 row.id
             )
     );
@@ -410,6 +426,7 @@ export async function getCard(
         learning_text: string;
         localized_text: string;
         example_sentence: string;
+        romanization: string;
     }>(
         "SELECT * FROM cards WHERE id = ?",
         id
@@ -423,6 +440,7 @@ export async function getCard(
         row.learning_text,
         row.localized_text,
         row.example_sentence,
+        row.romanization,
         row.id
     );
 }

@@ -309,6 +309,8 @@ function ActiveCards({
     const answerText = textFor(currentCard, answerSide);
 
     const exampleText = currentCard.exampleSentence?.trim();
+    const romanizationFor = (card: Card, side: PromptSide) =>
+        side === "learning" ? card.romanization?.trim() : undefined;
 
     // Always read the word being learned, whichever face is showing it
     const speak = () => {
@@ -337,32 +339,51 @@ function ActiveCards({
         side: PromptSide,
         textStyle: StyleProp<TextStyle>,
         small = false
-    ) => (
-        <View style={styles.line}>
-            {side === "learning" && (
-                <Pressable
-                    style={({ pressed }) => [
-                        styles.speakButton,
-                        small && styles.speakButtonSmall,
-                        pressed && styles.speakButtonPressed,
-                    ]}
-                    onPress={speak}
-                    hitSlop={10}
-                >
-                    <Text
-                        style={[
-                            styles.speakIcon,
-                            small && styles.speakIconSmall,
-                        ]}
-                    >
-                        🔊
-                    </Text>
-                </Pressable>
-            )}
+    ) => {
+        const romanization = romanizationFor(currentCard, side);
 
-            <Text style={[textStyle, styles.lineText]}>{text}</Text>
-        </View>
-    );
+        return (
+            <View style={styles.line}>
+                {side === "learning" && (
+                    <Pressable
+                        style={({ pressed }) => [
+                            styles.speakButton,
+                            small && styles.speakButtonSmall,
+                            pressed && styles.speakButtonPressed,
+                        ]}
+                        onPress={speak}
+                        hitSlop={10}
+                    >
+                        <Text
+                            style={[
+                                styles.speakIcon,
+                                small && styles.speakIconSmall,
+                            ]}
+                        >
+                            🔊
+                        </Text>
+                    </Pressable>
+                )}
+
+                <View style={styles.textGroup}>
+                    <Text style={[textStyle, styles.lineText]}>
+                        {text}
+                    </Text>
+
+                    {!!romanization && (
+                        <Text
+                            style={[
+                                styles.romanization,
+                                small && styles.romanizationSmall,
+                            ]}
+                        >
+                            {romanization}
+                        </Text>
+                    )}
+                </View>
+            </View>
+        );
+    };
 
     return (
         <>
@@ -516,10 +537,10 @@ const styles = StyleSheet.create({
 
     // Speaker button on the left, text beside it
     line: {
-        flexDirection: "row",
+        width: "100%",
         alignItems: "center",
         justifyContent: "center",
-        gap: 12,
+        position: "relative",
     },
 
     lineText: {
@@ -572,19 +593,26 @@ const styles = StyleSheet.create({
         fontWeight: "bold",
     },
 
+
     speakButton: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
+        position: "absolute",
+        left: 56,
+        top: 20,
+        width: 34,
+        height: 34,
+        borderRadius: 17,
         alignItems: "center",
         justifyContent: "center",
         backgroundColor: COLORS.cardBorder,
+        borderWidth: 1,
+        borderColor: COLORS.hint,
     },
 
     speakButtonSmall: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
+        width: 26,
+        height: 26,
+        borderRadius: 13,
+        left: 4,
     },
 
     speakButtonPressed: {
@@ -592,10 +620,28 @@ const styles = StyleSheet.create({
     },
 
     speakIcon: {
-        fontSize: 20,
+        fontSize: 16,
     },
 
     speakIconSmall: {
-        fontSize: 15,
+        fontSize: 12,
+    },
+
+    textGroup: {
+        flexShrink: 1,
+        alignItems: "center",
+    },
+
+    romanization: {
+        color: COLORS.hint,
+        fontSize: 18,
+        marginTop: 8,
+        textAlign: "center",
+    },
+
+    romanizationSmall: {
+        fontSize: 13,
+        marginTop: 4,
     },
 });
+
