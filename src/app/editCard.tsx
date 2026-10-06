@@ -65,8 +65,8 @@ export default function EditCardScreen() {
             const card = await getCard(cardId);
 
             if (card) {
-                setFront(card.front);
-                setBack(card.back);
+                setFront(card.learningText);
+                setBack(card.localizedText);
             }
 
             const cardProgress = await getCardProgress(cardId);

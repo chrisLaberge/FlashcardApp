@@ -24,7 +24,7 @@ const SWIPE_OUT_DURATION = 250;
 const FLIP_DURATION = 500;
 
 type Direction = "left" | "right";
-type PromptSide = "front" | "back";
+type PromptSide = "learning" | "localized";
 
 const isMostlyVertical = (g: PanResponderGestureState) =>
     Math.abs(g.dy) > Math.abs(g.dx);
@@ -39,11 +39,10 @@ const isTap = (g: PanResponderGestureState) =>
     Math.abs(g.dx) < TAP_THRESHOLD && Math.abs(g.dy) < TAP_THRESHOLD;
 
 const randomPromptSide = (): PromptSide =>
-    Math.random() < 0.5 ? "front" : "back";
+    Math.random() < 0.5 ? "learning" : "localized";
 
 const textFor = (card: Card, side: PromptSide) =>
-    side === "front" ? card.front : card.back;
-
+    side === "learning" ? card.learningText : card.localizedText;
 
 /* -------------------------------------------------------------------------- */
 /*                                   Wrapper                                  */
@@ -53,8 +52,10 @@ interface CardStackProps {
     currentCard: Card;
     nextCard?: Card;
     ttsCode?: string;
+
     /** Change this whenever the visible card changes (advance, undo, reload). */
     cardKey: number;
+
     onSwipe: (direction: Direction) => void;
     onDelete: () => void;
 }
@@ -75,17 +76,21 @@ export default function CardStack({
 
     const getSide = (card: Card): PromptSide => {
         const id = card.id ?? -1;
+
         let side = sides.get(id);
+
         if (!side) {
             side = randomPromptSide();
             sides.set(id, side);
         }
+
         return side;
     };
 
     const handleSwipe = (direction: Direction) => {
         // Forget the side so a repeated card gets a fresh random one
         sides.delete(currentCard.id ?? -1);
+
         onSwipe(direction);
     };
 
@@ -96,7 +101,9 @@ export default function CardStack({
                 currentCard={currentCard}
                 nextCard={nextCard}
                 initialPromptSide={getSide(currentCard)}
-                initialNextSide={nextCard ? getSide(nextCard) : "front"}
+                initialNextSide={
+                    nextCard ? getSide(nextCard) : "learning"
+                }
                 onSwipe={handleSwipe}
                 onDelete={onDelete}
                 ttsCode={ttsCode}
@@ -149,7 +156,10 @@ function ActiveCards({
         resetPosition: () => { },
     });
 
-    const slideOut = (toValue: { x: number; y: number }, done: () => void) => {
+    const slideOut = (
+        toValue: { x: number; y: number },
+        done: () => void
+    ) => {
         isLocked.current = true;
 
         Animated.parallel([
@@ -158,6 +168,7 @@ function ActiveCards({
                 duration: SWIPE_OUT_DURATION,
                 useNativeDriver: true,
             }),
+
             Animated.timing(nextCardProgress, {
                 toValue: 1,
                 duration: SWIPE_OUT_DURATION,
@@ -176,7 +187,10 @@ function ActiveCards({
     };
 
     const forceDelete = () =>
-        slideOut({ x: 0, y: SCREEN_HEIGHT * 0.8 }, onDelete);
+        slideOut(
+            { x: 0, y: SCREEN_HEIGHT * 0.8 },
+            onDelete
+        );
 
     const resetPosition = () => {
         setDeletePreview(false);
@@ -199,11 +213,17 @@ function ActiveCards({
         }).start();
     };
 
-    latest.current = { flipCard, forceSwipe, forceDelete, resetPosition };
+    latest.current = {
+        flipCard,
+        forceSwipe,
+        forceDelete,
+        resetPosition,
+    };
 
     const panResponder = useRef(
         PanResponder.create({
-            onStartShouldSetPanResponder: () => !isLocked.current,
+            onStartShouldSetPanResponder: () =>
+                !isLocked.current,
 
             onMoveShouldSetPanResponder: (_, g) =>
                 !isLocked.current &&
@@ -211,23 +231,43 @@ function ActiveCards({
                     Math.abs(g.dy) > TAP_THRESHOLD),
 
             onPanResponderMove: (_, g) => {
-                position.setValue({ x: g.dx, y: g.dy });
+                position.setValue({
+                    x: g.dx,
+                    y: g.dy,
+                });
+
                 setDeletePreview(isDeletePreview(g));
             },
 
             onPanResponderRelease: (_, g) => {
-                const { flipCard, forceSwipe, forceDelete, resetPosition } =
-                    latest.current;
+                const {
+                    flipCard,
+                    forceSwipe,
+                    forceDelete,
+                    resetPosition,
+                } = latest.current;
 
-                if (isDeleteGesture(g)) return forceDelete();
-                if (g.dx > SWIPE_THRESHOLD) return forceSwipe("right");
-                if (g.dx < -SWIPE_THRESHOLD) return forceSwipe("left");
+                if (isDeleteGesture(g)) {
+                    return forceDelete();
+                }
 
-                if (isTap(g)) flipCard();
+                if (g.dx > SWIPE_THRESHOLD) {
+                    return forceSwipe("right");
+                }
+
+                if (g.dx < -SWIPE_THRESHOLD) {
+                    return forceSwipe("left");
+                }
+
+                if (isTap(g)) {
+                    flipCard();
+                }
+
                 resetPosition();
             },
 
-            onPanResponderTerminate: () => latest.current.resetPosition(),
+            onPanResponderTerminate: () =>
+                latest.current.resetPosition(),
         })
     ).current;
 
@@ -254,7 +294,11 @@ function ActiveCards({
     });
 
     const rotate = position.x.interpolate({
-        inputRange: [-SCREEN_WIDTH / 2, 0, SCREEN_WIDTH / 2],
+        inputRange: [
+            -SCREEN_WIDTH / 2,
+            0,
+            SCREEN_WIDTH / 2,
+        ],
         outputRange: ["-10deg", "0deg", "10deg"],
         extrapolate: "clamp",
     });
@@ -269,34 +313,32 @@ function ActiveCards({
         outputRange: [12, 0],
     });
 
-    const promptText = textFor(currentCard, promptSide);
-    const answerText = textFor(
+    const promptText = textFor(
         currentCard,
-        promptSide === "front" ? "back" : "front"
+        promptSide
     );
 
-    const visibleText = hasFlipped ? answerText : promptText;
+    const answerText = textFor(
+        currentCard,
+        promptSide === "learning"
+            ? "localized"
+            : "learning"
+    );
 
-   /* const speak = async () => {
-        console.log("Speak button pressed");
-        console.log("Text:", visibleText);
-        console.log("TTS code:", ttsCode);
-
-        const voices = await Speech.getAvailableVoicesAsync();
-        console.log("Voices:", voices);
-
-        Speech.stop();
-        Speech.speak(visibleText, {
-            language: ttsCode,
-            rate: 0.9,
-        });
-        
-
-    }; */
+    const visibleText = hasFlipped
+        ? answerText
+        : promptText;
 
     const speak = () => {
-        console.log("visibleText:", JSON.stringify(visibleText));
-        console.log("ttsCode:", JSON.stringify(ttsCode));
+        console.log(
+            "visibleText:",
+            JSON.stringify(visibleText)
+        );
+
+        console.log(
+            "ttsCode:",
+            JSON.stringify(ttsCode)
+        );
 
         Speech.stop();
 
@@ -306,12 +348,18 @@ function ActiveCards({
         });
     };
 
-// Stop audio when this card goes away (swipe, delete, undo)
-useEffect(() => () => { Speech.stop(); }, []);
+    // Stop audio when this card goes away
+    // (swipe, delete, undo)
+    useEffect(
+        () => () => {
+            Speech.stop();
+        },
+        []
+    );
 
     return (
         <>
-            {/* NEXT CARD - now shows its real prompt */}
+            {/* NEXT CARD - shows its real prompt */}
             {nextCard && (
                 <Animated.View
                     style={[
@@ -319,8 +367,13 @@ useEffect(() => () => { Speech.stop(); }, []);
                         styles.nextCard,
                         {
                             transform: [
-                                { scale: nextCardScale },
-                                { translateY: nextCardTranslateY },
+                                {
+                                    scale: nextCardScale,
+                                },
+                                {
+                                    translateY:
+                                        nextCardTranslateY,
+                                },
                             ],
                         },
                     ]}
@@ -337,11 +390,18 @@ useEffect(() => () => { Speech.stop(); }, []);
                 style={[
                     styles.card,
                     styles.currentCard,
-                    deletePreview && styles.deleteCard,
+                    deletePreview &&
+                    styles.deleteCard,
                     {
                         transform: [
-                            { translateX: position.x },
-                            { translateY: position.y },
+                            {
+                                translateX:
+                                    position.x,
+                            },
+                            {
+                                translateY:
+                                    position.y,
+                            },
                             { rotate },
                         ],
                     },
@@ -349,45 +409,85 @@ useEffect(() => () => { Speech.stop(); }, []);
             >
                 {deletePreview && (
                     <View style={styles.deleteMessage}>
-                        <Text style={styles.deleteText}>Delete card?</Text>
+                        <Text style={styles.deleteText}>
+                            Delete card?
+                        </Text>
                     </View>
                 )}
 
+                {/* PROMPT SIDE */}
                 <Animated.View
                     style={[
                         styles.cardFace,
                         {
-                            opacity: promptOpacity,
+                            opacity:
+                                promptOpacity,
+
                             transform: [
-                                { perspective: 1000 },
-                                { rotateY: promptRotate },
+                                {
+                                    perspective: 1000,
+                                },
+                                {
+                                    rotateY:
+                                        promptRotate,
+                                },
                             ],
                         },
                     ]}
                 >
-                    <Text style={styles.cardText}>{promptText}</Text>
+                    <Text style={styles.cardText}>
+                        {promptText}
+                    </Text>
                 </Animated.View>
 
+                {/* ANSWER SIDE */}
                 <Animated.View
                     style={[
                         styles.cardFace,
                         {
-                            opacity: answerOpacity,
+                            opacity:
+                                answerOpacity,
+
                             transform: [
-                                { perspective: 1000 },
-                                { rotateY: answerRotate },
+                                {
+                                    perspective: 1000,
+                                },
+                                {
+                                    rotateY:
+                                        answerRotate,
+                                },
                             ],
                         },
                     ]}
                 >
-                    <Text style={styles.hintText}>{promptText}</Text>
-                    <Text style={styles.cardText}>{answerText}</Text>
+                    <Text style={styles.hintText}>
+                        {promptText}
+                    </Text>
+
+                    <Text style={styles.cardText}>
+                        {answerText}
+                    </Text>
                 </Animated.View>
 
-                <Pressable style={styles.speakButton} onPress={speak} hitSlop={10}>
-
-                    <Text style={styles.speakIcon}>🔊</Text>
-                </Pressable>
+                {/* TTS ONLY ON LEARNING-LANGUAGE SIDE */}
+                {!hasFlipped &&
+                    promptSide === "learning" && (
+                        <Pressable
+                            style={
+                                styles.speakButton
+                            }
+                            onPress={speak}
+                            hitSlop={10}
+                        >
+                            <Text
+                                style={
+                                    styles.speakIcon
+                                }
+                            >
+                                🔊
+                            </Text>
+                        </Pressable>
+                    )}
             </Animated.View>
         </>
     );
@@ -417,12 +517,16 @@ const styles = StyleSheet.create({
         padding: 30,
         justifyContent: "center",
         alignItems: "center",
-        backgroundColor: COLORS.cardBackground,
+        backgroundColor:
+            COLORS.cardBackground,
         borderRadius: 28,
         borderWidth: 2,
         borderColor: COLORS.cardBorder,
         shadowColor: "#000",
-        shadowOffset: { width: 0, height: 6 },
+        shadowOffset: {
+            width: 0,
+            height: 6,
+        },
         shadowOpacity: 0.2,
         shadowRadius: 10,
         elevation: 6,
@@ -434,7 +538,8 @@ const styles = StyleSheet.create({
     },
 
     nextCard: {
-        backgroundColor: COLORS.nextCardBackground,
+        backgroundColor:
+            COLORS.nextCardBackground,
     },
 
     cardFace: {
@@ -478,6 +583,7 @@ const styles = StyleSheet.create({
         fontSize: 17,
         fontWeight: "bold",
     },
+
     speakButton: {
         position: "absolute",
         bottom: 16,
@@ -487,11 +593,12 @@ const styles = StyleSheet.create({
         borderRadius: 20,
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor: COLORS.cardBorder,
+        backgroundColor:
+            COLORS.cardBorder,
         zIndex: 5,
     },
 
     speakIcon: {
         fontSize: 18,
-},
+    },
 });

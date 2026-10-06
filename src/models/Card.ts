@@ -1,11 +1,15 @@
 export class Card {
+    learningText: string;
+    localizedText: string;
     id?: number;
-    front: string;
-    back: string;
 
-    constructor(front: string, back: string, id?: number) {
-        this.front = front;
-        this.back = back;
+    constructor(
+        learningText: string,
+        localizedText: string,
+        id?: number
+    ) {
+        this.learningText = learningText;
+        this.localizedText = localizedText;
         this.id = id;
     }
 }

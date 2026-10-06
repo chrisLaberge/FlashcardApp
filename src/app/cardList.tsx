@@ -44,10 +44,10 @@ export default function CardsScreen() {
 
     const filteredCards = cards.filter(
         (card) =>
-            card.front
+            card.learningText
                 .toLowerCase()
                 .includes(search.toLowerCase()) ||
-            card.back
+            card.localizedText
                 .toLowerCase()
                 .includes(search.toLowerCase())
     );
@@ -99,11 +99,11 @@ export default function CardsScreen() {
                         >
                             <View style={styles.cardTextContainer}>
                                 <Text style={styles.front}>
-                                    {card.front}
+                                    {card.learningText}
                                 </Text>
 
                                 <Text style={styles.back}>
-                                    {card.back}
+                                    {card.localizedText}
                                 </Text>
                             </View>
 
