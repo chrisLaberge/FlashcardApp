@@ -6,6 +6,7 @@ import {
     ActivityIndicator,
     Modal,
     Pressable,
+    ScrollView,
     StyleSheet,
     Text,
     TextInput,
@@ -44,9 +45,11 @@ export default function EditCardScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const cardId = Number(id);
 
-    const [front, setFront] = useState("");
-    const [back, setBack] = useState("");
+    const [learningText, setLearningText] = useState("");
+    const [localizedText, setLocalizedText] = useState("");
+    const [exampleSentence, setExampleSentence] = useState("");
     const [progress, setProgress] = useState<CardProgress>();
+    const [showProgress, setShowProgress] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [showResetModal, setShowResetModal] = useState(false);
 
@@ -65,8 +68,9 @@ export default function EditCardScreen() {
             const card = await getCard(cardId);
 
             if (card) {
-                setFront(card.learningText);
-                setBack(card.localizedText);
+                setLearningText(card.learningText);
+                setLocalizedText(card.localizedText);
+                setExampleSentence(card.exampleSentence ?? "");
             }
 
             const cardProgress = await getCardProgress(cardId);
@@ -96,7 +100,7 @@ export default function EditCardScreen() {
     }, [cardId]);
 
     const saveChanges = async () => {
-        await updateCard(cardId, front, back);
+        await updateCard(cardId, learningText, localizedText, exampleSentence);
         router.back();
     };
 
@@ -127,7 +131,7 @@ export default function EditCardScreen() {
 
         const isLearningSource = direction === "learningToLocalized";
 
-        const sourceText = isLearningSource ? front : back;
+        const sourceText = isLearningSource ? learningText : localizedText;
 
         const targetLanguage = isLearningSource
             ? localizedLanguageCode
@@ -153,9 +157,9 @@ export default function EditCardScreen() {
             );
 
             if (isLearningSource) {
-                setBack(translation);
+                setLocalizedText(translation);
             } else {
-                setFront(translation);
+                setLearningText(translation);
             }
         } catch (error) {
             console.error("Translation failed:", error);
@@ -199,42 +203,71 @@ export default function EditCardScreen() {
     };
 
     // --------------------------------------------------
+    // Faded label inside the input (flag + code, or plain text)
+    // --------------------------------------------------
+
+    const renderWatermark = (label: string) => (
+        <Text style={styles.watermark} pointerEvents="none">
+            {label}
+        </Text>
+    );
+
+    // --------------------------------------------------
     // UI
     // --------------------------------------------------
 
     return (
-        <View style={styles.container}>
-            <Text style={styles.title}>Edit Card</Text>
+        <ScrollView
+            style={styles.container}
+            contentContainerStyle={styles.content}
+            keyboardShouldPersistTaps="handled"
+        >
 
+            {/* ---------- Card content ---------- */}
             <View style={styles.form}>
-                <Text style={styles.flag}>{learningLanguageFlag}</Text>
-
                 <View style={styles.inputContainer}>
                     <TextInput
                         style={styles.input}
-                        value={front}
-                        onChangeText={setFront}
+                        value={learningText}
+                        onChangeText={setLearningText}
                         placeholder="Enter the word or phrase"
                         placeholderTextColor={COLORS.gray}
                         multiline
                     />
 
+                    {renderWatermark(
+                        `${learningLanguageFlag} ${learningLanguageCode.toUpperCase()}`
+                    )}
                     {renderTranslateButton("learningToLocalized")}
                 </View>
-
-                <Text style={styles.flag}>{localizedLanguageFlag}</Text>
 
                 <View style={styles.inputContainer}>
                     <TextInput
                         style={styles.input}
-                        value={back}
-                        onChangeText={setBack}
+                        value={localizedText}
+                        onChangeText={setLocalizedText}
                         placeholder="Enter the meaning"
                         placeholderTextColor={COLORS.gray}
                         multiline
                     />
 
+                    {renderWatermark(
+                        `${localizedLanguageFlag} ${localizedLanguageCode.toUpperCase()}`
+                    )}
                     {renderTranslateButton("localizedToLearning")}
+                </View>
+
+                <View style={styles.inputContainer}>
+                    <TextInput
+                        style={[styles.input, styles.exampleInput]}
+                        value={exampleSentence}
+                        onChangeText={setExampleSentence}
+                        placeholder="Example sentence (optional)"
+                        placeholderTextColor={COLORS.gray}
+                        multiline
+                    />
+
+                    {renderWatermark("Example")}
                 </View>
 
                 <Pressable
@@ -248,55 +281,95 @@ export default function EditCardScreen() {
                 </Pressable>
             </View>
 
+
+
+            {/* ---------- Collapsible progress ---------- */}
             <View style={styles.progressSection}>
-                <Text style={styles.sectionTitle}>Learning Progress</Text>
+                <Pressable
+                    style={({ pressed }) => [
+                        styles.progressHeader,
+                        pressed && styles.buttonPressed,
+                    ]}
+                    onPress={() => setShowProgress((value) => !value)}
+                >
+                    <Text style={styles.title}></Text>
 
-                <View style={styles.statsContainer}>
-                    <View style={styles.statCard}>
-                        <Text style={styles.statNumber}>
-                            {progress?.reviewCount ?? 0}
+                    <View style={styles.progressHeaderText}>
+
+                        <Text style={styles.sectionTitle}>
+
+                            Learning Progress
                         </Text>
 
-                        <Text style={styles.statLabel}>Level</Text>
+                        {!showProgress && (
+                            <Text style={styles.progressSummary}>
+                                Level {progress?.reviewCount ?? 0} · Next:{" "}
+                                {formatTimeRemaining(progress?.nextReviewAt)}
+                            </Text>
+                        )}
                     </View>
 
-                    <View style={styles.statCard}>
-                        <Text style={styles.statNumber}>
-                            {formatTimeRemaining(progress?.nextReviewAt)}
-                        </Text>
+                    <MaterialCommunityIcons
+                        name={showProgress ? "chevron-up" : "chevron-down"}
+                        size={24}
+                        color={COLORS.gray}
+                    />
+                </Pressable>
 
-                        <Text style={styles.statLabel}>Next Review</Text>
+                {showProgress && (
+                    <View style={styles.statsContainer}>
+                        <View style={styles.statCard}>
+                            <Text style={styles.statNumber}>
+                                {progress?.reviewCount ?? 0}
+                            </Text>
+
+                            <Text style={styles.statLabel}>Level</Text>
+                        </View>
+
+                        <View style={styles.statCard}>
+                            <Text style={styles.statNumber}>
+                                {formatTimeRemaining(progress?.nextReviewAt)}
+                            </Text>
+
+                            <Text style={styles.statLabel}>Next Review</Text>
+                        </View>
+
+                        <View style={styles.statCard}>
+                            <Text style={styles.statNumber}>
+                                {progress?.mastered ? "Yes" : "No"}
+                            </Text>
+
+                            <Text style={styles.statLabel}>Mastered</Text>
+                        </View>
                     </View>
-
-                    <View style={styles.statCard}>
-                        <Text style={styles.statNumber}>
-                            {progress?.mastered ? "Yes" : "No"}
-                        </Text>
-
-                        <Text style={styles.statLabel}>Mastered</Text>
-                    </View>
-                </View>
+                )}
             </View>
 
-            <Pressable
-                style={({ pressed }) => [
-                    styles.resetButton,
-                    pressed && styles.buttonPressed,
-                ]}
-                onPress={() => setShowResetModal(true)}
-            >
-                <Text style={styles.resetButtonText}>Reset Card</Text>
-            </Pressable>
+            <Text style={styles.title}></Text>
+            <Text style={styles.title}></Text>
 
-            <Pressable
-                style={({ pressed }) => [
-                    styles.deleteButton,
-                    pressed && styles.buttonPressed,
-                ]}
-                onPress={() => setShowDeleteModal(true)}
-            >
-                <Text style={styles.deleteButtonText}>Delete Card</Text>
-            </Pressable>
+            {/* ---------- Actions ---------- */}
+            <View style={styles.actionsRow}>
+                <Pressable
+                    style={({ pressed }) => [
+                        styles.resetButton,
+                        pressed && styles.buttonPressed,
+                    ]}
+                    onPress={() => setShowResetModal(true)}
+                >
+                    <Text style={styles.resetButtonText}>Reset</Text>
+                </Pressable>
+
+                <Pressable
+                    style={({ pressed }) => [
+                        styles.deleteButton,
+                        pressed && styles.buttonPressed,
+                    ]}
+                    onPress={() => setShowDeleteModal(true)}
+                >
+                    <Text style={styles.deleteButtonText}>Delete</Text>
+                </Pressable>
+            </View>
 
             <Modal
                 visible={showResetModal}
@@ -380,7 +453,7 @@ export default function EditCardScreen() {
                     </View>
                 </View>
             </Modal>
-        </View>
+        </ScrollView>
     );
 }
 
@@ -416,25 +489,33 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: COLORS.bg0,
+    },
+
+    content: {
         padding: 20,
         paddingTop: 40,
+        paddingBottom: 40,
     },
 
     title: {
         color: COLORS.fg,
         fontSize: 32,
         fontWeight: "bold",
-        marginBottom: 30,
+        marginBottom: 24,
     },
 
     form: {
         gap: 4,
     },
 
-    flag: {
-        fontSize: 20,
-        marginLeft: 8,
-        marginBottom: 8,
+    // Faded language tag in the bottom-right corner of a field
+    watermark: {
+        position: "absolute",
+        right: 12,
+        bottom: 8,
+        color: COLORS.gray,
+        fontSize: 13,
+        opacity: 0.45,
     },
 
     inputContainer: {
@@ -448,11 +529,19 @@ const styles = StyleSheet.create({
         fontSize: 18,
         padding: 15,
         paddingRight: 56,
+        paddingBottom: 22,
+        paddingTop: 22,
         borderRadius: 10,
         borderWidth: 1,
         borderColor: COLORS.bg2,
         minHeight: 55,
         textAlignVertical: "top",
+    },
+
+    exampleInput: {
+        minHeight: 55,
+        paddingRight: 15,
+        fontSize: 16,
     },
 
     // Tinted circle, sits at the top-right of the field
@@ -493,28 +582,48 @@ const styles = StyleSheet.create({
     },
 
     progressSection: {
-        marginTop: 30,
+        marginTop: 24,
+        backgroundColor: COLORS.bg1,
+        borderWidth: 1,
+        borderColor: COLORS.bg2,
+        borderRadius: 12,
+        padding: 14,
+    },
+
+    progressHeader: {
+        flexDirection: "row",
+        alignItems: "center",
+    },
+
+    progressHeaderText: {
+        flex: 1,
+    },
+
+    progressSummary: {
+        color: COLORS.gray,
+        fontSize: 13,
+        marginTop: 2,
     },
 
     sectionTitle: {
         color: COLORS.fg,
-        fontSize: 20,
+        fontSize: 17,
         fontWeight: "bold",
-        marginBottom: 12,
     },
 
     statsContainer: {
         flexDirection: "row",
         gap: 10,
+        marginTop: 14,
     },
 
     statCard: {
         flex: 1,
-        backgroundColor: COLORS.bg1,
+        backgroundColor: COLORS.bg0,
         borderWidth: 1,
         borderColor: COLORS.bg2,
-        borderRadius: 12,
-        paddingVertical: 16,
+        borderRadius: 10,
+        paddingVertical: 14,
         paddingHorizontal: 8,
         alignItems: "center",
     },
@@ -532,35 +641,41 @@ const styles = StyleSheet.create({
         textAlign: "center",
     },
 
-    deleteButton: {
-        backgroundColor: COLORS.bg1,
-        borderWidth: 1,
-        borderColor: COLORS.red,
-        padding: 16,
-        borderRadius: 10,
-        alignItems: "center",
-        marginTop: 30,
-    },
-
-    deleteButtonText: {
-        color: COLORS.red,
-        fontSize: 17,
-        fontWeight: "bold",
+    actionsRow: {
+        flexDirection: "row",
+        gap: 10,
+        marginTop: 24,
     },
 
     resetButton: {
+        flex: 1,
         backgroundColor: COLORS.bg1,
         borderWidth: 1,
         borderColor: COLORS.blue,
-        padding: 16,
+        padding: 14,
         borderRadius: 10,
         alignItems: "center",
-        marginTop: 30,
     },
 
     resetButtonText: {
         color: COLORS.blue,
-        fontSize: 17,
+        fontSize: 16,
+        fontWeight: "bold",
+    },
+
+    deleteButton: {
+        flex: 1,
+        backgroundColor: COLORS.bg1,
+        borderWidth: 1,
+        borderColor: COLORS.red,
+        padding: 14,
+        borderRadius: 10,
+        alignItems: "center",
+    },
+
+    deleteButtonText: {
+        color: COLORS.red,
+        fontSize: 16,
         fontWeight: "bold",
     },
 

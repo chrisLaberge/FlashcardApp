@@ -5,6 +5,7 @@ import { useCallback, useState } from "react";
 import {
     ActivityIndicator,
     Pressable,
+    ScrollView,
     StyleSheet,
     Text,
     TextInput,
@@ -40,6 +41,7 @@ export default function AddCardScreen() {
 
     const [learningText, setLearningText] = useState("");
     const [localizedText, setLocalizedText] = useState("");
+    const [exampleSentence, setExampleSentence] = useState("");
 
     const [translating, setTranslating] =
         useState<TranslationDirection>(null);
@@ -144,10 +146,11 @@ export default function AddCardScreen() {
             return;
         }
 
-        await addCard(learningText, localizedText, Number(deckId));
+        await addCard(learningText, localizedText, exampleSentence, Number(deckId));
 
         setLearningText("");
         setLocalizedText("");
+        setExampleSentence("");
 
         router.back();
     };
@@ -187,19 +190,33 @@ export default function AddCardScreen() {
     };
 
     // --------------------------------------------------
+    // Faded label inside the input (flag + code, or plain text)
+    // --------------------------------------------------
+
+    const renderWatermark = (label: string) => (
+        <Text style={styles.watermark} pointerEvents="none">
+            {label}
+        </Text>
+    );
+
+    // --------------------------------------------------
     // UI
     // --------------------------------------------------
 
     return (
-        <View style={styles.container}>
-            <Text style={styles.title}>Add Card</Text>
+        <ScrollView
+            style={styles.container}
+            contentContainerStyle={styles.content}
+            keyboardShouldPersistTaps="handled"
+        >
+            <Text style={styles.title}></Text>
+            <Text style={styles.title}></Text>
+            <Text style={styles.title}></Text>
+            <Text style={styles.title}></Text>
 
-            <Text style={styles.subtitle}>Create a new flashcard</Text>
 
             <View style={styles.form}>
                 {/* Learning language */}
-
-                <Text style={styles.flag}>{learningLanguageFlag}</Text>
 
                 <View style={styles.inputContainer}>
                     <TextInput
@@ -211,12 +228,13 @@ export default function AddCardScreen() {
                         multiline
                     />
 
+                    {renderWatermark(
+                        `${learningLanguageFlag} ${learningLanguageCode.toUpperCase()}`
+                    )}
                     {renderTranslateButton("learningToLocalized")}
                 </View>
 
                 {/* Localized language */}
-
-                <Text style={styles.flag}>{localizedLanguageFlag}</Text>
 
                 <View style={styles.inputContainer}>
                     <TextInput
@@ -228,7 +246,25 @@ export default function AddCardScreen() {
                         multiline
                     />
 
+                    {renderWatermark(
+                        `${localizedLanguageFlag} ${localizedLanguageCode.toUpperCase()}`
+                    )}
                     {renderTranslateButton("localizedToLearning")}
+                </View>
+
+                {/* Example */}
+
+                <View style={styles.inputContainer}>
+                    <TextInput
+                        style={[styles.input, styles.exampleInput]}
+                        value={exampleSentence}
+                        onChangeText={setExampleSentence}
+                        placeholder="Example sentence (optional)"
+                        placeholderTextColor={COLORS.gray}
+                        multiline
+                    />
+
+                    {renderWatermark("Example")}
                 </View>
 
                 {/* Add card */}
@@ -243,7 +279,7 @@ export default function AddCardScreen() {
                     <Text style={styles.buttonText}>Add Card</Text>
                 </Pressable>
             </View>
-        </View>
+        </ScrollView>
     );
 }
 
@@ -251,8 +287,12 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: COLORS.bg0,
+    },
+
+    content: {
         padding: 20,
         paddingTop: 40,
+        paddingBottom: 40,
     },
 
     title: {
@@ -265,16 +305,11 @@ const styles = StyleSheet.create({
     subtitle: {
         color: COLORS.gray,
         fontSize: 16,
-        marginBottom: 40,
+        marginBottom: 24,
     },
 
     form: {
         gap: 12,
-    },
-
-    flag: {
-        fontSize: 20,
-        marginLeft: 8,
     },
 
     inputContainer: {
@@ -287,11 +322,29 @@ const styles = StyleSheet.create({
         fontSize: 18,
         padding: 15,
         paddingRight: 56,
+        paddingBottom: 22,
+        paddingTop: 22,
         borderRadius: 10,
         borderWidth: 1,
         borderColor: COLORS.bg2,
         minHeight: 55,
         textAlignVertical: "top",
+    },
+
+    exampleInput: {
+        minHeight: 55,
+        paddingRight: 15,
+        fontSize: 16,
+    },
+
+    // Faded language tag in the bottom-right corner of a field
+    watermark: {
+        position: "absolute",
+        right: 12,
+        bottom: 8,
+        color: COLORS.gray,
+        fontSize: 13,
+        opacity: 0.45,
     },
 
     // Tinted circle, sits at the top-right of the field
@@ -322,7 +375,7 @@ const styles = StyleSheet.create({
         padding: 16,
         borderRadius: 10,
         alignItems: "center",
-        marginTop: 25,
+        marginTop: 12,
     },
 
     buttonPressed: {

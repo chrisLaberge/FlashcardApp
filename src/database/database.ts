@@ -23,6 +23,7 @@ async function getDatabase() {
     deck_id INTEGER NOT NULL,
     learning_text TEXT NOT NULL,
     localized_text TEXT NOT NULL,
+    example_sentence TEXT,
 
     FOREIGN KEY(deck_id)
                     REFERENCES decks(id)
@@ -49,16 +50,18 @@ async function getDatabase() {
 export async function addCard(
     learningText: string,
     localizedText: string,
+    exampleSentence: string,
     deckId: number
 ) {
     const database = await getDatabase();
 
     const result = await database.runAsync(
         `INSERT INTO cards
-    (learning_text, localized_text, deck_id)
-VALUES(?, ?, ?)`,
+    (learning_text, localized_text, example_sentence, deck_id)
+VALUES(?, ?, ?, ?)`,
         learningText,
         localizedText,
+        exampleSentence,
         deckId
     );
 
@@ -75,6 +78,7 @@ export async function getCards(deckId: number): Promise<Card[]> {
         id: number;
         learning_text: string;
         localized_text: string;
+        example_sentence: string;
     }>(
         "SELECT * FROM cards WHERE deck_id = ?",
         deckId
@@ -85,8 +89,10 @@ export async function getCards(deckId: number): Promise<Card[]> {
             new Card(
                 row.learning_text,
                 row.localized_text,
-                row.id
+                row.example_sentence,
+                row.id,
             )
+
     );
 }
 
@@ -102,17 +108,20 @@ export async function deleteCard(id: number) {
 export async function updateCard(
     id: number,
     learningText: string,
-    localizedText: string
+    localizedText: string,
+    exampleSentence: string
 ) {
     const database = await getDatabase();
 
     await database.runAsync(
         `UPDATE cards
          SET learning_text = ?,
-    localized_text = ?
+    localized_text = ?,
+    example_sentence = ?
         WHERE id = ? `,
         learningText,
         localizedText,
+        exampleSentence,
         id
     );
 }
@@ -228,12 +237,14 @@ export async function getDueCards(
         id: number;
         learning_text: string;
         localized_text: string;
+        example_sentence: string;
     }>(
         `
         SELECT
 cards.id,
     cards.learning_text,
-    cards.localized_text
+    cards.localized_text,
+    cards.example_sentence
         FROM cards
         JOIN card_progress
             ON cards.id = card_progress.card_id
@@ -252,6 +263,7 @@ cards.id,
             new Card(
                 row.learning_text,
                 row.localized_text,
+                row.example_sentence,
                 row.id
             )
     );
@@ -397,6 +409,7 @@ export async function getCard(
         id: number;
         learning_text: string;
         localized_text: string;
+        example_sentence: string;
     }>(
         "SELECT * FROM cards WHERE id = ?",
         id
@@ -409,6 +422,7 @@ export async function getCard(
     return new Card(
         row.learning_text,
         row.localized_text,
+        row.example_sentence,
         row.id
     );
 }

@@ -49,6 +49,9 @@ export default function CardsScreen() {
                 .includes(search.toLowerCase()) ||
             card.localizedText
                 .toLowerCase()
+                .includes(search.toLowerCase()) ||
+            card.exampleSentence
+                .toLowerCase()
                 .includes(search.toLowerCase())
     );
 
@@ -104,6 +107,9 @@ export default function CardsScreen() {
 
                                 <Text style={styles.back}>
                                     {card.localizedText}
+                                </Text>
+                                <Text style={styles.example}>
+                                    {card.exampleSentence}
                                 </Text>
                             </View>
 
@@ -207,5 +213,10 @@ const styles = StyleSheet.create({
         borderColor: "#504945",
         borderRadius: 12,
         marginBottom: 20,
+    },
+    example: {
+        color: "#b8bb26",
+        fontSize: 16,
+        marginTop: 5,
     },
 });
