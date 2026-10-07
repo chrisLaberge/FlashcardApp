@@ -4,6 +4,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import {
     ActivityIndicator,
+    Image,
     Modal,
     Pressable,
     ScrollView,
@@ -12,9 +13,21 @@ import {
     TextInput,
     View,
 } from "react-native";
+
+import {
+    ImageSearchResult,
+    downloadImage,
+    searchImages,
+} from "@/services/imageApi";
+
+import {
+    addImage,
+    getCardImage,
+    setCardImage,
+} from "../database/database";
 import { getRomanization } from "../utils/romanization";
 
-import { translateText } from "@/services/api";
+import { translateText } from "@/services/translationApi";
 import { getLanguage } from "../constants/languages";
 import {
     deleteCard,
@@ -54,6 +67,13 @@ export default function EditCardScreen() {
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [showResetModal, setShowResetModal] = useState(false);
 
+    const [selectedImage, setSelectedImage] = useState<ImageSearchResult | null>(null);
+    const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(null);
+    const [imageResults, setImageResults] = useState<ImageSearchResult[]>([]);
+    const [imageQuery, setImageQuery] = useState("");
+    const [imageModalVisible, setImageModalVisible] = useState(false);
+    const [searchingImages, setSearchingImages] = useState(false);
+
     const [learningLanguageCode, setLearningLanguageCode] = useState("en");
     const [learningLanguageFlag, setLearningLanguageFlag] = useState("🌐");
 
@@ -80,6 +100,14 @@ export default function EditCardScreen() {
                 setProgress(cardProgress);
             }
 
+            const image = await getCardImage(cardId);
+
+            if (image) {
+                setCurrentImageUrl(
+                    `http://10.0.0.208:3000${image.file_path}`
+                );
+            }
+
             // Load deck language (same approach as AddCardScreen)
             const lastDeckId = await AsyncStorage.getItem("lastDeckId");
 
@@ -102,7 +130,10 @@ export default function EditCardScreen() {
 
     const saveChanges = async () => {
         const romanization =
-            (await getRomanization(learningText, learningLanguageCode)) ?? "";
+            (await getRomanization(
+                learningText,
+                learningLanguageCode
+            )) ?? "";
 
         await updateCard(
             cardId,
@@ -111,6 +142,26 @@ export default function EditCardScreen() {
             exampleSentence,
             romanization
         );
+
+        if (selectedImage) {
+            const downloaded =
+                await downloadImage(selectedImage);
+
+            const imageId = await addImage(
+                selectedImage.source,
+                String(selectedImage.id),
+                downloaded.imageUrl,
+                null,
+                selectedImage.pageUrl,
+                selectedImage.photographer,
+                selectedImage.photographerUrl
+            );
+
+            await setCardImage(
+                cardId,
+                imageId
+            );
+        }
 
         router.back();
     };
@@ -223,6 +274,40 @@ export default function EditCardScreen() {
         </Text>
     );
 
+    const searchForImages = async (query: string) => {
+        const trimmedQuery = query.trim();
+
+        if (!trimmedQuery || searchingImages) {
+            return;
+        }
+
+        setSearchingImages(true);
+
+        try {
+            const results = await searchImages(trimmedQuery);
+            setImageResults(results);
+        } catch (error) {
+            console.error("Image search failed:", error);
+        } finally {
+            setSearchingImages(false);
+        }
+    };
+
+    const openImagePicker = () => {
+        setImageQuery(
+            localizedText.trim() ||
+            learningText.trim()
+        );
+
+        setImageModalVisible(true);
+    };
+
+    const selectImage = (image: ImageSearchResult) => {
+        setSelectedImage(image);
+        setCurrentImageUrl(image.downloadUrl);
+        setImageModalVisible(false);
+    };
+
     // --------------------------------------------------
     // UI
     // --------------------------------------------------
@@ -233,6 +318,38 @@ export default function EditCardScreen() {
             contentContainerStyle={styles.content}
             keyboardShouldPersistTaps="handled"
         >
+
+            <Pressable
+                style={styles.mainImageContainer}
+                onPress={openImagePicker}
+            >
+                {currentImageUrl ? (
+                    <Image
+                        source={{ uri: currentImageUrl }}
+                        style={styles.mainImage}
+                    />
+                ) : (
+                    <View style={styles.imagePlaceholder}>
+                        <MaterialCommunityIcons
+                            name="image-outline"
+                            size={50}
+                            color={COLORS.gray}
+                        />
+                    </View>
+                )}
+
+                <View style={styles.changeImageBadge}>
+                    <MaterialCommunityIcons
+                        name="image-edit-outline"
+                        size={17}
+                        color={COLORS.fg}
+                    />
+
+                    <Text style={styles.changeImageText}>
+                        Change
+                    </Text>
+                </View>
+            </Pressable>
 
             {/* ---------- Card content ---------- */}
             <View style={styles.form}>
@@ -357,7 +474,6 @@ export default function EditCardScreen() {
             </View>
 
             <Text style={styles.title}></Text>
-            <Text style={styles.title}></Text>
 
             {/* ---------- Actions ---------- */}
             <View style={styles.actionsRow}>
@@ -461,6 +577,121 @@ export default function EditCardScreen() {
                                 </Text>
                             </Pressable>
                         </View>
+                    </View>
+                </View>
+            </Modal>
+
+            <Modal
+                visible={imageModalVisible}
+                animationType="slide"
+                transparent
+                onRequestClose={() => setImageModalVisible(false)}
+            >
+                <View style={styles.imageModalOverlay}>
+                    <View style={styles.imageModal}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.imageModalTitle}>
+                                Choose Image
+                            </Text>
+
+                            <Pressable
+                                onPress={() => setImageModalVisible(false)}
+                            >
+                                <MaterialCommunityIcons
+                                    name="close"
+                                    size={26}
+                                    color={COLORS.fg}
+                                />
+                            </Pressable>
+                        </View>
+
+                        <View style={styles.imageSearchRow}>
+                            <TextInput
+                                style={styles.imageSearchInput}
+                                value={imageQuery}
+                                onChangeText={setImageQuery}
+                                placeholder="Search images..."
+                                placeholderTextColor={COLORS.gray}
+                                onSubmitEditing={() =>
+                                    searchForImages(imageQuery)
+                                }
+                                returnKeyType="search"
+                            />
+
+                            <Pressable
+                                style={styles.searchButton}
+                                onPress={() =>
+                                    searchForImages(imageQuery)
+                                }
+                                disabled={searchingImages}
+                            >
+                                {searchingImages ? (
+                                    <ActivityIndicator
+                                        size="small"
+                                        color={COLORS.bg0}
+                                    />
+                                ) : (
+                                    <MaterialCommunityIcons
+                                        name="magnify"
+                                        size={22}
+                                        color={COLORS.bg0}
+                                    />
+                                )}
+                            </Pressable>
+                        </View>
+
+                        <ScrollView
+                            contentContainerStyle={styles.imageGrid}
+                        >
+                            {imageResults.map((image) => {
+                                const isSelected =
+                                    selectedImage?.id === image.id;
+
+                                return (
+                                    <Pressable
+                                        key={image.id}
+                                        style={[
+                                            styles.imageResult,
+                                            isSelected &&
+                                            styles.imageResultSelected,
+                                        ]}
+                                        onPress={() =>
+                                            selectImage(image)
+                                        }
+                                    >
+                                        <Image
+                                            source={{
+                                                uri: image.thumbnailUrl,
+                                            }}
+                                            style={styles.thumbnail}
+                                        />
+
+                                        {isSelected && (
+                                            <View
+                                                style={
+                                                    styles.selectedOverlay
+                                                }
+                                            >
+                                                <MaterialCommunityIcons
+                                                    name="check-circle"
+                                                    size={30}
+                                                    color={COLORS.yellow}
+                                                />
+                                            </View>
+                                        )}
+                                    </Pressable>
+                                );
+                            })}
+                        </ScrollView>
+
+                        <Pressable
+                            style={styles.doneButton}
+                            onPress={() => setImageModalVisible(false)}
+                        >
+                            <Text style={styles.buttonText}>
+                                Done
+                            </Text>
+                        </Pressable>
                     </View>
                 </View>
             </Modal>
@@ -768,6 +999,154 @@ const styles = StyleSheet.create({
     deleteConfirmText: {
         color: COLORS.fg,
         fontSize: 16,
+        fontWeight: "bold",
+    },
+
+    mainImageContainer: {
+        width: "100%",
+        height: 230,
+        borderRadius: 14,
+        overflow: "hidden",
+        marginBottom: 18,
+        backgroundColor: COLORS.bg1,
+        borderWidth: 1,
+        borderColor: COLORS.bg2,
+        position: "relative",
+    },
+
+    mainImage: {
+        width: "100%",
+        height: "100%",
+        resizeMode: "cover",
+    },
+
+    imagePlaceholder: {
+        flex: 1,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+
+    changeImageBadge: {
+        position: "absolute",
+        right: 10,
+        bottom: 10,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 5,
+        backgroundColor: "rgba(40,40,40,0.85)",
+        paddingHorizontal: 10,
+        paddingVertical: 7,
+        borderRadius: 8,
+    },
+
+    changeImageText: {
+        color: COLORS.fg,
+        fontSize: 13,
+        fontWeight: "600",
+    },
+
+    imageModalOverlay: {
+        flex: 1,
+        backgroundColor: "rgba(0,0,0,0.65)",
+        justifyContent: "flex-end",
+    },
+
+    imageModal: {
+        height: "82%",
+        backgroundColor: COLORS.bg0,
+        borderTopLeftRadius: 18,
+        borderTopRightRadius: 18,
+        padding: 20,
+    },
+
+    modalHeader: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        marginBottom: 15,
+    },
+
+    imageModalTitle: {
+        color: COLORS.fg,
+        fontSize: 22,
+        fontWeight: "bold",
+    },
+
+    imageSearchRow: {
+        flexDirection: "row",
+        gap: 8,
+    },
+
+    imageSearchInput: {
+        flex: 1,
+        backgroundColor: COLORS.bg1,
+        color: COLORS.fg,
+        fontSize: 16,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: COLORS.bg2,
+    },
+
+    searchButton: {
+        width: 48,
+        borderRadius: 10,
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: COLORS.yellowDark,
+    },
+
+    imageGrid: {
+        flexDirection: "row",
+        flexWrap: "wrap",
+        gap: 8,
+        paddingTop: 15,
+        paddingBottom: 15,
+    },
+
+    imageResult: {
+        width: "18.4%",
+        aspectRatio: 1,
+        borderRadius: 8,
+        overflow: "hidden",
+        borderWidth: 2,
+        borderColor: "transparent",
+        position: "relative",
+    },
+
+    imageResultSelected: {
+        borderColor: COLORS.yellow,
+    },
+
+    thumbnail: {
+        width: "100%",
+        height: "100%",
+    },
+
+    selectedOverlay: {
+        position: "absolute",
+        left: 0,
+        right: 0,
+        top: 0,
+        bottom: 0,
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: "rgba(40,40,40,0.35)",
+    },
+
+    doneButton: {
+        backgroundColor: COLORS.yellowDark,
+        padding: 15,
+        borderRadius: 10,
+        alignItems: "center",
+        minHeight: 52,
+        justifyContent: "center",
+    },
+
+    buttonText: {
+        color: COLORS.bg0,
+        fontSize: 17,
         fontWeight: "bold",
     },
 });

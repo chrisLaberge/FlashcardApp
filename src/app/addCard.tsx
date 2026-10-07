@@ -1,9 +1,11 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
     ActivityIndicator,
+    Image,
+    Modal,
     Pressable,
     ScrollView,
     StyleSheet,
@@ -12,12 +14,27 @@ import {
     View,
 } from "react-native";
 
-import { translateText } from "@/services/api";
+import {
+    addCard,
+    addImage,
+    getDecks,
+    setCardImage,
+} from "../database/database";
+
+import {
+    ImageSearchResult,
+    downloadImage,
+    searchImages,
+} from "@/services/imageApi";
+
+import { translateText } from "@/services/translationApi";
 import { getRomanization } from "@/utils/romanization";
 import { getLanguage } from "../constants/languages";
-import { addCard, getDecks } from "../database/database";
 
-type TranslationDirection = "learningToLocalized" | "localizedToLearning" | null;
+type TranslationDirection =
+    | "learningToLocalized"
+    | "localizedToLearning"
+    | null;
 
 // Gruvbox palette
 const COLORS = {
@@ -31,21 +48,52 @@ const COLORS = {
 };
 
 export default function AddCardScreen() {
-    const { deckId } = useLocalSearchParams<{ deckId?: string }>();
+    const { deckId } =
+        useLocalSearchParams<{ deckId?: string }>();
 
-    const [learningLanguageCode, setLearningLanguageCode] = useState("en");
-    const [learningLanguageFlag, setLearningLanguageFlag] = useState("🌐");
+    const [learningLanguageCode, setLearningLanguageCode] =
+        useState("en");
 
-    // TODO: Replace these when localized language becomes selectable
+    const [learningLanguageFlag, setLearningLanguageFlag] =
+        useState("🌐");
+
+    // TODO: Replace when localized language becomes selectable
     const localizedLanguageCode = "en";
     const localizedLanguageFlag = "🇬🇧";
 
-    const [learningText, setLearningText] = useState("");
-    const [localizedText, setLocalizedText] = useState("");
-    const [exampleSentence, setExampleSentence] = useState("");
+    const [learningText, setLearningText] =
+        useState("");
+
+    const [localizedText, setLocalizedText] =
+        useState("");
+
+    const [exampleSentence, setExampleSentence] =
+        useState("");
 
     const [translating, setTranslating] =
         useState<TranslationDirection>(null);
+
+    // --------------------------------------------------
+    // Images
+    // --------------------------------------------------
+
+    const [imageResults, setImageResults] =
+        useState<ImageSearchResult[]>([]);
+
+    const [selectedImage, setSelectedImage] =
+        useState<ImageSearchResult | null>(null);
+
+    const [imageQuery, setImageQuery] =
+        useState("");
+
+    const [searchingImages, setSearchingImages] =
+        useState(false);
+
+    const [imageModalVisible, setImageModalVisible] =
+        useState(false);
+
+    const [savingCard, setSavingCard] =
+        useState(false);
 
     // --------------------------------------------------
     // Load deck language
@@ -54,7 +102,8 @@ export default function AddCardScreen() {
     useFocusEffect(
         useCallback(() => {
             const loadDeck = async () => {
-                const lastDeckId = await AsyncStorage.getItem("lastDeckId");
+                const lastDeckId =
+                    await AsyncStorage.getItem("lastDeckId");
 
                 if (!lastDeckId) {
                     setLearningLanguageCode("en");
@@ -65,7 +114,8 @@ export default function AddCardScreen() {
                 const decks = await getDecks();
 
                 const deck = decks.find(
-                    (deck) => deck.id === Number(lastDeckId)
+                    (deck) =>
+                        deck.id === Number(lastDeckId)
                 );
 
                 if (!deck) {
@@ -74,10 +124,16 @@ export default function AddCardScreen() {
                     return;
                 }
 
-                const language = getLanguage(deck.language);
+                const language =
+                    getLanguage(deck.language);
 
-                setLearningLanguageCode(language?.code ?? "en");
-                setLearningLanguageFlag(language?.flag ?? "🌐");
+                setLearningLanguageCode(
+                    language?.code ?? "en"
+                );
+
+                setLearningLanguageFlag(
+                    language?.flag ?? "🌐"
+                );
             };
 
             loadDeck();
@@ -89,15 +145,21 @@ export default function AddCardScreen() {
     // --------------------------------------------------
 
     const translate = async (
-        direction: Exclude<TranslationDirection, null>
+        direction: Exclude<
+            TranslationDirection,
+            null
+        >
     ) => {
         if (translating !== null) {
             return;
         }
 
-        const isLearningSource = direction === "learningToLocalized";
+        const isLearningSource =
+            direction === "learningToLocalized";
 
-        const sourceText = isLearningSource ? learningText : localizedText;
+        const sourceText = isLearningSource
+            ? learningText
+            : localizedText;
 
         const targetLanguage = isLearningSource
             ? localizedLanguageCode
@@ -109,7 +171,8 @@ export default function AddCardScreen() {
 
         if (
             isLearningSource &&
-            learningLanguageCode === localizedLanguageCode
+            learningLanguageCode ===
+            localizedLanguageCode
         ) {
             return;
         }
@@ -117,10 +180,11 @@ export default function AddCardScreen() {
         setTranslating(direction);
 
         try {
-            const translation = await translateText(
-                sourceText,
-                targetLanguage
-            );
+            const translation =
+                await translateText(
+                    sourceText,
+                    targetLanguage
+                );
 
             if (isLearningSource) {
                 setLocalizedText(translation);
@@ -128,10 +192,114 @@ export default function AddCardScreen() {
                 setLearningText(translation);
             }
         } catch (error) {
-            console.error("Translation failed:", error);
+            console.error(
+                "Translation failed:",
+                error
+            );
         } finally {
             setTranslating(null);
         }
+    };
+
+    // --------------------------------------------------
+    // Image search
+    // --------------------------------------------------
+
+    const searchForImages = async (
+        query: string,
+        automaticallySelectFirst = false
+    ) => {
+        const trimmedQuery = query.trim();
+
+        if (
+            !trimmedQuery ||
+            searchingImages
+        ) {
+            return;
+        }
+
+        setSearchingImages(true);
+
+        try {
+            const results =
+                await searchImages(trimmedQuery);
+
+            setImageResults(results);
+
+            if (
+                automaticallySelectFirst &&
+                results.length > 0
+            ) {
+                setSelectedImage(results[0]);
+            }
+        } catch (error) {
+            console.error(
+                "Image search failed:",
+                error
+            );
+        } finally {
+            setSearchingImages(false);
+        }
+    };
+
+    // --------------------------------------------------
+    // Automatically search for image
+    // --------------------------------------------------
+
+    useEffect(() => {
+        const query =
+            localizedText.trim() ||
+            learningText.trim();
+
+        if (!query) {
+            setSelectedImage(null);
+            setImageResults([]);
+            return;
+        }
+
+        const timeout = setTimeout(() => {
+            setImageQuery(query);
+
+            searchForImages(
+                query,
+                true
+            );
+        }, 700);
+
+        return () => {
+            clearTimeout(timeout);
+        };
+    }, [localizedText, learningText]);
+
+    // --------------------------------------------------
+    // Open image picker
+    // --------------------------------------------------
+
+    const openImagePicker = () => {
+        const query =
+            localizedText.trim() ||
+            learningText.trim();
+
+        setImageQuery(query);
+        setImageModalVisible(true);
+
+        if (
+            imageResults.length === 0 &&
+            query
+        ) {
+            searchForImages(query);
+        }
+    };
+
+    // --------------------------------------------------
+    // Select image
+    // --------------------------------------------------
+
+    const selectImage = (
+        image: ImageSearchResult
+    ) => {
+        setSelectedImage(image);
+        setImageModalVisible(false);
     };
 
     // --------------------------------------------------
@@ -139,43 +307,101 @@ export default function AddCardScreen() {
     // --------------------------------------------------
 
     const addCardToDatabase = async () => {
-        const lastDeckId = await AsyncStorage.getItem("lastDeckId");
-        const decks = await getDecks();
+        if (savingCard) {
+            return;
+        }
 
-
+        const lastDeckId =
+            await AsyncStorage.getItem(
+                "lastDeckId"
+            );
 
         if (!lastDeckId) {
             console.error("No selected deck");
             return;
         }
 
-        const id = Number(lastDeckId);
-        console.log("lastDeckId:", id);
-        console.log("existing decks:", decks);
-
-        if (!learningText.trim() || !localizedText.trim()) {
+        if (
+            !learningText.trim() ||
+            !localizedText.trim()
+        ) {
             return;
         }
 
-        const romanization =
-            (await getRomanization(
+        setSavingCard(true);
+
+        try {
+            const deckIdNumber =
+                Number(lastDeckId);
+
+            const romanization =
+                (await getRomanization(
+                    learningText,
+                    learningLanguageCode
+                )) ?? "";
+
+            // ------------------------------------------
+            // Download and save selected image
+            // ------------------------------------------
+
+            let imageId: number | null = null;
+
+            if (selectedImage) {
+                const downloaded =
+                    await downloadImage(
+                        selectedImage
+                    );
+
+                imageId = await addImage(
+                    selectedImage.source,
+                    String(selectedImage.id),
+                    downloaded.imageUrl,
+                    null,
+                    selectedImage.pageUrl,
+                    selectedImage.photographer,
+                    selectedImage.photographerUrl
+                );
+            }
+
+            // ------------------------------------------
+            // Create card
+            // ------------------------------------------
+
+            const cardId = await addCard(
                 learningText,
-                learningLanguageCode
-            )) ?? "";
+                localizedText,
+                exampleSentence,
+                romanization,
+                deckIdNumber
+            );
 
-        await addCard(
-            learningText,
-            localizedText,
-            exampleSentence,
-            romanization,
-            id
-        );
+            // ------------------------------------------
+            // Attach image
+            // ------------------------------------------
 
-        setLearningText("");
-        setLocalizedText("");
-        setExampleSentence("");
+            if (imageId !== null) {
+                await setCardImage(
+                    cardId,
+                    imageId
+                );
+            }
 
-        router.back();
+            setLearningText("");
+            setLocalizedText("");
+            setExampleSentence("");
+            setImageQuery("");
+            setImageResults([]);
+            setSelectedImage(null);
+
+            router.back();
+        } catch (error) {
+            console.error(
+                "Failed to add card:",
+                error
+            );
+        } finally {
+            setSavingCard(false);
+        }
     };
 
     // --------------------------------------------------
@@ -183,24 +409,38 @@ export default function AddCardScreen() {
     // --------------------------------------------------
 
     const renderTranslateButton = (
-        direction: Exclude<TranslationDirection, null>
+        direction: Exclude<
+            TranslationDirection,
+            null
+        >
     ) => {
-        const isLoading = translating === direction;
-        const isDisabled = translating !== null;
+        const isLoading =
+            translating === direction;
+
+        const isDisabled =
+            translating !== null;
 
         return (
             <Pressable
                 style={({ pressed }) => [
                     styles.translateButton,
-                    pressed && styles.translateButtonPressed,
-                    isDisabled && !isLoading && styles.translateButtonDisabled,
+                    pressed &&
+                    styles.translateButtonPressed,
+                    isDisabled &&
+                    !isLoading &&
+                    styles.translateButtonDisabled,
                 ]}
-                onPress={() => translate(direction)}
+                onPress={() =>
+                    translate(direction)
+                }
                 disabled={isDisabled}
                 hitSlop={8}
             >
                 {isLoading ? (
-                    <ActivityIndicator size="small" color={COLORS.yellow} />
+                    <ActivityIndicator
+                        size="small"
+                        color={COLORS.yellow}
+                    />
                 ) : (
                     <MaterialCommunityIcons
                         name="translate"
@@ -213,11 +453,16 @@ export default function AddCardScreen() {
     };
 
     // --------------------------------------------------
-    // Faded label inside the input (flag + code, or plain text)
+    // Watermark
     // --------------------------------------------------
 
-    const renderWatermark = (label: string) => (
-        <Text style={styles.watermark} pointerEvents="none">
+    const renderWatermark = (
+        label: string
+    ) => (
+        <Text
+            style={styles.watermark}
+            pointerEvents="none"
+        >
             {label}
         </Text>
     );
@@ -227,82 +472,443 @@ export default function AddCardScreen() {
     // --------------------------------------------------
 
     return (
-        <ScrollView
-            style={styles.container}
-            contentContainerStyle={styles.content}
-            keyboardShouldPersistTaps="handled"
-        >
-            <Text style={styles.title}></Text>
-            <Text style={styles.title}></Text>
-            <Text style={styles.title}></Text>
-            <Text style={styles.title}></Text>
-
-
-            <View style={styles.form}>
-                {/* Learning language */}
-
-                <View style={styles.inputContainer}>
-                    <TextInput
-                        style={styles.input}
-                        value={learningText}
-                        onChangeText={setLearningText}
-                        placeholder="Enter the word or phrase"
-                        placeholderTextColor={COLORS.gray}
-                        multiline
-                    />
-
-                    {renderWatermark(
-                        `${learningLanguageFlag} ${learningLanguageCode.toUpperCase()}`
-                    )}
-                    {renderTranslateButton("learningToLocalized")}
-                </View>
-
-                {/* Localized language */}
-
-                <View style={styles.inputContainer}>
-                    <TextInput
-                        style={styles.input}
-                        value={localizedText}
-                        onChangeText={setLocalizedText}
-                        placeholder="Enter the meaning"
-                        placeholderTextColor={COLORS.gray}
-                        multiline
-                    />
-
-                    {renderWatermark(
-                        `${localizedLanguageFlag} ${localizedLanguageCode.toUpperCase()}`
-                    )}
-                    {renderTranslateButton("localizedToLearning")}
-                </View>
-
-                {/* Example */}
-
-                <View style={styles.inputContainer}>
-                    <TextInput
-                        style={[styles.input, styles.exampleInput]}
-                        value={exampleSentence}
-                        onChangeText={setExampleSentence}
-                        placeholder="Example sentence (optional)"
-                        placeholderTextColor={COLORS.gray}
-                        multiline
-                    />
-
-                    {renderWatermark("Example")}
-                </View>
-
-                {/* Add card */}
+        <View style={styles.container}>
+            <ScrollView
+                contentContainerStyle={
+                    styles.content
+                }
+                keyboardShouldPersistTaps="handled"
+            >
+                {/* Automatic image */}
 
                 <Pressable
-                    style={({ pressed }) => [
-                        styles.button,
-                        pressed && styles.buttonPressed,
-                    ]}
-                    onPress={addCardToDatabase}
+                    style={styles.mainImageContainer}
+                    onPress={openImagePicker}
                 >
-                    <Text style={styles.buttonText}>Add Card</Text>
+                    {selectedImage ? (
+                        <Image
+                            source={{
+                                uri:
+                                    selectedImage.downloadUrl,
+                            }}
+                            style={styles.mainImage}
+                        />
+                    ) : (
+                        <View
+                            style={
+                                styles.imagePlaceholder
+                            }
+                        >
+                            {searchingImages ? (
+                                <ActivityIndicator
+                                    size="large"
+                                    color={
+                                        COLORS.yellow
+                                    }
+                                />
+                            ) : (
+                                <MaterialCommunityIcons
+                                    name="image-outline"
+                                    size={50}
+                                    color={
+                                        COLORS.gray
+                                    }
+                                />
+                            )}
+                        </View>
+                    )}
+
+                    <View
+                        style={
+                            styles.changeImageBadge
+                        }
+                    >
+                        <MaterialCommunityIcons
+                            name="image-edit-outline"
+                            size={17}
+                            color={COLORS.fg}
+                        />
+
+                        <Text
+                            style={
+                                styles.changeImageText
+                            }
+                        >
+                            Change
+                        </Text>
+                    </View>
                 </Pressable>
-            </View>
-        </ScrollView>
+
+                <View style={styles.form}>
+                    {/* Learning language */}
+
+                    <View
+                        style={
+                            styles.inputContainer
+                        }
+                    >
+                        <TextInput
+                            style={styles.input}
+                            value={learningText}
+                            onChangeText={
+                                setLearningText
+                            }
+                            placeholder="Enter the word or phrase"
+                            placeholderTextColor={
+                                COLORS.gray
+                            }
+                            multiline
+                        />
+
+                        {renderWatermark(
+                            `${learningLanguageFlag} ${learningLanguageCode.toUpperCase()} `
+                        )}
+
+                        {renderTranslateButton(
+                            "learningToLocalized"
+                        )}
+                    </View>
+
+                    {/* Localized language */}
+
+                    <View
+                        style={
+                            styles.inputContainer
+                        }
+                    >
+                        <TextInput
+                            style={styles.input}
+                            value={localizedText}
+                            onChangeText={
+                                setLocalizedText
+                            }
+                            placeholder="Enter the meaning"
+                            placeholderTextColor={
+                                COLORS.gray
+                            }
+                            multiline
+                        />
+
+                        {renderWatermark(
+                            `${localizedLanguageFlag} ${localizedLanguageCode.toUpperCase()} `
+                        )}
+
+                        {renderTranslateButton(
+                            "localizedToLearning"
+                        )}
+                    </View>
+
+                    {/* Example */}
+
+                    <View
+                        style={
+                            styles.inputContainer
+                        }
+                    >
+                        <TextInput
+                            style={[
+                                styles.input,
+                                styles.exampleInput,
+                            ]}
+                            value={
+                                exampleSentence
+                            }
+                            onChangeText={
+                                setExampleSentence
+                            }
+                            placeholder="Example sentence (optional)"
+                            placeholderTextColor={
+                                COLORS.gray
+                            }
+                            multiline
+                        />
+
+                        {renderWatermark(
+                            "Example"
+                        )}
+                    </View>
+
+                    {/* Add card */}
+
+                    <Pressable
+                        style={({ pressed }) => [
+                            styles.button,
+                            pressed &&
+                            styles.buttonPressed,
+                            savingCard &&
+                            styles.buttonDisabled,
+                        ]}
+                        onPress={
+                            addCardToDatabase
+                        }
+                        disabled={savingCard}
+                    >
+                        {savingCard ? (
+                            <ActivityIndicator
+                                size="small"
+                                color={COLORS.bg0}
+                            />
+                        ) : (
+                            <Text
+                                style={
+                                    styles.buttonText
+                                }
+                            >
+                                Add Card
+                            </Text>
+                        )}
+                    </Pressable>
+                </View>
+            </ScrollView>
+
+            {/* Image picker modal */}
+
+            <Modal
+                visible={imageModalVisible}
+                animationType="slide"
+                transparent
+                onRequestClose={() =>
+                    setImageModalVisible(false)
+                }
+            >
+                <View
+                    style={
+                        styles.modalOverlay
+                    }
+                >
+                    <View
+                        style={
+                            styles.modalContainer
+                        }
+                    >
+                        {/* Modal header */}
+
+                        <View
+                            style={
+                                styles.modalHeader
+                            }
+                        >
+                            <Text
+                                style={
+                                    styles.modalTitle
+                                }
+                            >
+                                Choose Image
+                            </Text>
+
+                            <Pressable
+                                onPress={() =>
+                                    setImageModalVisible(
+                                        false
+                                    )
+                                }
+                                style={
+                                    styles.closeButton
+                                }
+                            >
+                                <MaterialCommunityIcons
+                                    name="close"
+                                    size={24}
+                                    color={
+                                        COLORS.fg
+                                    }
+                                />
+                            </Pressable>
+                        </View>
+
+                        {/* Search */}
+
+                        <View
+                            style={
+                                styles.imageSearchRow
+                            }
+                        >
+                            <TextInput
+                                style={
+                                    styles.imageSearchInput
+                                }
+                                value={
+                                    imageQuery
+                                }
+                                onChangeText={
+                                    setImageQuery
+                                }
+                                placeholder="Search images..."
+                                placeholderTextColor={
+                                    COLORS.gray
+                                }
+                                onSubmitEditing={() =>
+                                    searchForImages(
+                                        imageQuery
+                                    )
+                                }
+                                returnKeyType="search"
+                            />
+
+                            <Pressable
+                                style={({ pressed }) => [
+                                    styles.searchButton,
+                                    pressed &&
+                                    styles.searchButtonPressed,
+                                ]}
+                                onPress={() =>
+                                    searchForImages(
+                                        imageQuery
+                                    )
+                                }
+                                disabled={
+                                    searchingImages
+                                }
+                            >
+                                {searchingImages ? (
+                                    <ActivityIndicator
+                                        size="small"
+                                        color={
+                                            COLORS.bg0
+                                        }
+                                    />
+                                ) : (
+                                    <MaterialCommunityIcons
+                                        name="magnify"
+                                        size={22}
+                                        color={
+                                            COLORS.bg0
+                                        }
+                                    />
+                                )}
+                            </Pressable>
+                        </View>
+
+                        {/* Results */}
+
+                        <ScrollView
+                            contentContainerStyle={
+                                styles.modalResults
+                            }
+                        >
+                            {imageResults.length > 0 ? (
+                                <View
+                                    style={
+                                        styles.imageGrid
+                                    }
+                                >
+                                    {imageResults.map(
+                                        (image) => {
+                                            const isSelected =
+                                                selectedImage?.id ===
+                                                image.id;
+
+                                            return (
+                                                <Pressable
+                                                    key={
+                                                        image.id
+                                                    }
+                                                    style={[
+                                                        styles.imageResult,
+                                                        isSelected &&
+                                                        styles.imageResultSelected,
+                                                    ]}
+                                                    onPress={() =>
+                                                        selectImage(
+                                                            image
+                                                        )
+                                                    }
+                                                >
+                                                    <Image
+                                                        source={{
+                                                            uri: image.thumbnailUrl,
+                                                        }}
+                                                        style={
+                                                            styles.thumbnail
+                                                        }
+                                                    />
+
+                                                    {isSelected && (
+                                                        <View
+                                                            style={
+                                                                styles.selectedOverlay
+                                                            }
+                                                        >
+                                                            <MaterialCommunityIcons
+                                                                name="check-circle"
+                                                                size={
+                                                                    30
+                                                                }
+                                                                color={
+                                                                    COLORS.yellow
+                                                                }
+                                                            />
+                                                        </View>
+                                                    )}
+                                                </Pressable>
+                                            );
+                                        }
+                                    )}
+                                </View>
+                            ) : searchingImages ? (
+                                <View
+                                    style={
+                                        styles.emptyState
+                                    }
+                                >
+                                    <ActivityIndicator
+                                        size="large"
+                                        color={
+                                            COLORS.yellow
+                                        }
+                                    />
+                                </View>
+                            ) : (
+                                <View
+                                    style={
+                                        styles.emptyState
+                                    }
+                                >
+                                    <MaterialCommunityIcons
+                                        name="image-search-outline"
+                                        size={42}
+                                        color={
+                                            COLORS.gray
+                                        }
+                                    />
+
+                                    <Text
+                                        style={
+                                            styles.emptyStateText
+                                        }
+                                    >
+                                        Search for an image
+                                    </Text>
+                                </View>
+                            )}
+                        </ScrollView>
+
+                        {/* Done */}
+
+                        <Pressable
+                            style={({ pressed }) => [
+                                styles.doneButton,
+                                pressed &&
+                                styles.buttonPressed,
+                            ]}
+                            onPress={() =>
+                                setImageModalVisible(
+                                    false
+                                )
+                            }
+                        >
+                            <Text
+                                style={
+                                    styles.buttonText
+                                }
+                            >
+                                Done
+                            </Text>
+                        </Pressable>
+                    </View>
+                </View>
+            </Modal>
+        </View>
     );
 }
 
@@ -316,19 +922,6 @@ const styles = StyleSheet.create({
         padding: 20,
         paddingTop: 40,
         paddingBottom: 40,
-    },
-
-    title: {
-        color: COLORS.fg,
-        fontSize: 32,
-        fontWeight: "bold",
-        marginBottom: 5,
-    },
-
-    subtitle: {
-        color: COLORS.gray,
-        fontSize: 16,
-        marginBottom: 24,
     },
 
     form: {
@@ -360,7 +953,6 @@ const styles = StyleSheet.create({
         fontSize: 16,
     },
 
-    // Faded language tag in the bottom-right corner of a field
     watermark: {
         position: "absolute",
         right: 12,
@@ -370,7 +962,6 @@ const styles = StyleSheet.create({
         opacity: 0.45,
     },
 
-    // Tinted circle, sits at the top-right of the field
     translateButton: {
         position: "absolute",
         right: 10,
@@ -380,9 +971,11 @@ const styles = StyleSheet.create({
         borderRadius: 18,
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor: "rgba(250,189,47,0.12)",
+        backgroundColor:
+            "rgba(250,189,47,0.12)",
         borderWidth: 1,
-        borderColor: "rgba(250,189,47,0.35)",
+        borderColor:
+            "rgba(250,189,47,0.35)",
     },
 
     translateButtonPressed: {
@@ -393,16 +986,197 @@ const styles = StyleSheet.create({
         opacity: 0.4,
     },
 
+    /* Main automatic image */
+
+    mainImageContainer: {
+        width: "100%",
+        height: 230,
+        borderRadius: 14,
+        overflow: "hidden",
+        marginBottom: 18,
+        backgroundColor: COLORS.bg1,
+        borderWidth: 1,
+        borderColor: COLORS.bg2,
+        position: "relative",
+    },
+
+    mainImage: {
+        width: "100%",
+        height: "100%",
+        resizeMode: "cover",
+    },
+
+    imagePlaceholder: {
+        flex: 1,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+
+    changeImageBadge: {
+        position: "absolute",
+        right: 10,
+        bottom: 10,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 5,
+        backgroundColor: "rgba(40,40,40,0.85)",
+        paddingHorizontal: 10,
+        paddingVertical: 7,
+        borderRadius: 8,
+    },
+
+    changeImageText: {
+        color: COLORS.fg,
+        fontSize: 13,
+        fontWeight: "600",
+    },
+
+    /* Modal */
+
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: "rgba(0,0,0,0.65)",
+        justifyContent: "flex-end",
+    },
+
+    modalContainer: {
+        height: "82%",
+        backgroundColor: COLORS.bg0,
+        borderTopLeftRadius: 18,
+        borderTopRightRadius: 18,
+        padding: 20,
+    },
+
+    modalHeader: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        marginBottom: 15,
+    },
+
+    modalTitle: {
+        color: COLORS.fg,
+        fontSize: 22,
+        fontWeight: "bold",
+    },
+
+    closeButton: {
+        width: 40,
+        height: 40,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+
+    imageSearchRow: {
+        flexDirection: "row",
+        gap: 8,
+    },
+
+    imageSearchInput: {
+        flex: 1,
+        backgroundColor: COLORS.bg1,
+        color: COLORS.fg,
+        fontSize: 16,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: COLORS.bg2,
+    },
+
+    searchButton: {
+        width: 48,
+        borderRadius: 10,
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: COLORS.yellowDark,
+    },
+
+    searchButtonPressed: {
+        opacity: 0.7,
+    },
+
+    modalResults: {
+        paddingTop: 15,
+        paddingBottom: 15,
+    },
+
+    imageGrid: {
+        flexDirection: "row",
+        flexWrap: "wrap",
+        gap: 8,
+    },
+
+    imageResult: {
+        width: "18.4%",
+        aspectRatio: 1,
+        borderRadius: 8,
+        overflow: "hidden",
+        borderWidth: 2,
+        borderColor: "transparent",
+        position: "relative",
+    },
+
+    imageResultSelected: {
+        borderColor: COLORS.yellow,
+    },
+
+    thumbnail: {
+        width: "100%",
+        height: "100%",
+    },
+
+    selectedOverlay: {
+        position: "absolute",
+        left: 0,
+        right: 0,
+        top: 0,
+        bottom: 0,
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor:
+            "rgba(40,40,40,0.35)",
+    },
+
+    emptyState: {
+        minHeight: 250,
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 10,
+    },
+
+    emptyStateText: {
+        color: COLORS.gray,
+        fontSize: 15,
+    },
+
+    /* Buttons */
+
     button: {
         backgroundColor: COLORS.yellowDark,
         padding: 16,
         borderRadius: 10,
         alignItems: "center",
         marginTop: 12,
+        minHeight: 54,
+        justifyContent: "center",
+    },
+
+    doneButton: {
+        backgroundColor: COLORS.yellowDark,
+        padding: 15,
+        borderRadius: 10,
+        alignItems: "center",
+        minHeight: 52,
+        justifyContent: "center",
     },
 
     buttonPressed: {
         opacity: 0.7,
+    },
+
+    buttonDisabled: {
+        opacity: 0.6,
     },
 
     buttonText: {
