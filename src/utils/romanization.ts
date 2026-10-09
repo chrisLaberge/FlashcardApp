@@ -2,6 +2,8 @@ import hangulRomanization from "hangul-romanization";
 import pinyin from "pinyin";
 import ToJyutping from "to-jyutping";
 import { transliterate } from "transliteration";
+import { toRomaji } from "wanakana";
+
 
 // ─────────────────────────────
 // Japanese (lazy-loaded, initialised once)
@@ -41,7 +43,8 @@ export async function getRomanization(
 
         // Japanese → Hepburn romaji (kanji handled via morphological analysis)
         case "ja": {
-            return null;
+            // Temporary fallback: converts kana, but not kanji readings.
+            return toRomaji(text);
         }
 
         // Korean → Revised Romanization
