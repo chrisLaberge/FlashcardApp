@@ -1,4 +1,4 @@
-const API_URL = "http://10.0.0.208:3000";
+const API_URL = "https://flashcard-backend-1097034776784.us-east1.run.app";
 
 export async function translateText(
     text: string,

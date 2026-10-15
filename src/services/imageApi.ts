@@ -1,4 +1,4 @@
-export const API_URL = "http://10.0.0.208:3000";
+export const API_URL = "https://flashcard-backend-1097034776784.us-east1.run.app";
 export type ImageSearchResult = {
     id: number;
     source: string;
