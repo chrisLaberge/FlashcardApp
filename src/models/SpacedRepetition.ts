@@ -1,4 +1,4 @@
-const REVIEW_INTERVALS = [
+export const REVIEW_INTERVALS = [
     1 * 60 * 1000,           // 1 minute
     3 * 60 * 1000,           // 3 minutes
     30 * 60 * 1000,          // 30 minutes

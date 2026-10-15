@@ -5,7 +5,9 @@ import { useCallback, useEffect, useState } from "react";
 import {
     ActivityIndicator,
     Image,
+    KeyboardAvoidingView,
     Modal,
+    Platform,
     Pressable,
     ScrollView,
     StyleSheet,
@@ -17,6 +19,8 @@ import {
 import {
     addCard,
     addImage,
+    deleteCard,
+    findDuplicateCard,
     getDecks,
     setCardImage,
 } from "../database/database";
@@ -36,39 +40,100 @@ type TranslationDirection =
     | "localizedToLearning"
     | null;
 
+type ExistingCard = {
+    id: number;
+    learning_text?: string;
+    localized_text?: string;
+};
+
+type DuplicateChoice = "existing" | "new" | null;
+
 // Gruvbox palette
 const COLORS = {
     bg0: "#282828",
     bg1: "#3c3836",
     bg2: "#504945",
+    bg3: "#665c54",
     fg: "#ebdbb2",
     gray: "#a89984",
     yellow: "#fabd2f",
     yellowDark: "#d79921",
+    aqua: "#8ec07c",
+    red: "#fb4934",
 };
 
+function normalize(text: string): string {
+    return text.trim().toLocaleLowerCase();
+}
+
+// --------------------------------------------------
+// Tappable card used in the duplicate dialog
+// --------------------------------------------------
+
+function ChoiceCard({
+    tone,
+    label,
+    word,
+    definition,
+    example,
+    selected,
+    dimmed,
+    onPress,
+}: {
+    tone: "existing" | "new";
+    label: string;
+    word: string;
+    definition: string;
+    example?: string;
+    selected: boolean;
+    dimmed: boolean;
+    onPress: () => void;
+}) {
+    const accent = tone === "existing" ? COLORS.aqua : COLORS.yellow;
+
+    return (
+        <Pressable
+            onPress={onPress}
+            style={({ pressed }) => [
+                styles.choiceCard,
+                tone === "existing"
+                    ? styles.choiceExisting
+                    : styles.choiceNew,
+                selected && { borderColor: accent },
+                dimmed && styles.choiceDimmed,
+                pressed && styles.choicePressed,
+            ]}
+        >
+            <View style={styles.choiceTop}>
+                <Text style={[styles.choiceLabel, { color: accent }]}>
+                    {label}
+                </Text>
+                {selected && (
+                    <Text style={[styles.check, { color: accent }]}>✓</Text>
+                )}
+            </View>
+            <Text style={styles.choiceWord}>{word}</Text>
+            <Text style={styles.choiceDefinition}>{definition}</Text>
+            {!!example && (
+                <Text style={styles.choiceExample}>{example}</Text>
+            )}
+        </Pressable>
+    );
+}
+
 export default function AddCardScreen() {
-    const { deckId } =
-        useLocalSearchParams<{ deckId?: string }>();
+    const { deckId } = useLocalSearchParams<{ deckId?: string }>();
 
-    const [learningLanguageCode, setLearningLanguageCode] =
-        useState("en");
-
-    const [learningLanguageFlag, setLearningLanguageFlag] =
-        useState("🌐");
+    const [learningLanguageCode, setLearningLanguageCode] = useState("en");
+    const [learningLanguageFlag, setLearningLanguageFlag] = useState("🌐");
 
     // TODO: Replace when localized language becomes selectable
     const localizedLanguageCode = "en";
     const localizedLanguageFlag = "🇬🇧";
 
-    const [learningText, setLearningText] =
-        useState("");
-
-    const [localizedText, setLocalizedText] =
-        useState("");
-
-    const [exampleSentence, setExampleSentence] =
-        useState("");
+    const [learningText, setLearningText] = useState("");
+    const [localizedText, setLocalizedText] = useState("");
+    const [exampleSentence, setExampleSentence] = useState("");
 
     const [translating, setTranslating] =
         useState<TranslationDirection>(null);
@@ -77,23 +142,26 @@ export default function AddCardScreen() {
     // Images
     // --------------------------------------------------
 
-    const [imageResults, setImageResults] =
-        useState<ImageSearchResult[]>([]);
-
+    const [imageResults, setImageResults] = useState<ImageSearchResult[]>([]);
     const [selectedImage, setSelectedImage] =
         useState<ImageSearchResult | null>(null);
+    const [imageQuery, setImageQuery] = useState("");
+    const [searchingImages, setSearchingImages] = useState(false);
+    const [imageModalVisible, setImageModalVisible] = useState(false);
+    const [savingCard, setSavingCard] = useState(false);
 
-    const [imageQuery, setImageQuery] =
-        useState("");
+    // --------------------------------------------------
+    // Duplicate handling
+    // --------------------------------------------------
 
-    const [searchingImages, setSearchingImages] =
-        useState(false);
-
-    const [imageModalVisible, setImageModalVisible] =
-        useState(false);
-
-    const [savingCard, setSavingCard] =
-        useState(false);
+    const [duplicateCard, setDuplicateCard] = useState<ExistingCard | null>(
+        null
+    );
+    const [choice, setChoice] = useState<DuplicateChoice>(null);
+    const [renameText, setRenameText] = useState("");
+    const [renameDefinition, setRenameDefinition] = useState("");
+    const [renameExample, setRenameExample] = useState("");
+    const [duplicateError, setDuplicateError] = useState("");
 
     // --------------------------------------------------
     // Load deck language
@@ -102,8 +170,7 @@ export default function AddCardScreen() {
     useFocusEffect(
         useCallback(() => {
             const loadDeck = async () => {
-                const lastDeckId =
-                    await AsyncStorage.getItem("lastDeckId");
+                const lastDeckId = await AsyncStorage.getItem("lastDeckId");
 
                 if (!lastDeckId) {
                     setLearningLanguageCode("en");
@@ -114,8 +181,7 @@ export default function AddCardScreen() {
                 const decks = await getDecks();
 
                 const deck = decks.find(
-                    (deck) =>
-                        deck.id === Number(lastDeckId)
+                    (deck) => deck.id === Number(lastDeckId)
                 );
 
                 if (!deck) {
@@ -124,16 +190,10 @@ export default function AddCardScreen() {
                     return;
                 }
 
-                const language =
-                    getLanguage(deck.language);
+                const language = getLanguage(deck.language);
 
-                setLearningLanguageCode(
-                    language?.code ?? "en"
-                );
-
-                setLearningLanguageFlag(
-                    language?.flag ?? "🌐"
-                );
+                setLearningLanguageCode(language?.code ?? "en");
+                setLearningLanguageFlag(language?.flag ?? "🌐");
             };
 
             loadDeck();
@@ -145,21 +205,15 @@ export default function AddCardScreen() {
     // --------------------------------------------------
 
     const translate = async (
-        direction: Exclude<
-            TranslationDirection,
-            null
-        >
+        direction: Exclude<TranslationDirection, null>
     ) => {
         if (translating !== null) {
             return;
         }
 
-        const isLearningSource =
-            direction === "learningToLocalized";
+        const isLearningSource = direction === "learningToLocalized";
 
-        const sourceText = isLearningSource
-            ? learningText
-            : localizedText;
+        const sourceText = isLearningSource ? learningText : localizedText;
 
         const targetLanguage = isLearningSource
             ? localizedLanguageCode
@@ -169,22 +223,14 @@ export default function AddCardScreen() {
             return;
         }
 
-        if (
-            isLearningSource &&
-            learningLanguageCode ===
-            localizedLanguageCode
-        ) {
+        if (isLearningSource && learningLanguageCode === localizedLanguageCode) {
             return;
         }
 
         setTranslating(direction);
 
         try {
-            const translation =
-                await translateText(
-                    sourceText,
-                    targetLanguage
-                );
+            const translation = await translateText(sourceText, targetLanguage);
 
             if (isLearningSource) {
                 setLocalizedText(translation);
@@ -192,10 +238,7 @@ export default function AddCardScreen() {
                 setLearningText(translation);
             }
         } catch (error) {
-            console.error(
-                "Translation failed:",
-                error
-            );
+            console.error("Translation failed:", error);
         } finally {
             setTranslating(null);
         }
@@ -211,32 +254,22 @@ export default function AddCardScreen() {
     ) => {
         const trimmedQuery = query.trim();
 
-        if (
-            !trimmedQuery ||
-            searchingImages
-        ) {
+        if (!trimmedQuery || searchingImages) {
             return;
         }
 
         setSearchingImages(true);
 
         try {
-            const results =
-                await searchImages(trimmedQuery);
+            const results = await searchImages(trimmedQuery);
 
             setImageResults(results);
 
-            if (
-                automaticallySelectFirst &&
-                results.length > 0
-            ) {
+            if (automaticallySelectFirst && results.length > 0) {
                 setSelectedImage(results[0]);
             }
         } catch (error) {
-            console.error(
-                "Image search failed:",
-                error
-            );
+            console.error("Image search failed:", error);
         } finally {
             setSearchingImages(false);
         }
@@ -247,9 +280,7 @@ export default function AddCardScreen() {
     // --------------------------------------------------
 
     useEffect(() => {
-        const query =
-            localizedText.trim() ||
-            learningText.trim();
+        const query = localizedText.trim() || learningText.trim();
 
         if (!query) {
             setSelectedImage(null);
@@ -260,10 +291,7 @@ export default function AddCardScreen() {
         const timeout = setTimeout(() => {
             setImageQuery(query);
 
-            searchForImages(
-                query,
-                true
-            );
+            searchForImages(query, true);
         }, 700);
 
         return () => {
@@ -276,17 +304,12 @@ export default function AddCardScreen() {
     // --------------------------------------------------
 
     const openImagePicker = () => {
-        const query =
-            localizedText.trim() ||
-            learningText.trim();
+        const query = localizedText.trim() || learningText.trim();
 
         setImageQuery(query);
         setImageModalVisible(true);
 
-        if (
-            imageResults.length === 0 &&
-            query
-        ) {
+        if (imageResults.length === 0 && query) {
             searchForImages(query);
         }
     };
@@ -295,50 +318,36 @@ export default function AddCardScreen() {
     // Select image
     // --------------------------------------------------
 
-    const selectImage = (
-        image: ImageSearchResult
-    ) => {
+    const selectImage = (image: ImageSearchResult) => {
         setSelectedImage(image);
         setImageModalVisible(false);
     };
 
     // --------------------------------------------------
-    // Save card
+    // Save card (optionally replacing an existing one)
     // --------------------------------------------------
 
-    const addCardToDatabase = async () => {
-        if (savingCard) {
-            return;
-        }
-
-        const lastDeckId =
-            await AsyncStorage.getItem(
-                "lastDeckId"
-            );
+    const saveCard = async (
+        text: string,
+        meaning: string,
+        example: string,
+        replaceCardId?: number
+    ) => {
+        const lastDeckId = await AsyncStorage.getItem("lastDeckId");
 
         if (!lastDeckId) {
             console.error("No selected deck");
-            return;
-        }
-
-        if (
-            !learningText.trim() ||
-            !localizedText.trim()
-        ) {
+            setSavingCard(false);
             return;
         }
 
         setSavingCard(true);
 
         try {
-            const deckIdNumber =
-                Number(lastDeckId);
+            const deckIdNumber = Number(lastDeckId);
 
             const romanization =
-                (await getRomanization(
-                    learningText,
-                    learningLanguageCode
-                )) ?? "";
+                (await getRomanization(text, learningLanguageCode)) ?? "";
 
             // ------------------------------------------
             // Download and save selected image
@@ -347,10 +356,7 @@ export default function AddCardScreen() {
             let imageId: number | null = null;
 
             if (selectedImage) {
-                const downloaded =
-                    await downloadImage(
-                        selectedImage
-                    );
+                const downloaded = await downloadImage(selectedImage);
 
                 imageId = await addImage(
                     selectedImage.source,
@@ -364,13 +370,22 @@ export default function AddCardScreen() {
             }
 
             // ------------------------------------------
+            // Remove the old card only once everything
+            // else has succeeded
+            // ------------------------------------------
+
+            if (replaceCardId !== undefined) {
+                await deleteCard(replaceCardId);
+            }
+
+            // ------------------------------------------
             // Create card
             // ------------------------------------------
 
             const cardId = await addCard(
-                learningText,
-                localizedText,
-                exampleSentence,
+                text,
+                meaning,
+                example,
                 romanization,
                 deckIdNumber
             );
@@ -380,10 +395,7 @@ export default function AddCardScreen() {
             // ------------------------------------------
 
             if (imageId !== null) {
-                await setCardImage(
-                    cardId,
-                    imageId
-                );
+                await setCardImage(cardId, imageId);
             }
 
             setLearningText("");
@@ -392,16 +404,125 @@ export default function AddCardScreen() {
             setImageQuery("");
             setImageResults([]);
             setSelectedImage(null);
+            setDuplicateCard(null);
 
             router.back();
         } catch (error) {
-            console.error(
-                "Failed to add card:",
-                error
-            );
+            console.error("Failed to add card:", error);
         } finally {
             setSavingCard(false);
         }
+    };
+
+    // --------------------------------------------------
+    // Add card button: check for a duplicate first
+    // --------------------------------------------------
+
+    const addCardToDatabase = async () => {
+        if (savingCard) {
+            return;
+        }
+
+        if (!learningText.trim() || !localizedText.trim()) {
+            return;
+        }
+
+        const lastDeckId = await AsyncStorage.getItem("lastDeckId");
+
+        if (!lastDeckId) {
+            console.error("No selected deck");
+            return;
+        }
+
+        setSavingCard(true);
+
+        try {
+            const found = (await findDuplicateCard(
+                learningText.trim(),
+                Number(lastDeckId)
+            )) as ExistingCard | null;
+
+            if (found) {
+                setRenameText(learningText);
+                setRenameDefinition(localizedText);
+                setRenameExample(exampleSentence);
+                setChoice(null);
+                setDuplicateError("");
+                setDuplicateCard(found);
+                setSavingCard(false);
+                return;
+            }
+        } catch (error) {
+            console.error("Duplicate check failed:", error);
+            setSavingCard(false);
+            return;
+        }
+
+        await saveCard(learningText, localizedText, exampleSentence);
+    };
+
+    // --------------------------------------------------
+    // Duplicate dialog actions
+    // --------------------------------------------------
+
+    const closeDuplicateDialog = () => {
+        if (savingCard) {
+            return;
+        }
+
+        setDuplicateCard(null);
+        setChoice(null);
+        setDuplicateError("");
+    };
+
+    const confirmChoice = async () => {
+        if (!duplicateCard || !choice || savingCard) {
+            return;
+        }
+
+        if (choice === "existing") {
+            // Keep the card that is already in the deck; nothing is added.
+            closeDuplicateDialog();
+            return;
+        }
+
+        await saveCard(
+            learningText,
+            localizedText,
+            exampleSentence,
+            Number(duplicateCard.id)
+        );
+    };
+
+    const renameAndAdd = async () => {
+        if (!duplicateCard || savingCard) {
+            return;
+        }
+
+        const name = renameText.trim();
+        const definition = renameDefinition.trim();
+
+        if (!name) {
+            setDuplicateError("Enter a learning text first.");
+            return;
+        }
+
+        if (
+            normalize(name) ===
+            normalize(duplicateCard.learning_text ?? learningText)
+        ) {
+            setDuplicateError("Choose a different learning text.");
+            return;
+        }
+
+        if (!definition) {
+            setDuplicateError("Enter a definition first.");
+            return;
+        }
+
+        setDuplicateError("");
+
+        await saveCard(name, definition, renameExample.trim());
     };
 
     // --------------------------------------------------
@@ -409,38 +530,25 @@ export default function AddCardScreen() {
     // --------------------------------------------------
 
     const renderTranslateButton = (
-        direction: Exclude<
-            TranslationDirection,
-            null
-        >
+        direction: Exclude<TranslationDirection, null>
     ) => {
-        const isLoading =
-            translating === direction;
+        const isLoading = translating === direction;
 
-        const isDisabled =
-            translating !== null;
+        const isDisabled = translating !== null;
 
         return (
             <Pressable
                 style={({ pressed }) => [
                     styles.translateButton,
-                    pressed &&
-                    styles.translateButtonPressed,
-                    isDisabled &&
-                    !isLoading &&
-                    styles.translateButtonDisabled,
+                    pressed && styles.translateButtonPressed,
+                    isDisabled && !isLoading && styles.translateButtonDisabled,
                 ]}
-                onPress={() =>
-                    translate(direction)
-                }
+                onPress={() => translate(direction)}
                 disabled={isDisabled}
                 hitSlop={8}
             >
                 {isLoading ? (
-                    <ActivityIndicator
-                        size="small"
-                        color={COLORS.yellow}
-                    />
+                    <ActivityIndicator size="small" color={COLORS.yellow} />
                 ) : (
                     <MaterialCommunityIcons
                         name="translate"
@@ -456,16 +564,22 @@ export default function AddCardScreen() {
     // Watermark
     // --------------------------------------------------
 
-    const renderWatermark = (
-        label: string
-    ) => (
-        <Text
-            style={styles.watermark}
-            pointerEvents="none"
-        >
+    const renderWatermark = (label: string) => (
+        <Text style={styles.watermark} pointerEvents="none">
             {label}
         </Text>
     );
+
+    // --------------------------------------------------
+    // Duplicate dialog text
+    // --------------------------------------------------
+
+    const confirmLabel =
+        choice === "existing"
+            ? "Keep existing card"
+            : choice === "new"
+              ? "Replace with new card"
+              : "Choose a card";
 
     // --------------------------------------------------
     // UI
@@ -474,9 +588,7 @@ export default function AddCardScreen() {
     return (
         <View style={styles.container}>
             <ScrollView
-                contentContainerStyle={
-                    styles.content
-                }
+                contentContainerStyle={styles.content}
                 keyboardShouldPersistTaps="handled"
             >
                 {/* Automatic image */}
@@ -487,76 +599,47 @@ export default function AddCardScreen() {
                 >
                     {selectedImage ? (
                         <Image
-                            source={{
-                                uri:
-                                    selectedImage.downloadUrl,
-                            }}
+                            source={{ uri: selectedImage.downloadUrl }}
                             style={styles.mainImage}
                         />
                     ) : (
-                        <View
-                            style={
-                                styles.imagePlaceholder
-                            }
-                        >
+                        <View style={styles.imagePlaceholder}>
                             {searchingImages ? (
                                 <ActivityIndicator
                                     size="large"
-                                    color={
-                                        COLORS.yellow
-                                    }
+                                    color={COLORS.yellow}
                                 />
                             ) : (
                                 <MaterialCommunityIcons
                                     name="image-outline"
                                     size={50}
-                                    color={
-                                        COLORS.gray
-                                    }
+                                    color={COLORS.gray}
                                 />
                             )}
                         </View>
                     )}
 
-                    <View
-                        style={
-                            styles.changeImageBadge
-                        }
-                    >
+                    <View style={styles.changeImageBadge}>
                         <MaterialCommunityIcons
                             name="image-edit-outline"
                             size={17}
                             color={COLORS.fg}
                         />
 
-                        <Text
-                            style={
-                                styles.changeImageText
-                            }
-                        >
-                            Change
-                        </Text>
+                        <Text style={styles.changeImageText}>Change</Text>
                     </View>
                 </Pressable>
 
                 <View style={styles.form}>
                     {/* Learning language */}
 
-                    <View
-                        style={
-                            styles.inputContainer
-                        }
-                    >
+                    <View style={styles.inputContainer}>
                         <TextInput
                             style={styles.input}
                             value={learningText}
-                            onChangeText={
-                                setLearningText
-                            }
+                            onChangeText={setLearningText}
                             placeholder="Enter the word or phrase"
-                            placeholderTextColor={
-                                COLORS.gray
-                            }
+                            placeholderTextColor={COLORS.gray}
                             multiline
                         />
 
@@ -564,28 +647,18 @@ export default function AddCardScreen() {
                             `${learningLanguageFlag} ${learningLanguageCode.toUpperCase()} `
                         )}
 
-                        {renderTranslateButton(
-                            "learningToLocalized"
-                        )}
+                        {renderTranslateButton("learningToLocalized")}
                     </View>
 
                     {/* Localized language */}
 
-                    <View
-                        style={
-                            styles.inputContainer
-                        }
-                    >
+                    <View style={styles.inputContainer}>
                         <TextInput
                             style={styles.input}
                             value={localizedText}
-                            onChangeText={
-                                setLocalizedText
-                            }
+                            onChangeText={setLocalizedText}
                             placeholder="Enter the meaning"
-                            placeholderTextColor={
-                                COLORS.gray
-                            }
+                            placeholderTextColor={COLORS.gray}
                             multiline
                         />
 
@@ -593,39 +666,22 @@ export default function AddCardScreen() {
                             `${localizedLanguageFlag} ${localizedLanguageCode.toUpperCase()} `
                         )}
 
-                        {renderTranslateButton(
-                            "localizedToLearning"
-                        )}
+                        {renderTranslateButton("localizedToLearning")}
                     </View>
 
                     {/* Example */}
 
-                    <View
-                        style={
-                            styles.inputContainer
-                        }
-                    >
+                    <View style={styles.inputContainer}>
                         <TextInput
-                            style={[
-                                styles.input,
-                                styles.exampleInput,
-                            ]}
-                            value={
-                                exampleSentence
-                            }
-                            onChangeText={
-                                setExampleSentence
-                            }
+                            style={[styles.input, styles.exampleInput]}
+                            value={exampleSentence}
+                            onChangeText={setExampleSentence}
                             placeholder="Example sentence (optional)"
-                            placeholderTextColor={
-                                COLORS.gray
-                            }
+                            placeholderTextColor={COLORS.gray}
                             multiline
                         />
 
-                        {renderWatermark(
-                            "Example"
-                        )}
+                        {renderWatermark("Example")}
                     </View>
 
                     {/* Add card */}
@@ -633,29 +689,19 @@ export default function AddCardScreen() {
                     <Pressable
                         style={({ pressed }) => [
                             styles.button,
-                            pressed &&
-                            styles.buttonPressed,
-                            savingCard &&
-                            styles.buttonDisabled,
+                            pressed && styles.buttonPressed,
+                            savingCard && styles.buttonDisabled,
                         ]}
-                        onPress={
-                            addCardToDatabase
-                        }
+                        onPress={addCardToDatabase}
                         disabled={savingCard}
                     >
-                        {savingCard ? (
+                        {savingCard && duplicateCard === null ? (
                             <ActivityIndicator
                                 size="small"
                                 color={COLORS.bg0}
                             />
                         ) : (
-                            <Text
-                                style={
-                                    styles.buttonText
-                                }
-                            >
-                                Add Card
-                            </Text>
+                            <Text style={styles.buttonText}>Add Card</Text>
                         )}
                     </Pressable>
                 </View>
@@ -667,80 +713,38 @@ export default function AddCardScreen() {
                 visible={imageModalVisible}
                 animationType="slide"
                 transparent
-                onRequestClose={() =>
-                    setImageModalVisible(false)
-                }
+                onRequestClose={() => setImageModalVisible(false)}
             >
-                <View
-                    style={
-                        styles.modalOverlay
-                    }
-                >
-                    <View
-                        style={
-                            styles.modalContainer
-                        }
-                    >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContainer}>
                         {/* Modal header */}
 
-                        <View
-                            style={
-                                styles.modalHeader
-                            }
-                        >
-                            <Text
-                                style={
-                                    styles.modalTitle
-                                }
-                            >
-                                Choose Image
-                            </Text>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Choose Image</Text>
 
                             <Pressable
-                                onPress={() =>
-                                    setImageModalVisible(
-                                        false
-                                    )
-                                }
-                                style={
-                                    styles.closeButton
-                                }
+                                onPress={() => setImageModalVisible(false)}
+                                style={styles.closeButton}
                             >
                                 <MaterialCommunityIcons
                                     name="close"
                                     size={24}
-                                    color={
-                                        COLORS.fg
-                                    }
+                                    color={COLORS.fg}
                                 />
                             </Pressable>
                         </View>
 
                         {/* Search */}
 
-                        <View
-                            style={
-                                styles.imageSearchRow
-                            }
-                        >
+                        <View style={styles.imageSearchRow}>
                             <TextInput
-                                style={
-                                    styles.imageSearchInput
-                                }
-                                value={
-                                    imageQuery
-                                }
-                                onChangeText={
-                                    setImageQuery
-                                }
+                                style={styles.imageSearchInput}
+                                value={imageQuery}
+                                onChangeText={setImageQuery}
                                 placeholder="Search images..."
-                                placeholderTextColor={
-                                    COLORS.gray
-                                }
+                                placeholderTextColor={COLORS.gray}
                                 onSubmitEditing={() =>
-                                    searchForImages(
-                                        imageQuery
-                                    )
+                                    searchForImages(imageQuery)
                                 }
                                 returnKeyType="search"
                             />
@@ -748,32 +752,21 @@ export default function AddCardScreen() {
                             <Pressable
                                 style={({ pressed }) => [
                                     styles.searchButton,
-                                    pressed &&
-                                    styles.searchButtonPressed,
+                                    pressed && styles.searchButtonPressed,
                                 ]}
-                                onPress={() =>
-                                    searchForImages(
-                                        imageQuery
-                                    )
-                                }
-                                disabled={
-                                    searchingImages
-                                }
+                                onPress={() => searchForImages(imageQuery)}
+                                disabled={searchingImages}
                             >
                                 {searchingImages ? (
                                     <ActivityIndicator
                                         size="small"
-                                        color={
-                                            COLORS.bg0
-                                        }
+                                        color={COLORS.bg0}
                                     />
                                 ) : (
                                     <MaterialCommunityIcons
                                         name="magnify"
                                         size={22}
-                                        color={
-                                            COLORS.bg0
-                                        }
+                                        color={COLORS.bg0}
                                     />
                                 )}
                             </Pressable>
@@ -781,102 +774,65 @@ export default function AddCardScreen() {
 
                         {/* Results */}
 
-                        <ScrollView
-                            contentContainerStyle={
-                                styles.modalResults
-                            }
-                        >
+                        <ScrollView contentContainerStyle={styles.modalResults}>
                             {imageResults.length > 0 ? (
-                                <View
-                                    style={
-                                        styles.imageGrid
-                                    }
-                                >
-                                    {imageResults.map(
-                                        (image) => {
-                                            const isSelected =
-                                                selectedImage?.id ===
-                                                image.id;
+                                <View style={styles.imageGrid}>
+                                    {imageResults.map((image) => {
+                                        const isSelected =
+                                            selectedImage?.id === image.id;
 
-                                            return (
-                                                <Pressable
-                                                    key={
-                                                        image.id
-                                                    }
-                                                    style={[
-                                                        styles.imageResult,
-                                                        isSelected &&
+                                        return (
+                                            <Pressable
+                                                key={image.id}
+                                                style={[
+                                                    styles.imageResult,
+                                                    isSelected &&
                                                         styles.imageResultSelected,
-                                                    ]}
-                                                    onPress={() =>
-                                                        selectImage(
-                                                            image
-                                                        )
-                                                    }
-                                                >
-                                                    <Image
-                                                        source={{
-                                                            uri: image.thumbnailUrl,
-                                                        }}
-                                                        style={
-                                                            styles.thumbnail
-                                                        }
-                                                    />
+                                                ]}
+                                                onPress={() =>
+                                                    selectImage(image)
+                                                }
+                                            >
+                                                <Image
+                                                    source={{
+                                                        uri: image.thumbnailUrl,
+                                                    }}
+                                                    style={styles.thumbnail}
+                                                />
 
-                                                    {isSelected && (
-                                                        <View
-                                                            style={
-                                                                styles.selectedOverlay
-                                                            }
-                                                        >
-                                                            <MaterialCommunityIcons
-                                                                name="check-circle"
-                                                                size={
-                                                                    30
-                                                                }
-                                                                color={
-                                                                    COLORS.yellow
-                                                                }
-                                                            />
-                                                        </View>
-                                                    )}
-                                                </Pressable>
-                                            );
-                                        }
-                                    )}
+                                                {isSelected && (
+                                                    <View
+                                                        style={
+                                                            styles.selectedOverlay
+                                                        }
+                                                    >
+                                                        <MaterialCommunityIcons
+                                                            name="check-circle"
+                                                            size={30}
+                                                            color={COLORS.yellow}
+                                                        />
+                                                    </View>
+                                                )}
+                                            </Pressable>
+                                        );
+                                    })}
                                 </View>
                             ) : searchingImages ? (
-                                <View
-                                    style={
-                                        styles.emptyState
-                                    }
-                                >
+                                <View style={styles.emptyState}>
                                     <ActivityIndicator
                                         size="large"
-                                        color={
-                                            COLORS.yellow
-                                        }
+                                        color={COLORS.yellow}
                                     />
                                 </View>
                             ) : (
-                                <View
-                                    style={
-                                        styles.emptyState
-                                    }
-                                >
+                                <View style={styles.emptyState}>
                                     <MaterialCommunityIcons
                                         name="image-search-outline"
                                         size={42}
-                                        color={
-                                            COLORS.gray
-                                        }
+                                        color={COLORS.gray}
                                     />
 
-                                    <Text
-                                        style={
-                                            styles.emptyStateText
-                                        }
-                                    >
+                                    <Text style={styles.emptyStateText}>
                                         Search for an image
                                     </Text>
                                 </View>
@@ -888,25 +844,154 @@ export default function AddCardScreen() {
                         <Pressable
                             style={({ pressed }) => [
                                 styles.doneButton,
-                                pressed &&
-                                styles.buttonPressed,
+                                pressed && styles.buttonPressed,
                             ]}
-                            onPress={() =>
-                                setImageModalVisible(
-                                    false
-                                )
-                            }
+                            onPress={() => setImageModalVisible(false)}
                         >
-                            <Text
-                                style={
-                                    styles.buttonText
-                                }
-                            >
-                                Done
-                            </Text>
+                            <Text style={styles.buttonText}>Done</Text>
                         </Pressable>
                     </View>
                 </View>
+            </Modal>
+
+            {/* Duplicate modal */}
+
+            <Modal
+                visible={duplicateCard !== null}
+                animationType="slide"
+                transparent
+                onRequestClose={closeDuplicateDialog}
+            >
+                <KeyboardAvoidingView
+                    style={styles.modalOverlay}
+                    behavior={Platform.OS === "ios" ? "padding" : undefined}
+                >
+                    <View style={styles.duplicateContainer}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Duplicate</Text>
+
+                            <Pressable
+                                onPress={closeDuplicateDialog}
+                                style={styles.closeButton}
+                            >
+                                <MaterialCommunityIcons
+                                    name="close"
+                                    size={24}
+                                    color={COLORS.fg}
+                                />
+                            </Pressable>
+                        </View>
+
+                        <ScrollView
+                            style={styles.duplicateScroll}
+                            contentContainerStyle={styles.duplicateContent}
+                            keyboardShouldPersistTaps="handled"
+                        >
+                            <Text style={styles.mutedText}>
+                                This word is already in your deck. Tap the card
+                                you want to keep.
+                            </Text>
+
+                            <View style={styles.cardRow}>
+                                <ChoiceCard
+                                    tone="existing"
+                                    label="In your deck"
+                                    word={duplicateCard?.learning_text ?? "—"}
+                                    definition={
+                                        duplicateCard?.localized_text ?? "—"
+                                    }
+                                    selected={choice === "existing"}
+                                    dimmed={choice === "new"}
+                                    onPress={() => setChoice("existing")}
+                                />
+                                <ChoiceCard
+                                    tone="new"
+                                    label="New card"
+                                    word={learningText}
+                                    definition={localizedText}
+                                    example={exampleSentence}
+                                    selected={choice === "new"}
+                                    dimmed={choice === "existing"}
+                                    onPress={() => setChoice("new")}
+                                />
+                            </View>
+
+                            <Pressable
+                                style={({ pressed }) => [
+                                    styles.button,
+                                    styles.confirmButton,
+                                    !choice && styles.buttonMuted,
+                                    pressed && styles.buttonPressed,
+                                ]}
+                                onPress={confirmChoice}
+                                disabled={!choice || savingCard}
+                            >
+                                {savingCard ? (
+                                    <ActivityIndicator
+                                        size="small"
+                                        color={COLORS.bg0}
+                                    />
+                                ) : (
+                                    <Text style={styles.buttonText}>
+                                        {confirmLabel}
+                                    </Text>
+                                )}
+                            </Pressable>
+
+                            <View style={styles.renameBox}>
+                                <TextInput
+                                    style={styles.renameInput}
+                                    value={renameText}
+                                    onChangeText={setRenameText}
+                                    placeholder="Learning text"
+                                    placeholderTextColor={COLORS.bg3}
+                                    autoCapitalize="none"
+                                    autoCorrect={false}
+                                />
+                                <TextInput
+                                    style={[
+                                        styles.renameInput,
+                                        styles.renameInputMulti,
+                                    ]}
+                                    value={renameDefinition}
+                                    onChangeText={setRenameDefinition}
+                                    placeholder="Definition"
+                                    placeholderTextColor={COLORS.bg3}
+                                    multiline
+                                />
+                                <TextInput
+                                    style={[
+                                        styles.renameInput,
+                                        styles.renameInputMulti,
+                                    ]}
+                                    value={renameExample}
+                                    onChangeText={setRenameExample}
+                                    placeholder="Example (optional)"
+                                    placeholderTextColor={COLORS.bg3}
+                                    multiline
+                                />
+                                <Pressable
+                                    style={({ pressed }) => [
+                                        styles.renameButton,
+                                        pressed && styles.choicePressed,
+                                    ]}
+                                    onPress={renameAndAdd}
+                                    disabled={savingCard}
+                                >
+                                    <Text style={styles.renameText}>
+                                        Rename
+                                    </Text>
+                                </Pressable>
+                            </View>
+
+                            {!!duplicateError && (
+                                <Text style={styles.errorText}>
+                                    {duplicateError}
+                                </Text>
+                            )}
+                        </ScrollView>
+                    </View>
+                </KeyboardAvoidingView>
             </Modal>
         </View>
     );
@@ -971,11 +1056,9 @@ const styles = StyleSheet.create({
         borderRadius: 18,
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor:
-            "rgba(250,189,47,0.12)",
+        backgroundColor: "rgba(250,189,47,0.12)",
         borderWidth: 1,
-        borderColor:
-            "rgba(250,189,47,0.35)",
+        borderColor: "rgba(250,189,47,0.35)",
     },
 
     translateButtonPressed: {
@@ -1134,8 +1217,7 @@ const styles = StyleSheet.create({
         bottom: 0,
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor:
-            "rgba(40,40,40,0.35)",
+        backgroundColor: "rgba(40,40,40,0.35)",
     },
 
     emptyState: {
@@ -1179,9 +1261,149 @@ const styles = StyleSheet.create({
         opacity: 0.6,
     },
 
+    buttonMuted: {
+        backgroundColor: COLORS.bg2,
+    },
+
     buttonText: {
         color: COLORS.bg0,
         fontSize: 17,
         fontWeight: "bold",
+    },
+
+    /* Duplicate dialog */
+
+    duplicateContainer: {
+        maxHeight: "92%",
+        backgroundColor: COLORS.bg0,
+        borderTopLeftRadius: 18,
+        borderTopRightRadius: 18,
+        padding: 20,
+    },
+
+    duplicateScroll: {
+        flexShrink: 1,
+    },
+
+    duplicateContent: {
+        gap: 12,
+        paddingBottom: 20,
+    },
+
+    mutedText: {
+        color: COLORS.gray,
+        fontSize: 14,
+    },
+
+    cardRow: {
+        flexDirection: "row",
+        gap: 10,
+    },
+
+    choiceCard: {
+        flex: 1,
+        minWidth: 0,
+        minHeight: 150,
+        borderRadius: 10,
+        borderWidth: 2,
+        borderColor: "transparent",
+        padding: 12,
+        gap: 4,
+    },
+
+    choiceExisting: {
+        backgroundColor: COLORS.bg1,
+    },
+
+    choiceNew: {
+        backgroundColor: COLORS.bg2,
+    },
+
+    choiceDimmed: {
+        opacity: 0.5,
+    },
+
+    choicePressed: {
+        transform: [{ scale: 0.97 }],
+    },
+
+    choiceTop: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+    },
+
+    choiceLabel: {
+        fontSize: 13,
+        fontWeight: "bold",
+    },
+
+    check: {
+        fontSize: 16,
+        fontWeight: "bold",
+    },
+
+    choiceWord: {
+        color: COLORS.fg,
+        fontSize: 20,
+        fontWeight: "bold",
+        marginTop: 6,
+    },
+
+    choiceDefinition: {
+        color: COLORS.fg,
+        fontSize: 15,
+    },
+
+    choiceExample: {
+        color: COLORS.gray,
+        fontStyle: "italic",
+        fontSize: 13,
+    },
+
+    confirmButton: {
+        marginTop: 0,
+    },
+
+    renameBox: {
+        borderWidth: 1,
+        borderColor: COLORS.aqua,
+        borderRadius: 10,
+        padding: 12,
+        gap: 8,
+    },
+
+    renameInput: {
+        backgroundColor: COLORS.bg1,
+        color: COLORS.fg,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: COLORS.bg3,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        fontSize: 16,
+    },
+
+    renameInputMulti: {
+        minHeight: 60,
+        textAlignVertical: "top",
+    },
+
+    renameButton: {
+        borderWidth: 1,
+        borderColor: COLORS.aqua,
+        borderRadius: 8,
+        paddingVertical: 12,
+        alignItems: "center",
+    },
+
+    renameText: {
+        color: COLORS.aqua,
+        fontWeight: "bold",
+        fontSize: 16,
+    },
+
+    errorText: {
+        color: COLORS.red,
     },
 });

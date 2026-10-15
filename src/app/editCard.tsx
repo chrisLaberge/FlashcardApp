@@ -5,7 +5,9 @@ import { useEffect, useState } from "react";
 import {
     ActivityIndicator,
     Image,
+    KeyboardAvoidingView,
     Modal,
+    Platform,
     Pressable,
     ScrollView,
     StyleSheet,
@@ -20,52 +22,122 @@ import {
     searchImages,
 } from "@/services/imageApi";
 
-import {
-    addImage,
-    getCardImage,
-    setCardImage,
-} from "../database/database";
-import { getRomanization } from "../utils/romanization";
-
 import { translateText } from "@/services/translationApi";
 import { getLanguage } from "../constants/languages";
 import {
+    addImage,
     deleteCard,
+    findDuplicateCard,
     getCard,
+    getCardImage,
     getCardProgress,
     getDecks,
     resetCardProgress,
+    setCardImage,
     updateCard,
 } from "../database/database";
+import { getRomanization } from "../utils/romanization";
 
 import { CardProgress } from "../models/CardProgress";
 
 type TranslationDirection = "learningToLocalized" | "localizedToLearning" | null;
+
+type ExistingCard = {
+    id: number;
+    learning_text?: string;
+    localized_text?: string;
+};
+
+type DuplicateChoice = "existing" | "current" | null;
 
 // Gruvbox palette
 const COLORS = {
     bg0: "#282828",
     bg1: "#3c3836",
     bg2: "#504945",
+    bg3: "#665c54",
     fg: "#ebdbb2",
     gray: "#a89984",
     yellow: "#fabd2f",
     yellowDark: "#d79921",
+    aqua: "#8ec07c",
     red: "#cc241d",
+    redBright: "#fb4934",
     blue: "#5992b1",
 };
+
+function normalize(text: string): string {
+    return text.trim().toLocaleLowerCase();
+}
+
+// --------------------------------------------------
+// Tappable card used in the duplicate dialog
+// --------------------------------------------------
+
+function ChoiceCard({
+    tone,
+    label,
+    word,
+    definition,
+    example,
+    selected,
+    dimmed,
+    onPress,
+}: {
+    tone: "existing" | "current";
+    label: string;
+    word: string;
+    definition: string;
+    example?: string;
+    selected: boolean;
+    dimmed: boolean;
+    onPress: () => void;
+}) {
+    const accent = tone === "existing" ? COLORS.aqua : COLORS.yellow;
+
+    return (
+        <Pressable
+            onPress={onPress}
+            style={({ pressed }) => [
+                styles.choiceCard,
+                tone === "existing"
+                    ? styles.choiceExisting
+                    : styles.choiceCurrent,
+                selected && { borderColor: accent },
+                dimmed && styles.choiceDimmed,
+                pressed && styles.choicePressed,
+            ]}
+        >
+            <View style={styles.choiceTop}>
+                <Text style={[styles.choiceLabel, { color: accent }]}>
+                    {label}
+                </Text>
+                {selected && (
+                    <Text style={[styles.check, { color: accent }]}>✓</Text>
+                )}
+            </View>
+            <Text style={styles.choiceWord}>{word}</Text>
+            <Text style={styles.choiceDefinition}>{definition}</Text>
+            {!!example && (
+                <Text style={styles.choiceExample}>{example}</Text>
+            )}
+        </Pressable>
+    );
+}
 
 export default function EditCardScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const cardId = Number(id);
 
     const [learningText, setLearningText] = useState("");
+    const [originalLearningText, setOriginalLearningText] = useState("");
     const [localizedText, setLocalizedText] = useState("");
     const [exampleSentence, setExampleSentence] = useState("");
     const [progress, setProgress] = useState<CardProgress>();
     const [showProgress, setShowProgress] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [showResetModal, setShowResetModal] = useState(false);
+    const [saving, setSaving] = useState(false);
 
     const [selectedImage, setSelectedImage] = useState<ImageSearchResult | null>(null);
     const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(null);
@@ -84,12 +156,26 @@ export default function EditCardScreen() {
     const [translating, setTranslating] =
         useState<TranslationDirection>(null);
 
+    // --------------------------------------------------
+    // Duplicate handling
+    // --------------------------------------------------
+
+    const [duplicateCard, setDuplicateCard] = useState<ExistingCard | null>(
+        null
+    );
+    const [choice, setChoice] = useState<DuplicateChoice>(null);
+    const [renameText, setRenameText] = useState("");
+    const [renameDefinition, setRenameDefinition] = useState("");
+    const [renameExample, setRenameExample] = useState("");
+    const [duplicateError, setDuplicateError] = useState("");
+
     useEffect(() => {
         const loadCard = async () => {
             const card = await getCard(cardId);
 
             if (card) {
                 setLearningText(card.learningText);
+                setOriginalLearningText(card.learningText);
                 setLocalizedText(card.localizedText);
                 setExampleSentence(card.exampleSentence ?? "");
             }
@@ -128,42 +214,168 @@ export default function EditCardScreen() {
         loadCard();
     }, [cardId]);
 
-    const saveChanges = async () => {
-        const romanization =
-            (await getRomanization(
-                learningText,
-                learningLanguageCode
-            )) ?? "";
+    // --------------------------------------------------
+    // Save (optionally deleting another card that clashes)
+    // --------------------------------------------------
 
-        await updateCard(
-            cardId,
+    const persistChanges = async (
+        text: string,
+        meaning: string,
+        example: string,
+        deleteOtherCardId?: number
+    ) => {
+        setSaving(true);
+
+        try {
+            const romanization =
+                (await getRomanization(text, learningLanguageCode)) ?? "";
+
+            // Download first so a failure here changes nothing
+            let imageId: number | null = null;
+
+            if (selectedImage) {
+                const downloaded = await downloadImage(selectedImage);
+
+                imageId = await addImage(
+                    selectedImage.source,
+                    String(selectedImage.id),
+                    downloaded.imageUrl,
+                    null,
+                    selectedImage.pageUrl,
+                    selectedImage.photographer,
+                    selectedImage.photographerUrl
+                );
+            }
+
+            if (deleteOtherCardId !== undefined) {
+                await deleteCard(deleteOtherCardId);
+            }
+
+            await updateCard(cardId, text, meaning, example, romanization);
+
+            if (imageId !== null) {
+                await setCardImage(cardId, imageId);
+            }
+
+            setDuplicateCard(null);
+            router.back();
+        } catch (error) {
+            console.error("Failed to save card:", error);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    // --------------------------------------------------
+    // Save button: check for a duplicate first
+    // --------------------------------------------------
+
+    const saveChanges = async () => {
+        if (saving) {
+            return;
+        }
+
+        setSaving(true);
+
+        try {
+            // Only look for duplicates if the learning text changed,
+            // otherwise the card would match itself.
+            if (
+                learningText.trim() &&
+                normalize(learningText) !== normalize(originalLearningText)
+            ) {
+                const lastDeckId = await AsyncStorage.getItem("lastDeckId");
+
+                if (lastDeckId) {
+                    const found = (await findDuplicateCard(
+                        learningText.trim(),
+                        Number(lastDeckId)
+                    )) as ExistingCard | null;
+
+                    if (found && Number(found.id) !== cardId) {
+                        setRenameText(learningText);
+                        setRenameDefinition(localizedText);
+                        setRenameExample(exampleSentence);
+                        setChoice(null);
+                        setDuplicateError("");
+                        setDuplicateCard(found);
+                        setSaving(false);
+                        return;
+                    }
+                }
+            }
+        } catch (error) {
+            console.error("Duplicate check failed:", error);
+            setSaving(false);
+            return;
+        }
+
+        await persistChanges(learningText, localizedText, exampleSentence);
+    };
+
+    // --------------------------------------------------
+    // Duplicate dialog actions
+    // --------------------------------------------------
+
+    const closeDuplicateDialog = () => {
+        if (saving) {
+            return;
+        }
+
+        setDuplicateCard(null);
+        setChoice(null);
+        setDuplicateError("");
+    };
+
+    const confirmChoice = async () => {
+        if (!duplicateCard || !choice || saving) {
+            return;
+        }
+
+        if (choice === "existing") {
+            // Leave both cards untouched.
+            closeDuplicateDialog();
+            return;
+        }
+
+        // Keep this card (with its progress), remove the other one.
+        await persistChanges(
             learningText,
             localizedText,
             exampleSentence,
-            romanization
+            Number(duplicateCard.id)
         );
+    };
 
-        if (selectedImage) {
-            const downloaded =
-                await downloadImage(selectedImage);
-
-            const imageId = await addImage(
-                selectedImage.source,
-                String(selectedImage.id),
-                downloaded.imageUrl,
-                null,
-                selectedImage.pageUrl,
-                selectedImage.photographer,
-                selectedImage.photographerUrl
-            );
-
-            await setCardImage(
-                cardId,
-                imageId
-            );
+    const renameAndSave = async () => {
+        if (!duplicateCard || saving) {
+            return;
         }
 
-        router.back();
+        const name = renameText.trim();
+        const definition = renameDefinition.trim();
+
+        if (!name) {
+            setDuplicateError("Enter a learning text first.");
+            return;
+        }
+
+        if (
+            normalize(name) ===
+            normalize(duplicateCard.learning_text ?? learningText)
+        ) {
+            setDuplicateError("Choose a different learning text.");
+            return;
+        }
+
+        if (!definition) {
+            setDuplicateError("Enter a definition first.");
+            return;
+        }
+
+        setDuplicateError("");
+
+        await persistChanges(name, definition, renameExample.trim());
     };
 
     const removeCard = async () => {
@@ -308,6 +520,13 @@ export default function EditCardScreen() {
         setImageModalVisible(false);
     };
 
+    const confirmLabel =
+        choice === "existing"
+            ? "Keep existing card"
+            : choice === "current"
+              ? "Replace existing card"
+              : "Choose a card";
+
     // --------------------------------------------------
     // UI
     // --------------------------------------------------
@@ -402,10 +621,16 @@ export default function EditCardScreen() {
                     style={({ pressed }) => [
                         styles.saveButton,
                         pressed && styles.buttonPressed,
+                        saving && styles.buttonDisabled,
                     ]}
                     onPress={saveChanges}
+                    disabled={saving}
                 >
-                    <Text style={styles.saveButtonText}>Save Changes</Text>
+                    {saving && duplicateCard === null ? (
+                        <ActivityIndicator size="small" color={COLORS.bg0} />
+                    ) : (
+                        <Text style={styles.saveButtonText}>Save Changes</Text>
+                    )}
                 </Pressable>
             </View>
 
@@ -695,6 +920,143 @@ export default function EditCardScreen() {
                     </View>
                 </View>
             </Modal>
+
+            {/* ---------- Duplicate dialog ---------- */}
+            <Modal
+                visible={duplicateCard !== null}
+                animationType="slide"
+                transparent
+                onRequestClose={closeDuplicateDialog}
+            >
+                <KeyboardAvoidingView
+                    style={styles.imageModalOverlay}
+                    behavior={Platform.OS === "ios" ? "padding" : undefined}
+                >
+                    <View style={styles.duplicateContainer}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.imageModalTitle}>
+                                Duplicate
+                            </Text>
+
+                            <Pressable onPress={closeDuplicateDialog}>
+                                <MaterialCommunityIcons
+                                    name="close"
+                                    size={26}
+                                    color={COLORS.fg}
+                                />
+                            </Pressable>
+                        </View>
+
+                        <ScrollView
+                            style={styles.duplicateScroll}
+                            contentContainerStyle={styles.duplicateContent}
+                            keyboardShouldPersistTaps="handled"
+                        >
+                            <Text style={styles.mutedText}>
+                                Another card in your deck already has this
+                                word. Tap the card you want to keep.
+                            </Text>
+
+                            <View style={styles.cardRow}>
+                                <ChoiceCard
+                                    tone="existing"
+                                    label="In your deck"
+                                    word={duplicateCard?.learning_text ?? "—"}
+                                    definition={
+                                        duplicateCard?.localized_text ?? "—"
+                                    }
+                                    selected={choice === "existing"}
+                                    dimmed={choice === "current"}
+                                    onPress={() => setChoice("existing")}
+                                />
+                                <ChoiceCard
+                                    tone="current"
+                                    label="This card"
+                                    word={learningText}
+                                    definition={localizedText}
+                                    example={exampleSentence}
+                                    selected={choice === "current"}
+                                    dimmed={choice === "existing"}
+                                    onPress={() => setChoice("current")}
+                                />
+                            </View>
+
+                            <Pressable
+                                style={({ pressed }) => [
+                                    styles.confirmButton,
+                                    !choice && styles.confirmButtonMuted,
+                                    pressed && styles.buttonPressed,
+                                ]}
+                                onPress={confirmChoice}
+                                disabled={!choice || saving}
+                            >
+                                {saving ? (
+                                    <ActivityIndicator
+                                        size="small"
+                                        color={COLORS.bg0}
+                                    />
+                                ) : (
+                                    <Text style={styles.buttonText}>
+                                        {confirmLabel}
+                                    </Text>
+                                )}
+                            </Pressable>
+
+                            <View style={styles.renameBox}>
+                                <TextInput
+                                    style={styles.renameInput}
+                                    value={renameText}
+                                    onChangeText={setRenameText}
+                                    placeholder="Learning text"
+                                    placeholderTextColor={COLORS.bg3}
+                                    autoCapitalize="none"
+                                    autoCorrect={false}
+                                />
+                                <TextInput
+                                    style={[
+                                        styles.renameInput,
+                                        styles.renameInputMulti,
+                                    ]}
+                                    value={renameDefinition}
+                                    onChangeText={setRenameDefinition}
+                                    placeholder="Definition"
+                                    placeholderTextColor={COLORS.bg3}
+                                    multiline
+                                />
+                                <TextInput
+                                    style={[
+                                        styles.renameInput,
+                                        styles.renameInputMulti,
+                                    ]}
+                                    value={renameExample}
+                                    onChangeText={setRenameExample}
+                                    placeholder="Example (optional)"
+                                    placeholderTextColor={COLORS.bg3}
+                                    multiline
+                                />
+                                <Pressable
+                                    style={({ pressed }) => [
+                                        styles.renameButton,
+                                        pressed && styles.choicePressed,
+                                    ]}
+                                    onPress={renameAndSave}
+                                    disabled={saving}
+                                >
+                                    <Text style={styles.renameText}>
+                                        Rename
+                                    </Text>
+                                </Pressable>
+                            </View>
+
+                            {!!duplicateError && (
+                                <Text style={styles.errorText}>
+                                    {duplicateError}
+                                </Text>
+                            )}
+                        </ScrollView>
+                    </View>
+                </KeyboardAvoidingView>
+            </Modal>
         </ScrollView>
     );
 }
@@ -814,7 +1176,9 @@ const styles = StyleSheet.create({
         padding: 16,
         borderRadius: 10,
         alignItems: "center",
+        justifyContent: "center",
         marginTop: 8,
+        minHeight: 54,
     },
 
     saveButtonText: {
@@ -923,6 +1287,10 @@ const styles = StyleSheet.create({
 
     buttonPressed: {
         opacity: 0.7,
+    },
+
+    buttonDisabled: {
+        opacity: 0.6,
     },
 
     modalOverlay: {
@@ -1148,5 +1516,150 @@ const styles = StyleSheet.create({
         color: COLORS.bg0,
         fontSize: 17,
         fontWeight: "bold",
+    },
+
+    /* Duplicate dialog */
+
+    duplicateContainer: {
+        maxHeight: "92%",
+        backgroundColor: COLORS.bg0,
+        borderTopLeftRadius: 18,
+        borderTopRightRadius: 18,
+        padding: 20,
+    },
+
+    duplicateScroll: {
+        flexShrink: 1,
+    },
+
+    duplicateContent: {
+        gap: 12,
+        paddingBottom: 20,
+    },
+
+    mutedText: {
+        color: COLORS.gray,
+        fontSize: 14,
+    },
+
+    cardRow: {
+        flexDirection: "row",
+        gap: 10,
+    },
+
+    choiceCard: {
+        flex: 1,
+        minWidth: 0,
+        minHeight: 150,
+        borderRadius: 10,
+        borderWidth: 2,
+        borderColor: "transparent",
+        padding: 12,
+        gap: 4,
+    },
+
+    choiceExisting: {
+        backgroundColor: COLORS.bg1,
+    },
+
+    choiceCurrent: {
+        backgroundColor: COLORS.bg2,
+    },
+
+    choiceDimmed: {
+        opacity: 0.5,
+    },
+
+    choicePressed: {
+        transform: [{ scale: 0.97 }],
+    },
+
+    choiceTop: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+    },
+
+    choiceLabel: {
+        fontSize: 13,
+        fontWeight: "bold",
+    },
+
+    check: {
+        fontSize: 16,
+        fontWeight: "bold",
+    },
+
+    choiceWord: {
+        color: COLORS.fg,
+        fontSize: 20,
+        fontWeight: "bold",
+        marginTop: 6,
+    },
+
+    choiceDefinition: {
+        color: COLORS.fg,
+        fontSize: 15,
+    },
+
+    choiceExample: {
+        color: COLORS.gray,
+        fontStyle: "italic",
+        fontSize: 13,
+    },
+
+    confirmButton: {
+        backgroundColor: COLORS.yellowDark,
+        padding: 16,
+        borderRadius: 10,
+        alignItems: "center",
+        justifyContent: "center",
+        minHeight: 54,
+    },
+
+    confirmButtonMuted: {
+        backgroundColor: COLORS.bg2,
+    },
+
+    renameBox: {
+        borderWidth: 1,
+        borderColor: COLORS.aqua,
+        borderRadius: 10,
+        padding: 12,
+        gap: 8,
+    },
+
+    renameInput: {
+        backgroundColor: COLORS.bg1,
+        color: COLORS.fg,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: COLORS.bg3,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        fontSize: 16,
+    },
+
+    renameInputMulti: {
+        minHeight: 60,
+        textAlignVertical: "top",
+    },
+
+    renameButton: {
+        borderWidth: 1,
+        borderColor: COLORS.aqua,
+        borderRadius: 8,
+        paddingVertical: 12,
+        alignItems: "center",
+    },
+
+    renameText: {
+        color: COLORS.aqua,
+        fontWeight: "bold",
+        fontSize: 16,
+    },
+
+    errorText: {
+        color: COLORS.redBright,
     },
 });

@@ -202,6 +202,20 @@ export async function getCard(
     );
 }
 
+export async function findDuplicateCard(
+    learningText: string,
+    deckId: number
+) {
+    const db = await getDatabase();
+
+    return db.getFirstAsync(
+        `SELECT * FROM cards
+         WHERE deck_id = ?
+         AND LOWER(TRIM(learning_text)) = LOWER(TRIM(?))`,
+        [deckId, learningText]
+    );
+}
+
 /* ============================================================
    IMAGES
    ============================================================ */
