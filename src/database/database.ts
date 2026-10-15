@@ -101,6 +101,57 @@ export async function getCards(
     );
 }
 
+
+export async function getCardsPage(
+    deckId: number,
+    limit: number,
+    offset: number,
+    search: string = ""
+): Promise<Card[]> {
+    const database = await getDatabase();
+    const term = `%${search.trim()}%`;
+
+    const rows = await database.getAllAsync<{
+        id: number;
+        learning_text: string;
+        localized_text: string;
+        example_sentence: string | null;
+        romanization: string | null;
+    }>(
+        `SELECT id, learning_text, localized_text,
+                example_sentence, romanization
+         FROM cards
+         WHERE deck_id = ?
+           AND (
+               ? = ''
+               OR learning_text LIKE ?
+               OR localized_text LIKE ?
+               OR COALESCE(example_sentence, '') LIKE ?
+           )
+         ORDER BY id
+         LIMIT ? OFFSET ?`,
+        deckId,
+        search.trim(),
+        term,
+        term,
+        term,
+        limit,
+        offset
+    );
+
+    return rows.map(
+        (row) =>
+            new Card(
+                row.learning_text,
+                row.localized_text,
+                row.example_sentence ?? "",
+                row.romanization ?? "",
+                row.id
+            )
+    );
+}
+
+
 export async function addCard(
     learningText: string,
     localizedText: string,

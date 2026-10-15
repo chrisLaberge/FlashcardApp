@@ -2,14 +2,14 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import {
+    FlatList,
     Pressable,
-    ScrollView,
     StyleSheet,
     Text,
     TextInput,
-    View,
+    View
 } from "react-native";
-import { getCards } from "../database/database";
+import { getCardsPage } from "../database/database";
 import { Card } from "../models/Card";
 
 export default function CardsScreen() {
@@ -17,11 +17,15 @@ export default function CardsScreen() {
     const [cards, setCards] = useState<Card[]>([]);
     const [search, setSearch] = useState("");
     const [deckId, setDeckId] = useState<string | null>(null);
+    const PAGE_SIZE = 100;
+
+    const [offset, setOffset] = useState(0);
+    const [hasMore, setHasMore] = useState(true);
+    const [loading, setLoading] = useState(false);
 
 
     const loadCards = useCallback(async () => {
-        const lastDeckId =
-            await AsyncStorage.getItem("lastDeckId");
+        const lastDeckId = await AsyncStorage.getItem("lastDeckId");
 
         if (!lastDeckId) {
             setDeckId(null);
@@ -30,13 +34,25 @@ export default function CardsScreen() {
         }
 
         setDeckId(lastDeckId);
+        setOffset(0);
+        setHasMore(true);
+        setLoading(true);
 
-        const loadedCards = await getCards(
-            Number(lastDeckId)
-        );
+        try {
+            const loadedCards = await getCardsPage(
+                Number(lastDeckId),
+                PAGE_SIZE,
+                0,
+                search
+            );
 
-        setCards(loadedCards);
-    }, []);
+            setCards(loadedCards);
+            setOffset(loadedCards.length);
+            setHasMore(loadedCards.length === PAGE_SIZE);
+        } finally {
+            setLoading(false);
+        }
+    }, [search]);
 
     useFocusEffect(
         useCallback(() => {
@@ -44,18 +60,28 @@ export default function CardsScreen() {
         }, [loadCards])
     );
 
-    const filteredCards = cards.filter(
-        (card) =>
-            card.learningText
-                .toLowerCase()
-                .includes(search.toLowerCase()) ||
-            card.localizedText
-                .toLowerCase()
-                .includes(search.toLowerCase()) ||
-            card.exampleSentence
-                .toLowerCase()
-                .includes(search.toLowerCase())
-    );
+    const loadMoreCards = async () => {
+        if (!deckId || loading || !hasMore) return;
+
+        setLoading(true);
+
+        try {
+            const newCards = await getCardsPage(
+                Number(deckId),
+                PAGE_SIZE,
+                offset,
+                search
+            );
+
+            setCards((previous) => [...previous, ...newCards]);
+            setOffset((previous) => previous + newCards.length);
+            setHasMore(newCards.length === PAGE_SIZE);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+
 
     const handleImport = () => {
         router.push("/import");
@@ -78,55 +104,59 @@ export default function CardsScreen() {
                 />
 
                 <Text style={styles.searchCount}>
-                    {filteredCards.length}
+                    {cards.length}
                 </Text>
             </View>
 
-            <ScrollView
+
+            <FlatList
                 style={styles.list}
                 contentContainerStyle={styles.listContent}
-            >
-                {cards.length === 0 ? (
-                    <Text style={styles.emptyText}>
-                        You don't have any cards yet.
-                    </Text>
-                ) : (
-                    filteredCards.map((card) => (
-                        <Pressable
-                            key={card.id}
-                            style={({ pressed }) => [
-                                styles.card,
-                                pressed && styles.cardPressed,
-                            ]}
-                            onPress={() =>
-                                router.push({
-                                    pathname: "/editCard",
-                                    params: {
-                                        id: String(card.id),
-                                    },
-                                })
-                            }
-                        >
-                            <View style={styles.cardTextContainer}>
-                                <Text style={styles.front}>
-                                    {card.learningText}
-                                </Text>
-
-                                <Text style={styles.back}>
-                                    {card.localizedText}
-                                </Text>
-                                <Text style={styles.example}>
-                                    {card.exampleSentence}
-                                </Text>
-                            </View>
-
-                            <Text style={styles.arrow}>
-                                ›
+                data={cards}
+                keyExtractor={(card) => String(card.id)}
+                renderItem={({ item: card }) => (
+                    <Pressable
+                        style={({ pressed }) => [
+                            styles.card,
+                            pressed && styles.cardPressed,
+                        ]}
+                        onPress={() =>
+                            router.push({
+                                pathname: "/editCard",
+                                params: { id: String(card.id) },
+                            })
+                        }
+                    >
+                        <View style={styles.cardTextContainer}>
+                            <Text style={styles.front}>
+                                {card.learningText}
                             </Text>
-                        </Pressable>
-                    ))
+                            <Text style={styles.back}>
+                                {card.localizedText}
+                            </Text>
+                            <Text style={styles.example}>
+                                {card.exampleSentence}
+                            </Text>
+                        </View>
+                        <Text style={styles.arrow}>›</Text>
+                    </Pressable>
                 )}
-            </ScrollView>
+                onEndReached={loadMoreCards}
+                onEndReachedThreshold={0.5}
+                ListEmptyComponent={
+                    <Text style={styles.emptyText}>
+                        {loading
+                            ? "Loading cards..."
+                            : "You don't have any cards yet."}
+                    </Text>
+                }
+                ListFooterComponent={
+                    loading && cards.length > 0
+                        ? <Text style={styles.emptyText}>Loading more...</Text>
+                        : null
+                }
+            />
+
         </View>
     );
 }
