@@ -1,8 +1,8 @@
 import NavigationButton from "@/components/NavigationButton";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
-import { useCallback, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useCallback, useRef, useState } from "react";
+import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
 import { getLanguage } from "../constants/languages";
 import { getDecks, getProgressCounts } from "../database/database";
 export default function HomeScreen() {
@@ -13,6 +13,7 @@ export default function HomeScreen() {
     const [selectedDeckId, setSelectedDeckId] = useState<string | null>(null);
     const [selectedDeckName, setSelectedDeckName] = useState("Select a deck");
     const [selectedDeckFlag, setSelectedDeckFlag] = useState("🌐");
+    const [deckSelected, setDeckSelected] = useState(false);
 
     const { deckId } = useLocalSearchParams<{ deckId?: string }>();
 
@@ -27,6 +28,7 @@ export default function HomeScreen() {
                     setSelectedDeckId(null);
                     setSelectedDeckName("Select a deck");
                     setSelectedDeckFlag("🌐");
+                    setDeckSelected(false);
                 };
 
                 if (!lastDeckId) return reset();
@@ -39,11 +41,14 @@ export default function HomeScreen() {
                 setSelectedDeckId(String(deck.id));
                 setSelectedDeckName(deck.name);
                 setSelectedDeckFlag(getLanguage(deck.language)?.flag ?? "🌐");
+                setDeckSelected(true);
             };
 
             loadDeck();
         }, [deckId])
+
     );
+
 
     useFocusEffect(
         useCallback(() => {
@@ -69,28 +74,93 @@ export default function HomeScreen() {
         }, [activeDeckId])
     );
 
+
+
+    const pulse = useRef(new Animated.Value(0)).current;
+
+    useFocusEffect(useCallback(() => {
+        if (deckSelected) {
+            pulse.stopAnimation();
+            pulse.setValue(0);
+            return;
+        }
+
+        const animation = Animated.loop(
+            Animated.sequence([
+                Animated.timing(pulse, {
+                    toValue: 1,
+                    duration: 800,
+                    useNativeDriver: false,
+                }),
+                Animated.timing(pulse, {
+                    toValue: 0,
+                    duration: 800,
+                    useNativeDriver: false,
+                }),
+            ])
+        );
+
+        animation.start();
+
+        return () => animation.stop();
+    }, [deckSelected, pulse]));
+
+    const borderColor = pulse.interpolate({
+        inputRange: [0, 1],
+        outputRange: ["#504945", "#fabd2f"],
+    });
+
+
     return (
         <View style={styles.container}>
-            <Pressable
-                style={({ pressed }) => [styles.deckButton, pressed && styles.pressed]}
-                onPress={() => router.push("/decks")}
+            <Animated.View
+                style={{
+                    backgroundColor: "#3c3836",
+                    borderWidth: deckSelected ? 1 : 2,
+                    borderColor: deckSelected ? "#504945" : "#fabd2f",
+                    borderRadius: 8,
+                    marginBottom: 16,
+                    opacity: deckSelected
+                        ? 1
+                        : pulse.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [0.5, 1],
+                        }),
+                }}
             >
-                <Text style={styles.deckName} numberOfLines={1}>
-                    {selectedDeckName}
-                </Text>
-                <Text style={styles.flag}>{selectedDeckFlag}</Text>
-                <Text style={styles.arrow}>▼</Text>
-            </Pressable>
+                <Pressable
+                    style={({ pressed }) => [
+                        styles.deckButton,
+                        pressed && styles.pressed,
+                    ]}
+                    onPress={() => router.push("/decks")}
+                >
+                    <Text style={styles.deckName} numberOfLines={1}>
+                        {selectedDeckName}
+                    </Text>
+                    <Text style={styles.flag}>{selectedDeckFlag}</Text>
+                    <Text style={styles.arrow}>▼</Text>
+                </Pressable>
+            </Animated.View>
 
             <Pressable
-                style={({ pressed }) => [styles.startButton, pressed && styles.pressed]}
+                style={({ pressed }) => [
+                    styles.startButton,
+                    !deckSelected && { opacity: 0.5 },
+                    pressed && styles.pressed,
+                ]}
+                disabled={!deckSelected}
                 onPress={() => router.push("/learn")}
             >
                 <Text style={styles.startText}>Start Learning</Text>
             </Pressable>
 
             <Pressable
-                style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
+                style={({ pressed }) => [
+                    styles.secondaryButton,
+                    !deckSelected && { opacity: 0.5 },
+                    pressed && styles.pressed]}
+                disabled={!deckSelected}
                 onPress={() => router.push("/cardList")}
             >
                 <Text style={styles.secondaryText}>My Cards</Text>
@@ -119,7 +189,7 @@ export default function HomeScreen() {
                 </View>
             </View>
 
-            <NavigationButton deckId={activeDeckId} />
+            {deckSelected && <NavigationButton deckId={activeDeckId} />}
         </View>
     );
 }
@@ -131,13 +201,8 @@ const styles = StyleSheet.create({
     deckButton: {
         flexDirection: "row",
         alignItems: "center",
-        backgroundColor: "#3c3836",
-        borderWidth: 1,
-        borderColor: "#504945",
         paddingVertical: 9,
         paddingHorizontal: 12,
-        borderRadius: 8,
-        marginBottom: 16,
     },
     deckName: { flex: 1, color: "#ebdbb2", fontSize: 15, fontWeight: "600" },
     flag: { fontSize: 20, marginLeft: 8 },
