@@ -24,7 +24,7 @@ import { Card } from "../models/Card";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
-const SWIPE_THRESHOLD = 100;
+const SWIPE_THRESHOLD = 70;
 const DELETE_THRESHOLD = 120;
 const DELETE_PREVIEW_THRESHOLD = 20;
 const TAP_THRESHOLD = 10;
@@ -281,19 +281,24 @@ function useCardGestures(callbacks: GestureCallbacks) {
                 (Math.abs(g.dx) > TAP_THRESHOLD || Math.abs(g.dy) > TAP_THRESHOLD),
 
             onPanResponderMove: (_, g) => {
+                // LOCK: until the card is flipped it doesn't move at all
+                if (!latest.current.canSwipe) return;
+
                 position.setValue({ x: g.dx, y: g.dy });
                 setDeletePreview(isDeletePreview(g));
             },
 
             onPanResponderRelease: (_, g) => {
-                if (isDeleteGesture(g)) return remove();
+                // Delete is also locked until flipped, so the card can't vanish without moving
+                if (latest.current.canSwipe && isDeleteGesture(g)) return remove();
+
                 const swipeDirection: Direction | null =
                     g.dx > SWIPE_THRESHOLD ? "right" : g.dx < -SWIPE_THRESHOLD ? "left" : null;
 
                 if (swipeDirection) {
                     if (latest.current.canSwipe) return swipe(swipeDirection);
 
-                    // Not flipped yet: reveal the answer and snap back.
+                    // Not flipped yet: reveal the answer
                     latest.current.onTap();
                     return reset();
                 }
