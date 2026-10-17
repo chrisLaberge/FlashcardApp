@@ -2,9 +2,10 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as DocumentPicker from "expo-document-picker";
 import { router } from "expo-router";
 import Papa from "papaparse";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
     ActivityIndicator,
+    Animated,
     Pressable,
     ScrollView,
     StyleSheet,
@@ -174,6 +175,27 @@ export default function ImportScreen() {
     const [error, setError] = useState("");
     const [message, setMessage] = useState("");
     const [loading, setLoading] = useState(false);
+    const [progress, setProgress] = useState<number | null>(null);
+    const [loadingMessage, setLoadingMessage] = useState("");
+    const indeterminateAnim = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        if (!loading || progress !== null) {
+            indeterminateAnim.stopAnimation();
+            indeterminateAnim.setValue(0);
+            return;
+        }
+
+        const animation = Animated.loop(
+            Animated.timing(indeterminateAnim, {
+                toValue: 1,
+                duration: 1100,
+                useNativeDriver: true,
+            })
+        );
+        animation.start();
+        return () => animation.stop();
+    }, [loading, progress, indeterminateAnim]);
     const [summary, setSummary] = useState<ImportSummary>({
         added: 0,
         replaced: 0,
@@ -192,6 +214,10 @@ export default function ImportScreen() {
         currentPlanIndex === undefined ? undefined : plans[currentPlanIndex];
 
     async function selectCsv() {
+        if (loading) return;
+        setLoading(true);
+        setProgress(null);
+        setLoadingMessage("Opening and reading CSV...");
         setError("");
         setMessage("");
         setCards([]);
@@ -311,6 +337,10 @@ export default function ImportScreen() {
                     ? err.message
                     : "Could not read the CSV file."
             );
+        } finally {
+            setLoading(false);
+            setProgress(null);
+            setLoadingMessage("");
         }
     }
 
@@ -318,6 +348,8 @@ export default function ImportScreen() {
         if (cards.length === 0 || loading) return;
 
         setLoading(true);
+        setProgress(0);
+        setLoadingMessage("Checking cards for duplicates...");
         setError("");
         setMessage("");
 
@@ -362,6 +394,8 @@ export default function ImportScreen() {
                         conflict: "csv",
                         duplicateOfIndex: previousIndex,
                     });
+                    setProgress(Math.round(((i + 1) / cards.length) * 100));
+                    setLoadingMessage(`Checking card ${i + 1} of ${cards.length}...`);
                     continue;
                 }
 
@@ -386,6 +420,9 @@ export default function ImportScreen() {
                         action: "add",
                     });
                 }
+
+                setProgress(Math.round(((i + 1) / cards.length) * 100));
+                setLoadingMessage(`Checking card ${i + 1} of ${cards.length}...`);
             }
 
             setPlans(nextPlans);
@@ -411,6 +448,8 @@ export default function ImportScreen() {
             );
         } finally {
             setLoading(false);
+            setProgress(null);
+            setLoadingMessage("");
         }
     }
 
@@ -465,6 +504,8 @@ export default function ImportScreen() {
         if (loading || plans.length === 0) return;
 
         setLoading(true);
+        setProgress(0);
+        setLoadingMessage("Importing cards...");
         setError("");
         setMessage("");
 
@@ -507,11 +548,19 @@ export default function ImportScreen() {
             }
 
             for (let i = 0; i < plans.length; i++) {
-                if (replacedCsvIndices.has(i)) continue;
+                if (replacedCsvIndices.has(i)) {
+                    setProgress(Math.round(((i + 1) / plans.length) * 100));
+                    setLoadingMessage(`Processing card ${i + 1} of ${plans.length}...`);
+                    continue;
+                }
 
                 let plan = plans[i];
 
-                if (replacedCsvIndices.has(plan.index)) continue;
+                if (replacedCsvIndices.has(plan.index)) {
+                    setProgress(Math.round(((i + 1) / plans.length) * 100));
+                    setLoadingMessage(`Processing card ${i + 1} of ${plans.length}...`);
+                    continue;
+                }
 
                 const csvReplacement = csvReplacements.get(i);
                 if (csvReplacement) {
@@ -520,6 +569,8 @@ export default function ImportScreen() {
 
                 if (plan.action === "skip") {
                     result.skipped++;
+                    setProgress(Math.round(((i + 1) / plans.length) * 100));
+                    setLoadingMessage(`Processing card ${i + 1} of ${plans.length}...`);
                     continue;
                 }
 
@@ -582,6 +633,9 @@ export default function ImportScreen() {
                         reviewCount >= 8
                     );
                 }
+
+                setProgress(Math.round(((i + 1) / plans.length) * 100));
+                setLoadingMessage(`Importing card ${i + 1} of ${plans.length}...`);
             }
 
             setSummary(result);
@@ -594,6 +648,8 @@ export default function ImportScreen() {
             );
         } finally {
             setLoading(false);
+            setProgress(null);
+            setLoadingMessage("");
         }
     }
 
@@ -633,10 +689,10 @@ export default function ImportScreen() {
         stage === "preview"
             ? "Import CSV"
             : stage === "review"
-              ? "Duplicates"
-              : stage === "confirm"
-                ? "Confirm"
-                : "Done";
+                ? "Duplicates"
+                : stage === "confirm"
+                    ? "Confirm"
+                    : "Done";
 
     // What the "existing" side of a duplicate shows
     const csvOriginal =
@@ -674,6 +730,38 @@ export default function ImportScreen() {
             {!error && !!message && stage === "preview" && (
                 <Text style={styles.message}>{message}</Text>
             )}
+            {loading && (
+                <View style={styles.progressContainer}>
+                    <View style={styles.progressHeading}>
+                        <Text style={styles.progressLabel}>{loadingMessage}</Text>
+                        {progress !== null && (
+                            <Text style={styles.progressPercent}>{progress}%</Text>
+                        )}
+                    </View>
+                    <View style={styles.progressTrack}>
+                        <Animated.View
+                            style={[
+                                styles.progressFill,
+                                progress === null
+                                    ? [
+                                        styles.progressIndeterminate,
+                                        {
+                                            transform: [
+                                                {
+                                                    translateX: indeterminateAnim.interpolate({
+                                                        inputRange: [0, 1],
+                                                        outputRange: [-120, 320],
+                                                    }),
+                                                },
+                                            ],
+                                        },
+                                    ]
+                                    : { width: `${progress}%` },
+                            ]}
+                        />
+                    </View>
+                </View>
+            )}
 
             {/* ---------- Preview ---------- */}
             {stage === "preview" && (
@@ -689,7 +777,11 @@ export default function ImportScreen() {
                                 onPress={selectCsv}
                                 disabled={loading}
                             >
-                                <Text style={styles.primaryText}>Choose CSV</Text>
+                                {loading ? (
+                                    <ActivityIndicator color={c.bg} />
+                                ) : (
+                                    <Text style={styles.primaryText}>Choose CSV</Text>
+                                )}
                             </Pressable>
                         </View>
                     ) : (
@@ -876,10 +968,10 @@ export default function ImportScreen() {
                                         plans.map((p) =>
                                             p.conflict
                                                 ? {
-                                                      ...p,
-                                                      action: undefined,
-                                                      renamedText: undefined,
-                                                  }
+                                                    ...p,
+                                                    action: undefined,
+                                                    renamedText: undefined,
+                                                }
                                                 : p
                                         )
                                     );
@@ -971,6 +1063,44 @@ const styles = StyleSheet.create({
     muted: {
         color: c.gray,
         fontSize: 14,
+    },
+    progressContainer: {
+        backgroundColor: c.bg1,
+        borderRadius: 10,
+        padding: 14,
+        marginBottom: 16,
+        gap: 10,
+    },
+    progressHeading: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 12,
+    },
+    progressLabel: {
+        color: c.fg,
+        fontSize: 14,
+        flex: 1,
+    },
+    progressPercent: {
+        color: c.yellow,
+        fontSize: 14,
+        fontWeight: "bold",
+    },
+    progressTrack: {
+        height: 8,
+        backgroundColor: c.bg2,
+        borderRadius: 999,
+        overflow: "hidden",
+    },
+    progressFill: {
+        height: "100%",
+        backgroundColor: c.yellow,
+        borderRadius: 999,
+    },
+    progressIndeterminate: {
+        width: "35%",
+        opacity: 0.9,
     },
 
     /* Empty / pick file */
