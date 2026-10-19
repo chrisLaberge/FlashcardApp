@@ -1,5 +1,5 @@
 import { getCardImage } from "@/database/database";
-import { API_URL } from "@/services/imageApi";
+import { resolveImageUrl } from "@/services/imageApi";
 import { Ionicons } from "@expo/vector-icons";
 import * as Speech from "expo-speech";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -86,10 +86,11 @@ function resolveCardImage(cardId: number): Promise<string | null> {
         request = (async () => {
             try {
                 const image = await getCardImage(cardId);
-                const url = image?.file_path ? `${API_URL}${image.file_path}` : null;
+                let url = resolveImageUrl(image?.file_path) ?? null;
 
                 if (url) {
-                    await Image.prefetch(url).catch(() => false);
+                    const ok = await Image.prefetch(url).catch(() => false);
+                    if (!ok) url = null; // file missing, show the card without an image
                 }
 
                 imageUrlCache.set(cardId, url);

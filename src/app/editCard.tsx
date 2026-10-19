@@ -16,10 +16,12 @@ import {
     View,
 } from "react-native";
 
+import { invalidateCardImage } from "@/components/CardStack";
 import {
     ImageSearchResult,
     downloadImage,
-    searchImages,
+    resolveImageUrl,
+    searchImages
 } from "@/services/imageApi";
 
 import { translateText } from "@/services/translationApi";
@@ -189,9 +191,7 @@ export default function EditCardScreen() {
             const image = await getCardImage(cardId);
 
             if (image) {
-                setCurrentImageUrl(
-                    `http://10.0.0.208:3000${image.file_path}`
-                );
+                setCurrentImageUrl(resolveImageUrl(image.file_path) ?? null);
             }
 
             // Load deck language (same approach as AddCardScreen)
@@ -234,17 +234,22 @@ export default function EditCardScreen() {
             let imageId: number | null = null;
 
             if (selectedImage) {
-                const downloaded = await downloadImage(selectedImage);
+                try {
+                    const downloaded = await downloadImage(selectedImage);
 
-                imageId = await addImage(
-                    selectedImage.source,
-                    String(selectedImage.id),
-                    downloaded.imageUrl,
-                    null,
-                    selectedImage.pageUrl,
-                    selectedImage.photographer,
-                    selectedImage.photographerUrl
-                );
+                    imageId = await addImage(
+                        selectedImage.source,
+                        String(selectedImage.id),
+                        downloaded.imageUrl,
+                        null,
+                        selectedImage.pageUrl,
+                        selectedImage.photographer,
+                        selectedImage.photographerUrl
+                    );
+                } catch (error) {
+                    console.warn("Image failed, saving card without it:", error);
+                    // imageId stays as it was, so the card still saves
+                }
             }
 
             if (deleteOtherCardId !== undefined) {
@@ -255,6 +260,7 @@ export default function EditCardScreen() {
 
             if (imageId !== null) {
                 await setCardImage(cardId, imageId);
+                invalidateCardImage(cardId);   // <-- add this line
             }
 
             setDuplicateCard(null);
@@ -524,8 +530,8 @@ export default function EditCardScreen() {
         choice === "existing"
             ? "Keep existing card"
             : choice === "current"
-              ? "Replace existing card"
-              : "Choose a card";
+                ? "Replace existing card"
+                : "Choose a card";
 
     // --------------------------------------------------
     // UI

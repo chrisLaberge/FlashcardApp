@@ -356,17 +356,22 @@ export default function AddCardScreen() {
             let imageId: number | null = null;
 
             if (selectedImage) {
-                const downloaded = await downloadImage(selectedImage);
+                try {
+                    const downloaded = await downloadImage(selectedImage);
 
-                imageId = await addImage(
-                    selectedImage.source,
-                    String(selectedImage.id),
-                    downloaded.imageUrl,
-                    null,
-                    selectedImage.pageUrl,
-                    selectedImage.photographer,
-                    selectedImage.photographerUrl
-                );
+                    imageId = await addImage(
+                        selectedImage.source,
+                        String(selectedImage.id),
+                        downloaded.imageUrl,
+                        null,
+                        selectedImage.pageUrl,
+                        selectedImage.photographer,
+                        selectedImage.photographerUrl
+                    );
+                } catch (error) {
+                    console.warn("Image failed, saving card without it:", error);
+                    // imageId stays as it was, so the card still saves
+                }
             }
 
             // ------------------------------------------
@@ -578,8 +583,8 @@ export default function AddCardScreen() {
         choice === "existing"
             ? "Keep existing card"
             : choice === "new"
-              ? "Replace with new card"
-              : "Choose a card";
+                ? "Replace with new card"
+                : "Choose a card";
 
     // --------------------------------------------------
     // UI
@@ -787,7 +792,7 @@ export default function AddCardScreen() {
                                                 style={[
                                                     styles.imageResult,
                                                     isSelected &&
-                                                        styles.imageResultSelected,
+                                                    styles.imageResultSelected,
                                                 ]}
                                                 onPress={() =>
                                                     selectImage(image)
