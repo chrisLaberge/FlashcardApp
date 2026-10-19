@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import CardStack from "../components/CardStack";
@@ -8,6 +8,7 @@ import CardStack from "../components/CardStack";
 import { getTTSLanguageCode } from "@/constants/languages";
 import {
   deleteCard,
+  getCard,
   getCardProgress,
   getDecks,
   getDueCards,
@@ -88,7 +89,7 @@ export default function LearnScreen() {
     queuedIds.current.clear();
 
     for (const card of cards) {
-      deck.addToBack(card);
+      deck.reinsertCard(card);
       if (card.id !== undefined) queuedIds.current.add(card.id);
     }
 
@@ -108,10 +109,42 @@ export default function LearnScreen() {
     showCard(deck.getNextCard(), deck.peekNext());
   }, [showCard]);
 
+  useEffect(() => {
+    void loadCards();
+  }, [loadCards]);
+
+  const refreshCurrentCard = useCallback(async () => {
+    const cardId = currentCardRef.current?.id;
+
+    if (cardId === undefined) return;
+
+    try {
+      const updatedCard = await getCard(cardId);
+
+      // Don't update the screen if the user has already moved to another card.
+      if (currentCardRef.current?.id !== cardId) return;
+
+      // The card may have been deleted from the Edit screen.
+      if (!updatedCard) {
+        queuedIds.current.delete(cardId);
+        advance();
+        return;
+      }
+
+      currentCardRef.current = updatedCard;
+      setCurrentCard(updatedCard);
+
+      // Remount the card so updated content and any changed image are refreshed.
+      setCardKey((key) => key + 1);
+    } catch (error) {
+      console.error("Failed to refresh card after editing:", error);
+    }
+  }, [advance]);
+
   useFocusEffect(
     useCallback(() => {
-      void loadCards();
-    }, [loadCards])
+      void refreshCurrentCard();
+    }, [refreshCurrentCard])
   );
 
   /* ------------------------ Pull in cards that come due ----------------------- */
@@ -136,7 +169,7 @@ export default function LearnScreen() {
 
         queuedIds.current.add(card.id);
         completedDeck.removeById(card.id);
-        deck.addToBack(card); // fresh copy from the DB
+        deck.reinsertCard(card); // fresh copy from the DB
         added++;
       }
 
@@ -177,11 +210,11 @@ export default function LearnScreen() {
 
       if (direction === "left") {
         await markCardIncorrect(cardId);
-        deck.addToBack(card); // stays queued
+        deck.reinsertCard(card); // stays queued
       } else {
         await markCardCorrect(cardId);
         setCorrectCount((count) => count + 1);
-        completedDeck.addToBack(card);
+        completedDeck.reinsertCard(card);
         queuedIds.current.delete(cardId); // no longer in the session
       }
     } finally {

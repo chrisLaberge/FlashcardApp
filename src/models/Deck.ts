@@ -1,31 +1,39 @@
 import { Card } from "./Card";
 
+const REINSERT_POSITION = 10;
+
 export class Deck {
     cards: Card[];
+
     constructor(cards: Card[] = []) {
         this.cards = cards;
     }
 
+    /** Removes and returns the first card. */
     getNextCard(): Card | undefined {
         return this.cards.shift();
     }
 
+    /** Looks at the first card without removing it. */
     peekNext(): Card | undefined {
         return this.cards[0];
     }
 
-    addToBack(card: Card): void {
-        this.cards.push(card);
+    /** Puts a card 10 places back, or at the very back if the deck is shorter. */
+    reinsertCard(card: Card): void {
+        const position = Math.min(REINSERT_POSITION, this.cards.length);
+        this.cards.splice(position, 0, card);
     }
 
+    /** Puts a card at the very front. */
     addToFront(card: Card): void {
-    this.cards.unshift(card);
-}
+        this.cards.unshift(card);
+    }
 
-removeById(id?: number): void {
-    const i = this.cards.findIndex((c) => c.id === id);
-    if (i !== -1) this.cards.splice(i, 1);
-}
+    removeById(id?: number): void {
+        const index = this.cards.findIndex((c) => c.id === id);
+        if (index !== -1) this.cards.splice(index, 1);
+    }
 
     clear(): void {
         this.cards = [];
@@ -38,6 +46,4 @@ removeById(id?: number): void {
     get size(): number {
         return this.cards.length;
     }
-
-
 }
