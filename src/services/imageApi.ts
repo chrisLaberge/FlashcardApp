@@ -28,20 +28,30 @@ export async function searchImages(
 }
 
 export async function downloadImage(image: ImageSearchResult) {
-    const response = await fetch(`${API_URL}/images/download`, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-            id: image.id,
-            url: image.downloadUrl,
-        }),
-    });
+    // 1. The phone downloads the picture from Pixabay
+    const source = await fetch(image.downloadUrl);
+
+    if (!source.ok) {
+        throw new Error(`Pixabay download failed (${source.status})`);
+    }
+
+    const blob = await source.blob();
+
+    // 2. The phone sends it to our server
+    const response = await fetch(
+        `${API_URL}/images/upload?id=${encodeURIComponent(String(image.id))}`,
+        {
+            method: "POST",
+            headers: {
+                "Content-Type": blob.type || "image/jpeg",
+            },
+            body: blob,
+        }
+    );
 
     if (!response.ok) {
         const body = await response.text().catch(() => "");
-        throw new Error(`Image download failed (${response.status}): ${body}`);
+        throw new Error(`Image upload failed (${response.status}): ${body}`);
     }
 
     return await response.json();
