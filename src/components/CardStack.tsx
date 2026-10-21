@@ -31,6 +31,7 @@ const TAP_THRESHOLD = 10;
 
 const SWIPE_OUT_DURATION = 250;
 const FLIP_DURATION = 500;
+const SPEAK_GAP = 8;
 
 const COLORS = {
     cardBackground: "#ebdbb2",
@@ -401,21 +402,31 @@ function Term({ card, side, image, size = "large", onSpeak }: TermProps) {
 
         return (
             <View style={styles.term}>
-                <Text style={textStyle} numberOfLines={3} adjustsFontSizeToFit>
-                    {card.learningText}
-                </Text>
+                <View style={styles.learningRow}>
+                    <SpeakButton
+                        small={small}
+                        onPress={onSpeak}
+                        style={styles.speakGapStart}
+                    />
+
+                    <Text
+                        style={[textStyle, styles.learningText]}
+                        numberOfLines={2}
+                        adjustsFontSizeToFit
+                        minimumFontScale={0.6}
+                    >
+                        {card.learningText}
+                    </Text>
+
+                    {/* Invisible twin of the speaker: keeps the word exactly centered */}
+                    <SpeakButton small={small} style={styles.speakGapEnd} />
+                </View>
 
                 {!!romanization && (
                     <Text style={small ? styles.romanizationSmall : styles.romanization}>
                         {romanization}
                     </Text>
                 )}
-
-                <SpeakButton
-                    small={small}
-                    onPress={onSpeak}
-                    style={small ? styles.speakGapSmall : styles.speakGapLarge}
-                />
             </View>
         );
     }
@@ -684,16 +695,18 @@ const styles = StyleSheet.create({
     textLarge: {
         alignSelf: "stretch",
         color: COLORS.text,
-        fontSize: 44,
+        fontSize: 36,
         fontWeight: "500",
         textAlign: "center",
+        includeFontPadding: false,
     },
 
     textSmall: {
         alignSelf: "stretch",
         color: COLORS.hint,
-        fontSize: 20,
+        fontSize: 18,
         textAlign: "center",
+        includeFontPadding: false,
     },
 
     romanization: {
@@ -742,10 +755,6 @@ const styles = StyleSheet.create({
         width: 32,
         height: 32,
         borderRadius: 16,
-    },
-
-    speakGapLarge: {
-        marginTop: 16,
     },
 
     speakGapSmall: {
@@ -798,4 +807,25 @@ const styles = StyleSheet.create({
         fontSize: 17,
         fontWeight: "bold",
     },
+
+    learningRow: {
+        width: "100%",
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+    },
+
+    learningText: {
+        flexShrink: 1,
+        alignSelf: "center",
+    },
+
+    speakGapStart: {
+        marginRight: SPEAK_GAP,
+    },
+
+    speakGapEnd: {
+        marginLeft: SPEAK_GAP,
+    },
+
 });
