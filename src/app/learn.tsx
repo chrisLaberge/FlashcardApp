@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import CardStack from "../components/CardStack";
 
+
 import { getTTSLanguageCode } from "@/constants/languages";
 import {
   deleteCard,

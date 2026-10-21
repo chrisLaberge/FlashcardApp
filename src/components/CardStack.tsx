@@ -7,12 +7,16 @@ import {
     Animated,
     Dimensions,
     Image,
+    KeyboardAvoidingView,
+    Modal,
     PanResponder,
     PanResponderGestureState,
+    Platform,
     Pressable,
     StyleProp,
     StyleSheet,
     Text,
+    TextInput,
     View,
     ViewStyle,
 } from "react-native";
@@ -31,6 +35,7 @@ const TAP_THRESHOLD = 10;
 
 const SWIPE_OUT_DURATION = 250;
 const FLIP_DURATION = 500;
+
 const SPEAK_GAP = 8;
 
 const COLORS = {
@@ -39,6 +44,7 @@ const COLORS = {
     text: "#282828",
     hint: "#7c6f64",
     danger: "#cc241d",
+    success: "#136d18",
 };
 
 type Direction = "left" | "right";
@@ -46,6 +52,13 @@ type PromptSide = "learning" | "localized";
 
 const oppositeSide = (side: PromptSide): PromptSide =>
     side === "learning" ? "localized" : "learning";
+
+/* -------------------------------------------------------------------------- */
+/*                              Answer grading                                */
+/* -------------------------------------------------------------------------- */
+
+const normalize = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
+const isCorrect = (typed: string, expected: string) => normalize(typed) === normalize(expected);
 
 /* -------------------------------------------------------------------------- */
 /*                              Gesture helpers                               */
@@ -353,7 +366,7 @@ interface SpeakButtonProps {
 
 /**
  * Without `onPress` it renders an invisible spacer of the same size, so the
- * preview card has exactly the same layout as the real card.
+ * learning row can stay symmetric around the word.
  */
 function SpeakButton({ onPress, small, style }: SpeakButtonProps) {
     const size = small ? styles.speakSmall : styles.speakLarge;
@@ -533,6 +546,25 @@ function ActiveCards({
         onTap: flip,
     });
 
+    /* ------------------------- Typed answer + grading --------------------- */
+
+    const [typed, setTyped] = useState("");
+    const [typing, setTyping] = useState(false);
+    const [result, setResult] = useState<"correct" | "wrong" | null>(null);
+
+    const expected =
+        answerSide === "learning" ? currentCard.learningText : currentCard.localizedText;
+
+    const submit = () => {
+        if (flipped) return;
+
+        setTyping(false);
+        if (!typed.trim()) return;
+
+        setResult(isCorrect(typed, expected) ? "correct" : "wrong");
+        flip();
+    };
+
     /* ------------------------------ Speech ------------------------------- */
 
     const speak = (text: string) => {
@@ -599,9 +631,18 @@ function ActiveCards({
                         image={currentImage}
                         onSpeak={speakLearning}
                     />
+
+                    <Pressable
+                        onPress={() => setTyping(true)}
+                        accessibilityRole="button"
+                        style={styles.typeButton}
+                    >
+                        <Ionicons name="create-outline" size={20} color={COLORS.text} />
+
+                    </Pressable>
                 </Animated.View>
 
-                {/* Back: the answer, the other language, and the example */}
+                {/* Back: the answer, what you typed, the other language, and the example */}
                 <Animated.View
                     pointerEvents={flipped ? "auto" : "none"}
                     style={[styles.cardFace, backStyle]}
@@ -612,6 +653,18 @@ function ActiveCards({
                         image={currentImage}
                         onSpeak={speakLearning}
                     />
+
+                    {!!typed.trim() && (
+                        <Text
+                            style={[
+                                styles.typed,
+                                result === "correct" && styles.typedCorrect,
+                                result === "wrong" && styles.typedWrong,
+                            ]}
+                        >
+                            {typed.trim()}
+                        </Text>
+                    )}
 
                     <View style={styles.secondary}>
                         <Term
@@ -631,6 +684,43 @@ function ActiveCards({
                     )}
                 </Animated.View>
             </Animated.View>
+
+            {/* Answer input: slides above the keyboard */}
+            <Modal
+                visible={typing}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setTyping(false)}
+            >
+                <KeyboardAvoidingView
+                    style={styles.modalRoot}
+                    behavior={Platform.OS === "ios" ? "padding" : undefined}
+                >
+                    <Pressable style={styles.backdrop} onPress={() => setTyping(false)} />
+
+                    <View style={styles.sheet}>
+                        <TextInput
+                            value={typed}
+                            onChangeText={setTyped}
+                            onSubmitEditing={submit}
+                            placeholderTextColor={COLORS.hint}
+                            autoFocus
+                            autoCapitalize="none"
+                            autoCorrect={false}
+                            returnKeyType="done"
+                            style={styles.input}
+                        />
+
+                        <Pressable
+                            onPress={submit}
+                            accessibilityRole="button"
+                            style={styles.checkButton}
+                        >
+                            <Text style={styles.checkText}>Check</Text>
+                        </Pressable>
+                    </View>
+                </KeyboardAvoidingView>
+            </Modal>
         </>
     );
 }
@@ -737,6 +827,28 @@ const styles = StyleSheet.create({
         marginBottom: 12,
     },
 
+    /* Learning row: [speaker][gap] word [gap][invisible twin] */
+
+    learningRow: {
+        width: "100%",
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+    },
+
+    learningText: {
+        flexShrink: 1, // long words shrink/wrap instead of pushing the buttons out
+        alignSelf: "center", // overrides alignSelf: "stretch" from textLarge/textSmall
+    },
+
+    speakGapStart: {
+        marginRight: SPEAK_GAP,
+    },
+
+    speakGapEnd: {
+        marginLeft: SPEAK_GAP,
+    },
+
     /* Speaker button */
 
     speakButton: {
@@ -755,10 +867,6 @@ const styles = StyleSheet.create({
         width: 32,
         height: 32,
         borderRadius: 16,
-    },
-
-    speakGapSmall: {
-        marginTop: 8,
     },
 
     speakPressed: {
@@ -786,6 +894,92 @@ const styles = StyleSheet.create({
         fontStyle: "italic",
     },
 
+    /* Typed answer (back of card) */
+
+    typed: {
+        marginTop: 12,
+        fontSize: 22,
+        fontWeight: "600",
+        color: COLORS.hint, // used when the card was flipped without grading
+    },
+
+    typedCorrect: {
+        color: COLORS.success,
+    },
+
+    typedWrong: {
+        color: COLORS.danger,
+        textDecorationLine: "line-through",
+    },
+
+    /* "Type answer" button (front of card) */
+
+    typeButton: {
+        position: "absolute",
+        bottom: 24,
+        alignSelf: "center",
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+        paddingHorizontal: 18,
+        paddingVertical: 12,
+        borderRadius: 20,
+        backgroundColor: COLORS.cardBorder,
+    },
+
+    typeButtonText: {
+        color: COLORS.text,
+        fontSize: 16,
+        fontWeight: "500",
+    },
+
+    /* Input modal */
+
+    modalRoot: {
+        flex: 1,
+        justifyContent: "flex-end",
+    },
+
+    backdrop: {
+        ...StyleSheet.absoluteFill,
+        backgroundColor: "rgba(0,0,0,0.4)",
+    },
+
+    sheet: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 12,
+        padding: 16,
+        backgroundColor: COLORS.cardBackground,
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+    },
+
+    input: {
+        flex: 1,
+        borderWidth: 1,
+        borderColor: COLORS.cardBorder,
+        borderRadius: 14,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        fontSize: 18,
+        color: COLORS.text,
+        backgroundColor: "#fbf1c7",
+    },
+
+    checkButton: {
+        paddingHorizontal: 18,
+        paddingVertical: 12,
+        borderRadius: 14,
+        backgroundColor: COLORS.text,
+    },
+
+    checkText: {
+        color: COLORS.cardBackground,
+        fontSize: 16,
+        fontWeight: "600",
+    },
+
     /* Delete preview */
 
     deleteCard: {
@@ -807,25 +1001,4 @@ const styles = StyleSheet.create({
         fontSize: 17,
         fontWeight: "bold",
     },
-
-    learningRow: {
-        width: "100%",
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "center",
-    },
-
-    learningText: {
-        flexShrink: 1,
-        alignSelf: "center",
-    },
-
-    speakGapStart: {
-        marginRight: SPEAK_GAP,
-    },
-
-    speakGapEnd: {
-        marginLeft: SPEAK_GAP,
-    },
-
 });
