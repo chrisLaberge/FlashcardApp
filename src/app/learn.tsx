@@ -1,27 +1,23 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import CardStack from "../components/CardStack";
 
-
 import { getTTSLanguageCode } from "@/constants/languages";
 import {
   deleteCard,
-  getCard,
   getCardProgress,
   getDecks,
   getDueCards,
   markCardCorrect,
   markCardIncorrect,
-  updateCardProgress,
+  restoreCardProgress,
 } from "../database/database";
 import { Card } from "../models/Card";
 import { CardProgress } from "../models/CardProgress";
 import { completedDeck, deck } from "../models/DeckManager";
-
-const DUE_CHECK_INTERVAL_MS = 15_000;
 
 type HistoryEntry = {
   card: Card;
@@ -47,29 +43,16 @@ export default function LearnScreen() {
   // Bumped whenever the visible card changes so CardStack remounts cleanly
   const [cardKey, setCardKey] = useState(0);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
-
-  // Refs: values that timers / async code must read without going stale
   const isProcessing = useRef(false);
-  const isRefreshing = useRef(false);
-  const currentCardRef = useRef<Card | undefined>(undefined);
-  const deckIdRef = useRef<number | undefined>(undefined);
-  // IDs of cards currently in the session (on screen or waiting in `deck`)
-  const queuedIds = useRef(new Set<number>());
 
   /* --------------------------------- Loading -------------------------------- */
 
-  /** Single place that changes the visible card, so state and ref never drift. */
-  const showCard = useCallback((card?: Card, next?: Card) => {
-    currentCardRef.current = card;
-    setCurrentCard(card);
-    setNextCard(next);
+  const advance = () => {
+    setCurrentCard(deck.getNextCard());
+    setNextCard(deck.peekNext());
     setCardKey((k) => k + 1);
-  }, []);
-
-  const advance = useCallback(() => {
-    showCard(deck.getNextCard(), deck.peekNext());
     isProcessing.current = false;
-  }, [showCard]);
+  };
 
   const loadCards = useCallback(async () => {
     const lastDeckId = await AsyncStorage.getItem("lastDeckId");
@@ -79,151 +62,69 @@ export default function LearnScreen() {
       return;
     }
 
-    const deckId = Number(lastDeckId);
-    deckIdRef.current = deckId;
     setSelectedDeckId(lastDeckId);
 
-    const [cards, decks] = await Promise.all([getDueCards(deckId), getDecks()]);
+    const cards = await getDueCards(Number(lastDeckId));
 
     deck.clear();
     completedDeck.clear();
-    queuedIds.current.clear();
 
     for (const card of cards) {
       deck.reinsertCard(card);
-      if (card.id !== undefined) queuedIds.current.add(card.id);
     }
 
-    setHistory([]);
-    isProcessing.current = false;
-
     if (deck.size === 0) {
-      showCard(undefined, undefined);
       setNoCardsDue(true);
       return;
     }
+  const decks = await getDecks();
 
-    const selectedDeck = decks.find((d) => d.id === deckId);
-    setTtsCode(getTTSLanguageCode(selectedDeck?.language ?? ""));
-
-    setNoCardsDue(false);
-    showCard(deck.getNextCard(), deck.peekNext());
-  }, [showCard]);
-
-  useEffect(() => {
-    void loadCards();
-  }, [loadCards]);
-
-  const refreshCurrentCard = useCallback(async () => {
-    const cardId = currentCardRef.current?.id;
-
-    if (cardId === undefined) return;
-
-    try {
-      const updatedCard = await getCard(cardId);
-
-      // Don't update the screen if the user has already moved to another card.
-      if (currentCardRef.current?.id !== cardId) return;
-
-      // The card may have been deleted from the Edit screen.
-      if (!updatedCard) {
-        queuedIds.current.delete(cardId);
-        advance();
-        return;
-      }
-
-      currentCardRef.current = updatedCard;
-      setCurrentCard(updatedCard);
-
-      // Remount the card so updated content and any changed image are refreshed.
-      setCardKey((key) => key + 1);
-    } catch (error) {
-      console.error("Failed to refresh card after editing:", error);
-    }
-  }, [advance]);
-
-  useFocusEffect(
-    useCallback(() => {
-      void refreshCurrentCard();
-    }, [refreshCurrentCard])
+  const selectedDeck = decks.find(
+      (d) => d.id === Number(lastDeckId)
   );
 
-  /* ------------------------ Pull in cards that come due ----------------------- */
+  const ttsCode = getTTSLanguageCode(selectedDeck?.language ?? "");
+    
+    setTtsCode(ttsCode);
+    setNoCardsDue(false);
+    setHistory([]);
+    isProcessing.current = false;
+    setCardKey((k) => k + 1);
+    setCurrentCard(deck.getNextCard());
+    setNextCard(deck.peekNext());
+  }, []);
 
-  const pullInDueCards = useCallback(async () => {
-    const deckId = deckIdRef.current;
-    if (deckId === undefined || isRefreshing.current) return;
-
-    isRefreshing.current = true;
-    try {
-      const due = await getDueCards(deckId);
-
-      // A swipe/undo was writing to the DB while we queried, so this result
-      // may be stale. Skip; the next tick or swipe will check again.
-      if (isProcessing.current) return;
-
-
-
-      let added = 0;
-      for (const card of due) {
-        if (card.id === undefined || queuedIds.current.has(card.id)) continue;
-
-        queuedIds.current.add(card.id);
-        completedDeck.removeById(card.id);
-        deck.reinsertCard(card); // fresh copy from the DB
-        added++;
-      }
-
-      if (added > 0) {
-        setNoCardsDue(false);
-        // Session had run out of cards: pick back up with the new one
-        if (!currentCardRef.current) advance();
-      }
-    } catch (error) {
-      console.error("Failed to check for due cards:", error);
-    } finally {
-      isRefreshing.current = false;
-    }
-  }, [advance]);
-
-  // pullInDueCards is stable, so this timer is created once per focus
   useFocusEffect(
     useCallback(() => {
-      const interval = setInterval(pullInDueCards, DUE_CHECK_INTERVAL_MS);
-      return () => clearInterval(interval);
-    }, [pullInDueCards])
+      loadCards();
+    }, [loadCards])
   );
 
   /* -------------------------------- Handlers -------------------------------- */
 
   const handleSwipe = async (direction: "left" | "right") => {
-    const card = currentCard;
-    if (!card || card.id === undefined || isProcessing.current) return;
-
-    const cardId = card.id;
+    if (currentCard?.id === undefined) return;
     isProcessing.current = true;
 
-    try {
-      // Snapshot progress so the swipe can be undone
-      const previousProgress = await getCardProgress(cardId);
-      setHistory((h) => [...h, { card, direction, previousProgress }]);
-      setReviewedCount((count) => count + 1);
+    // Snapshot progress so the swipe can be undone
+    const previousProgress = await getCardProgress(currentCard.id);
+    setHistory((h) => [
+      ...h,
+      { card: currentCard, direction, previousProgress },
+    ]);
 
-      if (direction === "left") {
-        await markCardIncorrect(cardId);
-        deck.reinsertCard(card); // stays queued
-      } else {
-        await markCardCorrect(cardId);
-        setCorrectCount((count) => count + 1);
-        completedDeck.reinsertCard(card);
-        queuedIds.current.delete(cardId); // no longer in the session
-      }
-    } finally {
-      advance(); // also clears isProcessing
+    setReviewedCount((count) => count + 1);
+
+    if (direction === "left") {
+      await markCardIncorrect(currentCard.id);
+      deck.reinsertCard(currentCard);
+    } else {
+      setCorrectCount((count) => count + 1);
+      await markCardCorrect(currentCard.id);
+      completedDeck.reinsertCard(currentCard);
     }
 
-    // A card may have come due while we were studying
-    void pullInDueCards();
+    advance();
   };
 
   const handleUndo = async () => {
@@ -237,48 +138,38 @@ export default function LearnScreen() {
 
     const { card, direction, previousProgress } = last;
 
-    try {
-      if (card.id !== undefined) {
-        // Restore the DB progress to what it was before the swipe
-        if (previousProgress) {
-          await updateCardProgress(
-            card.id,
-            previousProgress.reviewCount,
-            previousProgress.nextReviewAt,
-            previousProgress.mastered
-          );
-        }
-
-        // Remove from both piles: a right-swiped card may already have been
-        // re-queued into `deck` by pullInDueCards, and we don't want a duplicate.
-        deck.removeById(card.id);
-        completedDeck.removeById(card.id);
-        queuedIds.current.add(card.id); // it's the current card again
-      }
-
-      if (direction === "right") setCorrectCount((c) => c - 1);
-      setReviewedCount((c) => c - 1);
-
-      // Put the card we were looking at back in line
-      const viewing = currentCardRef.current;
-      if (viewing && viewing.id !== card.id) {
-        deck.addToFront(viewing);
-      }
-
-      setNoCardsDue(false);
-      showCard(card, deck.peekNext());
-    } finally {
-      isProcessing.current = false;
+    // Restore the DB progress to what it was before the swipe
+    if (card.id !== undefined && previousProgress) {
+      await restoreCardProgress(previousProgress);
     }
+
+    // Take the card back out of wherever the swipe put it
+    if (direction === "left") {
+      deck.removeById(card.id);
+    } else {
+      completedDeck.removeById(card.id);
+      setCorrectCount((c) => c - 1);
+    }
+    setReviewedCount((c) => c - 1);
+
+    // Put the card we were looking at back in line
+    if (currentCard && currentCard.id !== card.id) {
+      deck.addToFront(currentCard);
+    }
+
+    setNoCardsDue(false);
+    setCurrentCard(card);
+    setNextCard(deck.peekNext());
+    setCardKey((k) => k + 1);
+    isProcessing.current = false;
   };
 
   const handleDelete = async () => {
-    if (!currentCard || currentCard.id === undefined) return;
+    if (!currentCard?.id) return;
 
     const deletedId = currentCard.id;
 
     await deleteCard(deletedId);
-    queuedIds.current.delete(deletedId);
     setHistory((h) => h.filter((entry) => entry.card.id !== deletedId));
     advance();
   };
@@ -301,11 +192,13 @@ export default function LearnScreen() {
 
   /* --------------------------------- Buttons -------------------------------- */
 
+  const undoDisabled = history.length === 0;
+
   const undoButton = (
     <ActionButton
       label="↩ Undo"
       onPress={handleUndo}
-      disabled={history.length === 0}
+      disabled={undoDisabled}
     />
   );
   const editButton = <ActionButton label="Edit card" onPress={handleEdit} />;
