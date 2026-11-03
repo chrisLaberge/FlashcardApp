@@ -8,6 +8,8 @@ export type LoggedReview = {
     reviewedAt: number;
     correct: boolean;
     durationMs: number | null;
+    /** What the front of the card showed: "learning", "localized" or "audio" (null if unknown). */
+    prompt?: string | null;
 };
 
 export type DayStats = {

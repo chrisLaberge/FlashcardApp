@@ -1,14 +1,15 @@
 {
   "expo": {
-    "name": "FlashcardApp",
+    "name": "StompaCard",
     "slug": "FlashcardApp",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "flashcardapp",
+    "scheme": "stompacard",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "bundleIdentifier": "com.chrislaberge.stompacard"
     },
     "android": {
       "adaptiveIcon": {
@@ -18,7 +19,7 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.FlashcardApp"
+      "package": "com.chrislaberge.stompacard"
     },
     "web": {
       "output": "static",
