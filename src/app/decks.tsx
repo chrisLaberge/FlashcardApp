@@ -1,9 +1,11 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
-import { FlatList, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, FlatList, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { getLanguage } from "../constants/languages";
 import { deleteDeck, getDecks } from "../database/database";
+import { backfillLocalImages } from "../services/localImages";
+import { pickAndRestoreBackup } from "../utils/restoreBackup";
 
 type Deck = { id: number; name: string; language: string; card_count: number };
 
@@ -13,6 +15,42 @@ export default function DecksScreen() {
     const [deckToDelete, setDeckToDelete] = useState<Deck | null>(null);
 
     const load = async () => setDecks(await getDecks());
+
+    const [restoring, setRestoring] = useState(false);
+
+    const restoreBackup = () => {
+        if (restoring) return;
+        Alert.alert(
+            "Restore from backup?",
+            "Choose a backup file made with the Export button. Restoring only works while the app has no decks, so nothing you have can be overwritten.",
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Choose file",
+                    onPress: async () => {
+                        setRestoring(true);
+                        try {
+                            const result = await pickAndRestoreBackup();
+                            if (!result) return;
+                            await load();
+                            void backfillLocalImages(); // pictures are copied to this phone again in the background
+                            Alert.alert(
+                                "Backup restored",
+                                `${result.decks} deck${result.decks === 1 ? "" : "s"}, ${result.cards} cards and your progress are back.`,
+                            );
+                        } catch (error) {
+                            Alert.alert(
+                                "Could not restore",
+                                error instanceof Error ? error.message : String(error),
+                            );
+                        } finally {
+                            setRestoring(false);
+                        }
+                    },
+                },
+            ],
+        );
+    };
 
     useFocusEffect(useCallback(() => { load(); }, []));
 
@@ -39,6 +77,26 @@ export default function DecksScreen() {
         <View style={s.container}>
             <Text style={s.title}>My decks</Text>
             <Text style={s.hint}>Tap to select · hold to delete</Text>
+
+            {decks.length === 0 && (
+                <Pressable
+                    style={({ pressed }) => [s.restoreBox, pressed && s.pressed]}
+                    onPress={restoreBackup}
+                    disabled={restoring}
+                    accessibilityRole="button"
+                >
+                    {restoring ? (
+                        <ActivityIndicator color="#83a598" />
+                    ) : (
+                        <>
+                            <Text style={s.restoreTitle}>Restore from backup</Text>
+                            <Text style={s.restoreText}>
+                                Moving from another install? Choose the file saved with Export.
+                            </Text>
+                        </>
+                    )}
+                </Pressable>
+            )}
 
             <FlatList
                 data={decks}
@@ -157,6 +215,18 @@ const s = StyleSheet.create({
     count: { color: "#83a598", fontSize: 28, fontWeight: "bold" },
     countLabel: { color: "#a89984", fontSize: 12 },
     onAccent: { color: "#282828" },
+
+    restoreBox: {
+        borderWidth: 1,
+        borderColor: "#504945",
+        borderStyle: "dashed",
+        borderRadius: 14,
+        padding: 18,
+        marginBottom: 16,
+        alignItems: "center",
+    },
+    restoreTitle: { color: "#83a598", fontSize: 16, fontWeight: "600" },
+    restoreText: { color: "#a89984", fontSize: 13, marginTop: 4, textAlign: "center" },
 
     fab: {
         position: "absolute",

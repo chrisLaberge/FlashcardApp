@@ -550,6 +550,113 @@ export async function deleteDeck(id: number) {
     await database.runAsync("DELETE FROM decks WHERE id = ?", id);
 }
 
+/* RESTORE FROM A BACKUP */
+
+/** The part of a database that restoring reads from (an opened backup file). */
+export type RestoreSource = {
+    getAllAsync<T>(sql: string, ...params: SQLite.SQLiteBindParams[]): Promise<T[]>;
+};
+
+export type RestoreResult = {
+    decks: number;
+    cards: number;
+    images: number;
+    reviews: number;
+};
+
+export class RestoreError extends Error {}
+
+const RESTORE_TABLES = ["decks", "images", "cards", "card_progress", "review_log"] as const;
+
+async function columnNames(db: RestoreSource, table: string): Promise<string[]> {
+    const rows = await db.getAllAsync<{ name: string }>(`PRAGMA table_info(${table})`);
+    return rows.map((row) => row.name);
+}
+
+/**
+ * Copies a backup (made by the Export button, from this or an older version of the app) into this
+ * app's database.
+ *
+ * It only works on an EMPTY app, so existing cards and progress can never be overwritten or
+ * mixed up. Ids are kept, so progress and review history still point at the right cards.
+ * Backups from older versions are accepted: columns they lack (study level, review log, ...)
+ * are filled in with sensible values. All or nothing: if anything fails, nothing is restored.
+ */
+export async function restoreFromBackup(source: RestoreSource): Promise<RestoreResult> {
+    const database = await getDatabase();
+
+    const existing = await database.getFirstAsync<{ n: number }>(
+        "SELECT (SELECT COUNT(*) FROM decks) + (SELECT COUNT(*) FROM cards) AS n",
+    );
+    if ((existing?.n ?? 0) > 0) {
+        throw new RestoreError(
+            "This app already has decks or cards. A backup can only be restored into an empty app, so nothing here is overwritten.",
+        );
+    }
+
+    const tables = (await source.getAllAsync<{ name: string }>(
+        "SELECT name FROM sqlite_master WHERE type = 'table'",
+    )).map((row) => row.name);
+    if (!tables.includes("decks") || !tables.includes("cards")) {
+        throw new RestoreError("This file is not a flashcard backup.");
+    }
+
+    const sourceHadLevels = tables.includes("card_progress")
+        && (await columnNames(source, "card_progress")).includes("level");
+
+    const result: RestoreResult = { decks: 0, cards: 0, images: 0, reviews: 0 };
+
+    await database.withTransactionAsync(async () => {
+        // Rows are copied table by table; references are checked once everything is in.
+        await database.execAsync("PRAGMA defer_foreign_keys = ON");
+
+        for (const table of RESTORE_TABLES) {
+            if (!tables.includes(table)) continue;
+
+            const targetColumns = await columnNames(database, table);
+            // The old copy of the picture file lives in another app's storage: forget it, it is downloaded again.
+            const columns = (await columnNames(source, table)).filter(
+                (name) => targetColumns.includes(name) && !(table === "images" && name === "local_path"),
+            );
+            if (columns.length === 0) continue;
+
+            const rows = await source.getAllAsync<Record<string, SQLite.SQLiteBindValue>>(
+                `SELECT ${columns.join(", ")} FROM ${table}`,
+            );
+            const insert = `INSERT INTO ${table} (${columns.join(", ")}) VALUES (${columns.map(() => "?").join(", ")})`;
+            for (const row of rows) {
+                await database.runAsync(insert, ...columns.map((name) => row[name] ?? null));
+            }
+
+            if (table === "decks") result.decks = rows.length;
+            if (table === "cards") result.cards = rows.length;
+            if (table === "images") result.images = rows.length;
+            if (table === "review_log") result.reviews = rows.length;
+        }
+
+        // Tidy references that point at something the backup did not contain.
+        await database.execAsync(`
+            DELETE FROM card_progress WHERE card_id NOT IN (SELECT id FROM cards);
+            UPDATE cards SET image_id = NULL WHERE image_id IS NOT NULL AND image_id NOT IN (SELECT id FROM images);
+            INSERT OR IGNORE INTO card_progress (card_id) SELECT id FROM cards;
+        `);
+        const orphanCards = await database.getFirstAsync<{ n: number }>(
+            "SELECT COUNT(*) AS n FROM cards WHERE deck_id NOT IN (SELECT id FROM decks)",
+        );
+        if ((orphanCards?.n ?? 0) > 0) {
+            await database.execAsync("DELETE FROM cards WHERE deck_id NOT IN (SELECT id FROM decks)");
+            result.cards -= orphanCards?.n ?? 0;
+        }
+
+        // A backup from before study levels: well-known cards start at a mixed level, like an upgrade.
+        if (!sourceHadLevels) {
+            await database.runAsync("UPDATE card_progress SET level = ? WHERE mastered = 1", MASTERED_START_LEVEL);
+        }
+    });
+
+    return result;
+}
+
 /** Returns a complete, consistent snapshot of the database as bytes (read-only). */
 export async function serializeDatabase(): Promise<Uint8Array> {
     const database = await getDatabase();
