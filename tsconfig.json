@@ -9,12 +9,35 @@
       "@/assets/*": [
         "./assets/*"
       ]
-    }
+    },
+    "types": [
+      "jest",
+      "node"
+    ]
   },
   "include": [
     "**/*.ts",
     "**/*.tsx",
     ".expo/types/**/*.ts",
     "expo-env.d.ts"
+  ],
+  "exclude": [
+    "${configDir}/node_modules",
+    "${configDir}/android",
+    "${configDir}/ios",
+    "src/components/app-tabs.tsx",
+    "src/components/app-tabs.web.tsx",
+    "src/components/animated-icon.tsx",
+    "src/components/animated-icon.web.tsx",
+    "src/components/hint-row.tsx",
+    "src/components/web-badge.tsx",
+    "src/components/external-link.tsx",
+    "src/components/ui/collapsible.tsx",
+    "src/components/themed-text.tsx",
+    "src/components/themed-view.tsx",
+    "src/constants/theme.ts",
+    "src/hooks/use-theme.ts",
+    "src/hooks/use-color-scheme.ts",
+    "src/hooks/use-color-scheme.web.ts"
   ]
 }
