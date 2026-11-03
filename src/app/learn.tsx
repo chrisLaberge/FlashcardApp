@@ -1,23 +1,38 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { router, useFocusEffect } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
 import { useCallback, useRef, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Modal, Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import CardStack from "../components/CardStack";
 
 import { getTTSLanguageCode } from "@/constants/languages";
+import { REVIEW_BATCH_SIZE } from "../config";
 import {
   deleteCard,
   getCardProgress,
+  getCardsByIds,
   getDecks,
-  getDueCards,
+  getDueCardIds,
   markCardCorrect,
   markCardIncorrect,
   restoreCardProgress,
 } from "../database/database";
+import { useFocusedInterval } from "../hooks/useFocusedInterval";
+import { useLearnSettings } from "../hooks/useLearnSettings";
 import { Card } from "../models/Card";
 import { CardProgress } from "../models/CardProgress";
-import { completedDeck, deck } from "../models/DeckManager";
+import {
+  loadQueue,
+  pollDueCards,
+  refreshQueuedCards,
+  ReviewQueue,
+} from "../models/ReviewQueue";
+
+const source = { getDueCardIds, getCardsByIds };
+
+/** When fewer cards than this are waiting, top the queue up straight away instead of waiting for the next poll. */
+const REFILL_BELOW = 20;
 
 type HistoryEntry = {
   card: Card;
@@ -27,152 +42,161 @@ type HistoryEntry = {
 
 export default function LearnScreen() {
   const insets = useSafeAreaInsets();
+  const { settings, loaded: settingsLoaded, update: updateSettings } = useLearnSettings();
 
   const [sessionStart] = useState(Date.now());
+  const [queue] = useState(() => new ReviewQueue());
 
+  // What is on screen. The queue is the source of truth; `show` copies it into state.
   const [currentCard, setCurrentCard] = useState<Card | undefined>();
   const [nextCard, setNextCard] = useState<Card | undefined>();
-  const [noCardsDue, setNoCardsDue] = useState(false);
+  const [loadedOnce, setLoadedOnce] = useState(false);
+  const [hasDeck, setHasDeck] = useState(true);
 
   const [reviewedCount, setReviewedCount] = useState(0);
   const [correctCount, setCorrectCount] = useState(0);
 
   const [selectedDeckId, setSelectedDeckId] = useState<string | undefined>();
   const [ttsCode, setTtsCode] = useState<string | undefined>();
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
-  // Bumped whenever the visible card changes so CardStack remounts cleanly
+  // Bumped when the visible card changes so CardStack remounts cleanly
   const [cardKey, setCardKey] = useState(0);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
-  const isProcessing = useRef(false);
+
+  // True while an answer / undo / delete is being saved: further gestures are ignored.
+  const busy = useRef(false);
 
   /* --------------------------------- Loading -------------------------------- */
 
-  const advance = () => {
-    setCurrentCard(deck.getNextCard());
-    setNextCard(deck.peekNext());
-    setCardKey((k) => k + 1);
-    isProcessing.current = false;
-  };
-
-  const loadCards = useCallback(async () => {
-    const lastDeckId = await AsyncStorage.getItem("lastDeckId");
-
-    if (!lastDeckId) {
-      setNoCardsDue(true);
-      return;
-    }
-
-    setSelectedDeckId(lastDeckId);
-
-    const cards = await getDueCards(Number(lastDeckId));
-
-    deck.clear();
-    completedDeck.clear();
-
-    for (const card of cards) {
-      deck.reinsertCard(card);
-    }
-
-    if (deck.size === 0) {
-      setNoCardsDue(true);
-      return;
-    }
-  const decks = await getDecks();
-
-  const selectedDeck = decks.find(
-      (d) => d.id === Number(lastDeckId)
+  /** Copies the queue into screen state. `remount` restarts the card (needed whenever the card on screen changes). */
+  const show = useCallback(
+    (remount: boolean) => {
+      setCurrentCard(queue.current);
+      setNextCard(queue.peekNext());
+      if (remount) setCardKey((k) => k + 1);
+    },
+    [queue],
   );
 
-  const ttsCode = getTTSLanguageCode(selectedDeck?.language ?? "");
-    
-    setTtsCode(ttsCode);
-    setNoCardsDue(false);
-    setHistory([]);
-    isProcessing.current = false;
-    setCardKey((k) => k + 1);
-    setCurrentCard(deck.getNextCard());
-    setNextCard(deck.peekNext());
-  }, []);
+  const startSession = useCallback(
+    async (deckId: number) => {
+      await loadQueue(queue, deckId, source, REVIEW_BATCH_SIZE);
+      const decks = await getDecks();
+      const deck = decks.find((d) => d.id === deckId);
 
-  useFocusEffect(
-    useCallback(() => {
-      loadCards();
-    }, [loadCards])
+      setSelectedDeckId(String(deckId));
+      setTtsCode(getTTSLanguageCode(deck?.language ?? ""));
+      setHistory([]);
+      setReviewedCount(0);
+      setCorrectCount(0);
+      setHasDeck(true);
+      setLoadedOnce(true);
+      show(true);
+    },
+    [queue, show],
   );
+
+  /**
+   * Runs when the screen gains focus, every 10 seconds while it is focused, and when the app
+   * returns to the foreground. It never rebuilds the session: it merges what changed in the
+   * database into the queue, so the card you are looking at stays where it is.
+   */
+  const refresh = useCallback(
+    async (reason: "focus" | "tick" | "resume") => {
+      if (busy.current) return;
+
+      if (reason === "focus") {
+        const lastDeckId = await AsyncStorage.getItem("lastDeckId");
+        if (!lastDeckId) {
+          setHasDeck(false);
+          setLoadedOnce(true);
+          return;
+        }
+        if (Number(lastDeckId) !== queue.deckId) {
+          await startSession(Number(lastDeckId));
+          return;
+        }
+        // Coming back from the edit / add screens: pick up edits and deletions in place.
+        await refreshQueuedCards(queue, source);
+        await pollDueCards(queue, source, REVIEW_BATCH_SIZE);
+        queue.ensureCurrent();
+        show(true);
+        return;
+      }
+
+      const added = await pollDueCards(queue, source, REVIEW_BATCH_SIZE);
+      const startedCurrent = queue.ensureCurrent();
+      if (added > 0 || startedCurrent) show(startedCurrent);
+    },
+    [queue, show, startSession],
+  );
+
+  useFocusedInterval(refresh);
 
   /* -------------------------------- Handlers -------------------------------- */
 
-  const handleSwipe = async (direction: "left" | "right") => {
-    if (currentCard?.id === undefined) return;
-    isProcessing.current = true;
-
-    // Snapshot progress so the swipe can be undone
-    const previousProgress = await getCardProgress(currentCard.id);
-    setHistory((h) => [
-      ...h,
-      { card: currentCard, direction, previousProgress },
-    ]);
-
-    setReviewedCount((count) => count + 1);
-
-    if (direction === "left") {
-      await markCardIncorrect(currentCard.id);
-      deck.reinsertCard(currentCard);
-    } else {
-      setCorrectCount((count) => count + 1);
-      await markCardCorrect(currentCard.id);
-      completedDeck.reinsertCard(currentCard);
+  /** Runs one save-then-update step; ignores gestures while another is in flight and never leaves the screen frozen. */
+  const runExclusive = async (action: () => Promise<void>, errorMessage: string) => {
+    if (busy.current) return;
+    busy.current = true;
+    queue.beginWrite();
+    try {
+      await action();
+    } catch (error) {
+      console.error(errorMessage, error);
+      Alert.alert("Something went wrong", errorMessage);
+      // Put the card back on screen (a swiped card has already slid away).
+      show(true);
+    } finally {
+      queue.endWrite();
+      busy.current = false;
     }
-
-    advance();
+    if (queue.upcomingCount < REFILL_BELOW) void refresh("tick");
   };
 
-  const handleUndo = async () => {
-    if (isProcessing.current) return;
+  const handleSwipe = (direction: "left" | "right") =>
+    runExclusive(async () => {
+      const card = queue.current;
+      if (card?.id === undefined) return;
 
-    const last = history[history.length - 1];
-    if (!last) return;
+      // Snapshot progress so the swipe can be undone
+      const previousProgress = await getCardProgress(card.id);
+      if (direction === "left") await markCardIncorrect(card.id);
+      else await markCardCorrect(card.id);
 
-    isProcessing.current = true;
-    setHistory((h) => h.slice(0, -1));
+      queue.answer(direction);
+      setHistory((h) => [...h, { card, direction, previousProgress }]);
+      setReviewedCount((count) => count + 1);
+      if (direction === "right") setCorrectCount((count) => count + 1);
+      show(true);
+    }, "Your answer could not be saved. Please try again.");
 
-    const { card, direction, previousProgress } = last;
+  const handleUndo = () =>
+    runExclusive(async () => {
+      const last = history[history.length - 1];
+      if (!last) return;
 
-    // Restore the DB progress to what it was before the swipe
-    if (card.id !== undefined && previousProgress) {
-      await restoreCardProgress(previousProgress);
-    }
+      // Restore the DB progress to what it was before the swipe
+      if (last.previousProgress) await restoreCardProgress(last.previousProgress);
 
-    // Take the card back out of wherever the swipe put it
-    if (direction === "left") {
-      deck.removeById(card.id);
-    } else {
-      completedDeck.removeById(card.id);
-      setCorrectCount((c) => c - 1);
-    }
-    setReviewedCount((c) => c - 1);
+      queue.undo(last.card);
+      setHistory((h) => h.slice(0, -1));
+      setReviewedCount((c) => c - 1);
+      if (last.direction === "right") setCorrectCount((c) => c - 1);
+      show(true);
+    }, "The last answer could not be undone.");
 
-    // Put the card we were looking at back in line
-    if (currentCard && currentCard.id !== card.id) {
-      deck.addToFront(currentCard);
-    }
+  const handleDelete = () =>
+    runExclusive(async () => {
+      const deletedId = queue.current?.id;
+      if (deletedId === undefined) return;
 
-    setNoCardsDue(false);
-    setCurrentCard(card);
-    setNextCard(deck.peekNext());
-    setCardKey((k) => k + 1);
-    isProcessing.current = false;
-  };
-
-  const handleDelete = async () => {
-    if (!currentCard?.id) return;
-
-    const deletedId = currentCard.id;
-
-    await deleteCard(deletedId);
-    setHistory((h) => h.filter((entry) => entry.card.id !== deletedId));
-    advance();
-  };
+      await deleteCard(deletedId);
+      queue.discardCurrent();
+      setHistory((h) => h.filter((entry) => entry.card.id !== deletedId));
+      show(true);
+    }, "The card could not be deleted.");
 
   const handleEdit = () => {
     if (!currentCard) return;
@@ -195,18 +219,19 @@ export default function LearnScreen() {
   const undoDisabled = history.length === 0;
 
   const undoButton = (
-    <ActionButton
-      label="↩ Undo"
-      onPress={handleUndo}
-      disabled={undoDisabled}
-    />
+    <ActionButton label="↩ Undo" onPress={handleUndo} disabled={undoDisabled} />
   );
   const editButton = <ActionButton label="Edit card" onPress={handleEdit} />;
   const addButton = <ActionButton label="+ Add" onPress={handleAdd} />;
 
   /* --------------------------------- Screens -------------------------------- */
 
-  if (noCardsDue) {
+  // Wait for the stored settings so the first card does not speak when auto-speak is off.
+  if (!loadedOnce || !settingsLoaded) {
+    return <View style={styles.container} />;
+  }
+
+  if (!hasDeck || (!currentCard && reviewedCount === 0)) {
     return (
       <View style={[styles.container, styles.centered]}>
         <View style={styles.messageContainer}>
@@ -275,11 +300,23 @@ export default function LearnScreen() {
       style={[
         styles.container,
         {
-          paddingTop: insets.top + 16,
+          paddingTop: insets.top + 8,
           paddingBottom: insets.bottom + 16,
         },
       ]}
     >
+      <View style={styles.header}>
+        <Pressable
+          onPress={() => setSettingsOpen(true)}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel="Learn settings"
+          style={({ pressed }) => [styles.gear, pressed && styles.actionButtonPressed]}
+        >
+          <Ionicons name="settings-outline" size={22} color={COLORS.link} />
+        </Pressable>
+      </View>
+
       <View style={styles.cardArea}>
         <CardStack
           currentCard={currentCard}
@@ -288,6 +325,8 @@ export default function LearnScreen() {
           onSwipe={handleSwipe}
           onDelete={handleDelete}
           ttsCode={ttsCode}
+          autoSpeak={settings.autoSpeak}
+          showRomanization={settings.showRomanization}
         />
       </View>
 
@@ -296,6 +335,43 @@ export default function LearnScreen() {
         {editButton}
         {addButton}
       </View>
+
+      <Modal
+        visible={settingsOpen}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setSettingsOpen(false)}
+      >
+        <View style={styles.modalRoot}>
+          <Pressable style={styles.backdrop} onPress={() => setSettingsOpen(false)} />
+
+          <View style={styles.settingsSheet}>
+            <Text style={styles.settingsTitle}>Learn settings</Text>
+
+            <SettingRow
+              label="Automatic pronunciation"
+              hint="Speak the word whenever it appears. The speaker button always works."
+              value={settings.autoSpeak}
+              onChange={(autoSpeak) => updateSettings({ autoSpeak })}
+            />
+            <SettingRow
+              label="Show romanization"
+              hint="Pinyin, romaji and similar under the word."
+              value={settings.showRomanization}
+              onChange={(showRomanization) => updateSettings({ showRomanization })}
+            />
+
+            <Pressable
+              onPress={() => setSettingsOpen(false)}
+              accessibilityRole="button"
+              style={styles.settingsClose}
+            >
+              <Text style={styles.settingsCloseText}>Done</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -303,6 +379,33 @@ export default function LearnScreen() {
 /* -------------------------------------------------------------------------- */
 /*                                   Helpers                                  */
 /* -------------------------------------------------------------------------- */
+
+function SettingRow({
+  label,
+  hint,
+  value,
+  onChange,
+}: {
+  label: string;
+  hint: string;
+  value: boolean;
+  onChange: (value: boolean) => void;
+}) {
+  return (
+    <View style={styles.settingRow}>
+      <View style={styles.settingText}>
+        <Text style={styles.settingLabel}>{label}</Text>
+        <Text style={styles.settingHint}>{hint}</Text>
+      </View>
+      <Switch
+        value={value}
+        onValueChange={onChange}
+        trackColor={{ false: COLORS.border, true: COLORS.accent }}
+        thumbColor={COLORS.text}
+      />
+    </View>
+  );
+}
 
 function ActionButton({
   label,
@@ -357,6 +460,83 @@ const COLORS = {
 };
 
 const styles = StyleSheet.create({
+  header: {
+    height: 36,
+    marginHorizontal: 20,
+    marginBottom: 8,
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    alignItems: "center",
+  },
+
+  gear: {
+    padding: 6,
+  },
+
+  modalRoot: {
+    flex: 1,
+    justifyContent: "center",
+    paddingHorizontal: 24,
+  },
+
+  backdrop: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: "rgba(0,0,0,0.5)",
+  },
+
+  settingsSheet: {
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 20,
+    padding: 20,
+  },
+
+  settingsTitle: {
+    color: COLORS.text,
+    fontSize: 20,
+    fontWeight: "bold",
+    marginBottom: 16,
+  },
+
+  settingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 10,
+  },
+
+  settingText: {
+    flex: 1,
+  },
+
+  settingLabel: {
+    color: COLORS.text,
+    fontSize: 16,
+    fontWeight: "500",
+  },
+
+  settingHint: {
+    color: COLORS.muted,
+    fontSize: 13,
+    marginTop: 2,
+  },
+
+  settingsClose: {
+    alignSelf: "stretch",
+    alignItems: "center",
+    marginTop: 16,
+    paddingVertical: 12,
+    borderRadius: 999,
+    backgroundColor: COLORS.accent,
+  },
+
+  settingsCloseText: {
+    color: COLORS.background,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+
   container: {
     flex: 1,
     backgroundColor: COLORS.background,

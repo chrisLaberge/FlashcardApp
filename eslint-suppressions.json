@@ -1,9 +1,4 @@
 {
-  "src/app/addCard.tsx": {
-    "react-hooks/set-state-in-effect": {
-      "count": 1
-    }
-  },
   "src/app/editCard.tsx": {
     "react/no-unescaped-entities": {
       "count": 1

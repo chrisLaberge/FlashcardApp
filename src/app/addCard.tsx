@@ -1,13 +1,11 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useFocusEffect, useLocalSearchParams } from "expo-router";
+import { useCallback, useEffect, useRef, useState, type ComponentRef } from "react";
 import {
     ActivityIndicator,
     Image,
-    KeyboardAvoidingView,
     Modal,
-    Platform,
     Pressable,
     ScrollView,
     StyleSheet,
@@ -15,6 +13,8 @@ import {
     TextInput,
     View,
 } from "react-native";
+
+import KeyboardInsetView from "@/components/KeyboardInsetView";
 
 import {
     addCard,
@@ -149,6 +149,23 @@ export default function AddCardScreen() {
     const [searchingImages, setSearchingImages] = useState(false);
     const [imageModalVisible, setImageModalVisible] = useState(false);
     const [savingCard, setSavingCard] = useState(false);
+    const lastSearchedQuery = useRef("");
+
+    // --------------------------------------------------
+    // Staying on this screen after a card is added
+    // --------------------------------------------------
+
+    const learningInputRef = useRef<ComponentRef<typeof TextInput>>(null);
+    const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
+    const [addedMessage, setAddedMessage] = useState<string | null>(null);
+    const addedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    useEffect(
+        () => () => {
+            if (addedTimer.current) clearTimeout(addedTimer.current);
+        },
+        []
+    );
 
     // --------------------------------------------------
     // Duplicate handling
@@ -259,6 +276,7 @@ export default function AddCardScreen() {
         }
 
         setSearchingImages(true);
+        lastSearchedQuery.current = trimmedQuery;
 
         try {
             const results = await searchImages(trimmedQuery);
@@ -276,30 +294,6 @@ export default function AddCardScreen() {
     };
 
     // --------------------------------------------------
-    // Automatically search for image
-    // --------------------------------------------------
-
-    useEffect(() => {
-        const query = localizedText.trim() || learningText.trim();
-
-        if (!query) {
-            setSelectedImage(null);
-            setImageResults([]);
-            return;
-        }
-
-        const timeout = setTimeout(() => {
-            setImageQuery(query);
-
-            searchForImages(query, true);
-        }, 700);
-
-        return () => {
-            clearTimeout(timeout);
-        };
-    }, [localizedText, learningText]);
-
-    // --------------------------------------------------
     // Open image picker
     // --------------------------------------------------
 
@@ -309,9 +303,14 @@ export default function AddCardScreen() {
         setImageQuery(query);
         setImageModalVisible(true);
 
-        if (imageResults.length === 0 && query) {
+        // Images are only looked up when the picker is opened, and again if the text changed since.
+        if (query && query !== lastSearchedQuery.current) {
             searchForImages(query);
         }
+    };
+
+    const removeImage = () => {
+        setSelectedImage(null);
     };
 
     // --------------------------------------------------
@@ -410,8 +409,15 @@ export default function AddCardScreen() {
             setImageResults([]);
             setSelectedImage(null);
             setDuplicateCard(null);
+            setChoice(null);
+            lastSearchedQuery.current = "";
 
-            router.back();
+            // Stay here for the next card: confirm, scroll to the top and focus the first field.
+            setAddedMessage(`Added “${text.trim()}”`);
+            if (addedTimer.current) clearTimeout(addedTimer.current);
+            addedTimer.current = setTimeout(() => setAddedMessage(null), 2500);
+            scrollRef.current?.scrollTo({ y: 0, animated: true });
+            setTimeout(() => learningInputRef.current?.focus(), 150);
         } catch (error) {
             console.error("Failed to add card:", error);
         } finally {
@@ -591,12 +597,28 @@ export default function AddCardScreen() {
     // --------------------------------------------------
 
     return (
-        <View style={styles.container}>
+        <KeyboardInsetView
+            style={styles.container}
+        >
             <ScrollView
+                ref={scrollRef}
                 contentContainerStyle={styles.content}
                 keyboardShouldPersistTaps="handled"
             >
-                {/* Automatic image */}
+                {!!addedMessage && (
+                    <View style={styles.addedBanner}>
+                        <MaterialCommunityIcons
+                            name="check-circle"
+                            size={18}
+                            color={COLORS.aqua}
+                        />
+                        <Text style={styles.addedText} numberOfLines={1}>
+                            {addedMessage}
+                        </Text>
+                    </View>
+                )}
+
+                {/* Optional image: only searched for when you tap it */}
 
                 <Pressable
                     style={styles.mainImageContainer}
@@ -615,13 +637,34 @@ export default function AddCardScreen() {
                                     color={COLORS.yellow}
                                 />
                             ) : (
-                                <MaterialCommunityIcons
-                                    name="image-outline"
-                                    size={50}
-                                    color={COLORS.gray}
-                                />
+                                <>
+                                    <MaterialCommunityIcons
+                                        name="image-outline"
+                                        size={50}
+                                        color={COLORS.gray}
+                                    />
+                                    <Text style={styles.imageOptionalText}>
+                                        Add an image (optional)
+                                    </Text>
+                                </>
                             )}
                         </View>
+                    )}
+
+                    {selectedImage && (
+                        <Pressable
+                            onPress={removeImage}
+                            hitSlop={8}
+                            accessibilityRole="button"
+                            accessibilityLabel="Remove image"
+                            style={styles.removeImageBadge}
+                        >
+                            <MaterialCommunityIcons
+                                name="close"
+                                size={18}
+                                color={COLORS.fg}
+                            />
+                        </Pressable>
                     )}
 
                     <View style={styles.changeImageBadge}>
@@ -631,7 +674,9 @@ export default function AddCardScreen() {
                             color={COLORS.fg}
                         />
 
-                        <Text style={styles.changeImageText}>Change</Text>
+                        <Text style={styles.changeImageText}>
+                            {selectedImage ? "Change" : "Add"}
+                        </Text>
                     </View>
                 </Pressable>
 
@@ -640,6 +685,7 @@ export default function AddCardScreen() {
 
                     <View style={styles.inputContainer}>
                         <TextInput
+                            ref={learningInputRef}
                             style={styles.input}
                             value={learningText}
                             onChangeText={setLearningText}
@@ -718,9 +764,12 @@ export default function AddCardScreen() {
                 visible={imageModalVisible}
                 animationType="slide"
                 transparent
+                statusBarTranslucent
                 onRequestClose={() => setImageModalVisible(false)}
             >
-                <View style={styles.modalOverlay}>
+                <KeyboardInsetView
+                    style={styles.modalOverlay}
+                >
                     <View style={styles.modalContainer}>
                         {/* Modal header */}
 
@@ -856,7 +905,7 @@ export default function AddCardScreen() {
                             <Text style={styles.buttonText}>Done</Text>
                         </Pressable>
                     </View>
-                </View>
+                </KeyboardInsetView>
             </Modal>
 
             {/* Duplicate modal */}
@@ -865,11 +914,11 @@ export default function AddCardScreen() {
                 visible={duplicateCard !== null}
                 animationType="slide"
                 transparent
+                statusBarTranslucent
                 onRequestClose={closeDuplicateDialog}
             >
-                <KeyboardAvoidingView
+                <KeyboardInsetView
                     style={styles.modalOverlay}
-                    behavior={Platform.OS === "ios" ? "padding" : undefined}
                 >
                     <View style={styles.duplicateContainer}>
                         <View style={styles.modalHeader}>
@@ -996,9 +1045,9 @@ export default function AddCardScreen() {
                             )}
                         </ScrollView>
                     </View>
-                </KeyboardAvoidingView>
+                </KeyboardInsetView>
             </Modal>
-        </View>
+        </KeyboardInsetView>
     );
 }
 
@@ -1111,6 +1160,41 @@ const styles = StyleSheet.create({
         paddingHorizontal: 10,
         paddingVertical: 7,
         borderRadius: 8,
+    },
+
+    imageOptionalText: {
+        color: COLORS.gray,
+        fontSize: 14,
+        marginTop: 8,
+    },
+
+    removeImageBadge: {
+        position: "absolute",
+        top: 10,
+        right: 10,
+        backgroundColor: "rgba(40,40,40,0.85)",
+        borderRadius: 16,
+        padding: 6,
+    },
+
+    addedBanner: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+        backgroundColor: COLORS.bg1,
+        borderWidth: 1,
+        borderColor: COLORS.aqua,
+        borderRadius: 10,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        marginBottom: 14,
+    },
+
+    addedText: {
+        flex: 1,
+        color: COLORS.fg,
+        fontSize: 14,
+        fontWeight: "500",
     },
 
     changeImageText: {
