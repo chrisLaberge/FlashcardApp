@@ -8,6 +8,7 @@ import {
 } from "@/models/FsrsScheduler";
 import * as SQLite from "expo-sqlite";
 import { Card } from "../models/Card";
+import { clampLevel, MASTERED_START_LEVEL, nextLevel } from "../models/StudyMode";
 
 let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
@@ -44,6 +45,7 @@ async function openAndPrepareDatabase(): Promise<SQLite.SQLiteDatabase> {
                 page_url TEXT,
                 photographer TEXT,
                 photographer_url TEXT,
+                local_path TEXT,
                 UNIQUE(source, provider_id)
             );
             CREATE TABLE IF NOT EXISTS cards (
@@ -65,6 +67,7 @@ async function openAndPrepareDatabase(): Promise<SQLite.SQLiteDatabase> {
                 mastered INTEGER NOT NULL DEFAULT 0,
                 fsrs_card TEXT,
                 last_review_at INTEGER,
+                level INTEGER NOT NULL DEFAULT 0,
                 FOREIGN KEY(card_id) REFERENCES cards(id) ON DELETE CASCADE
             );
             CREATE INDEX IF NOT EXISTS idx_cards_deck ON cards(deck_id);
@@ -78,6 +81,21 @@ async function openAndPrepareDatabase(): Promise<SQLite.SQLiteDatabase> {
         }
         if (!columns.some((column) => column.name === "last_review_at")) {
             await db.execAsync("ALTER TABLE card_progress ADD COLUMN last_review_at INTEGER");
+        }
+
+        // Study levels (additive). Cards that were already mastered start at a mixed level instead of
+        // being shown as brand-new recognition cards; everything else starts at level 0.
+        if (!columns.some((column) => column.name === "level")) {
+            await db.execAsync(`
+                ALTER TABLE card_progress ADD COLUMN level INTEGER NOT NULL DEFAULT 0;
+                UPDATE card_progress SET level = ${MASTERED_START_LEVEL} WHERE mastered = 1;
+            `);
+        }
+
+        // Images are also kept on the phone (additive).
+        const imageColumns = await db.getAllAsync<{ name: string }>("PRAGMA table_info(images)");
+        if (!imageColumns.some((column) => column.name === "local_path")) {
+            await db.execAsync("ALTER TABLE images ADD COLUMN local_path TEXT");
         }
 
         // Ensure every card has a progress row, including cards created by older app versions.
@@ -98,6 +116,7 @@ type CardRow = {
     localized_text: string;
     example_sentence: string | null;
     romanization: string | null;
+    level?: number;
 };
 
 function mapCard(row: CardRow): Card {
@@ -107,6 +126,7 @@ function mapCard(row: CardRow): Card {
         row.example_sentence ?? "",
         row.romanization ?? "",
         row.id,
+        row.level === undefined ? undefined : clampLevel(row.level),
     );
 }
 
@@ -176,6 +196,8 @@ export type CardImage = {
     page_url: string | null;
     photographer: string | null;
     photographer_url: string | null;
+    /** Where a copy of the picture is stored on this phone (null until it has been downloaded). */
+    local_path: string | null;
 };
 
 export async function addImage(source: string, providerId: string, filePath: string, thumbnailPath: string | null, pageUrl: string | null, photographer: string | null, photographerUrl: string | null): Promise<number> {
@@ -189,6 +211,22 @@ export async function addImage(source: string, providerId: string, filePath: str
         VALUES (?, ?, ?, ?, ?, ?, ?)
     `, source, providerId, filePath, thumbnailPath, pageUrl, photographer, photographerUrl);
     return result.lastInsertRowId;
+}
+
+/** Remembers where the downloaded copy of an image lives on the phone. */
+export async function setImageLocalPath(imageId: number, localPath: string | null) {
+    const database = await getDatabase();
+    await database.runAsync("UPDATE images SET local_path = ? WHERE id = ?", localPath, imageId);
+}
+
+/** Images that are used by a card but have no copy on the phone yet. */
+export async function getImagesWithoutLocalCopy(): Promise<CardImage[]> {
+    const database = await getDatabase();
+    return database.getAllAsync<CardImage>(`
+        SELECT * FROM images WHERE local_path IS NULL
+          AND id IN (SELECT image_id FROM cards WHERE image_id IS NOT NULL)
+        ORDER BY id
+    `);
 }
 
 export async function getImage(imageId: number): Promise<CardImage | undefined> {
@@ -230,6 +268,7 @@ type ProgressRow = {
     mastered: number;
     fsrs_card: string | null;
     last_review_at: number | null;
+    level: number;
 };
 
 export async function resetCardProgress(cardId: number) {
@@ -248,17 +287,19 @@ export async function getCardProgress(cardId: number): Promise<CardProgress | un
         row.card_id, row.review_count, row.next_review_at ?? undefined,
         row.mastered === 1, row.id, row.fsrs_card ?? undefined,
         row.last_review_at ?? undefined,
+        clampLevel(row.level),
     );
 }
 
 /** Legacy progress updates used by CSV import and existing callers. Omitted FSRS values are preserved. */
-export async function updateCardProgress(cardId: number, reviewCount: number, nextReviewAt: number | undefined, mastered: boolean, fsrsCard?: string, lastReviewAt?: number) {
+export async function updateCardProgress(cardId: number, reviewCount: number, nextReviewAt: number | undefined, mastered: boolean, fsrsCard?: string, lastReviewAt?: number, level?: number) {
     const database = await getDatabase();
     await database.runAsync(`
         UPDATE card_progress SET review_count = ?, next_review_at = ?, mastered = ?,
-            fsrs_card = COALESCE(?, fsrs_card), last_review_at = COALESCE(?, last_review_at)
+            fsrs_card = COALESCE(?, fsrs_card), last_review_at = COALESCE(?, last_review_at),
+            level = COALESCE(?, level)
         WHERE card_id = ?
-    `, reviewCount, nextReviewAt ?? null, mastered ? 1 : 0, fsrsCard ?? null, lastReviewAt ?? null, cardId);
+    `, reviewCount, nextReviewAt ?? null, mastered ? 1 : 0, fsrsCard ?? null, lastReviewAt ?? null, level ?? null, cardId);
 }
 
 /** Exact restore for the Learn screen's Undo action. */
@@ -266,14 +307,15 @@ export async function restoreCardProgress(progress: CardProgress) {
     const database = await getDatabase();
     await database.runAsync(`
         UPDATE card_progress SET review_count = ?, next_review_at = ?, mastered = ?,
-            fsrs_card = ?, last_review_at = ? WHERE card_id = ?
+            fsrs_card = ?, last_review_at = ?, level = ? WHERE card_id = ?
     `, progress.reviewCount, progress.nextReviewAt ?? null, progress.mastered ? 1 : 0,
-        progress.fsrsCard ?? null, progress.lastReviewAt ?? null, progress.cardId);
+        progress.fsrsCard ?? null, progress.lastReviewAt ?? null, clampLevel(progress.level), progress.cardId);
 }
 
-async function reviewCard(cardId: number, direction: "left" | "right") {
+/** Saves the answer and returns the card's new study level. */
+async function reviewCard(cardId: number, direction: "left" | "right"): Promise<number | undefined> {
     const progress = await getCardProgress(cardId);
-    if (!progress) return;
+    if (!progress) return undefined;
 
     const now = new Date();
     const fsrsCard = progress.fsrsCard
@@ -285,6 +327,7 @@ async function reviewCard(cardId: number, direction: "left" | "right") {
         ? scheduledCard.due.getTime()
         : new Date(scheduledCard.due).getTime();
     const nextReviewCount = progress.reviewCount + 1;
+    const level = nextLevel(progress.level, direction);
 
     await updateCardProgress(
         cardId,
@@ -293,15 +336,17 @@ async function reviewCard(cardId: number, direction: "left" | "right") {
         isMastered(scheduledCard),
         serializeFsrsCard(scheduledCard),
         now.getTime(),
+        level,
     );
+    return level;
 }
 
 export async function markCardCorrect(cardId: number) {
-    await reviewCard(cardId, "right");
+    return reviewCard(cardId, "right");
 }
 
 export async function markCardIncorrect(cardId: number) {
-    await reviewCard(cardId, "left");
+    return reviewCard(cardId, "left");
 }
 
 /**
@@ -323,7 +368,8 @@ const DUE_ORDER = "card_progress.next_review_at IS NULL, card_progress.next_revi
 export async function getDueCards(deckId: number, limit?: number): Promise<Card[]> {
     const database = await getDatabase();
     const rows = await database.getAllAsync<CardRow>(`
-        SELECT cards.id, cards.learning_text, cards.localized_text, cards.example_sentence, cards.romanization
+        SELECT cards.id, cards.learning_text, cards.localized_text, cards.example_sentence, cards.romanization,
+            card_progress.level
         FROM cards JOIN card_progress ON cards.id = card_progress.card_id
         WHERE cards.deck_id = ? AND ${IS_DUE}
         ORDER BY ${DUE_ORDER}
@@ -354,8 +400,10 @@ export async function getCardsByIds(ids: number[]): Promise<Card[]> {
     for (let start = 0; start < ids.length; start += CHUNK) {
         const chunk = ids.slice(start, start + CHUNK);
         const rows = await database.getAllAsync<CardRow>(
-            `SELECT id, learning_text, localized_text, example_sentence, romanization
-             FROM cards WHERE id IN (${chunk.map(() => "?").join(",")})`,
+            `SELECT cards.id, cards.learning_text, cards.localized_text, cards.example_sentence, cards.romanization,
+                    card_progress.level
+             FROM cards LEFT JOIN card_progress ON cards.id = card_progress.card_id
+             WHERE cards.id IN (${chunk.map(() => "?").join(",")})`,
             ...chunk,
         );
         for (const row of rows) byId.set(row.id, mapCard(row));

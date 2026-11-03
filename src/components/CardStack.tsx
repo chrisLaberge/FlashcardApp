@@ -1,5 +1,5 @@
 import { getCardImage } from "@/database/database";
-import { resolveImageUrl } from "@/services/imageApi";
+import { downloadImageLocally, imageDisplayUrl, localImageUri } from "@/services/localImages";
 import { Ionicons } from "@expo/vector-icons";
 import * as Speech from "expo-speech";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -20,6 +20,7 @@ import {
 } from "react-native";
 import KeyboardInsetView from "./KeyboardInsetView";
 import { Card } from "../models/Card";
+import { answerSideFor, pickPromptSide, type PromptSide } from "../models/StudyMode";
 import { fitText } from "../utils/textFit";
 
 /* -------------------------------------------------------------------------- */
@@ -60,10 +61,7 @@ const COLORS = {
 };
 
 type Direction = "left" | "right";
-type PromptSide = "learning" | "localized";
 
-const oppositeSide = (side: PromptSide): PromptSide =>
-    side === "learning" ? "localized" : "learning";
 
 /* -------------------------------------------------------------------------- */
 /*                              Answer grading                                */
@@ -112,11 +110,13 @@ function resolveCardImage(cardId: number): Promise<string | null> {
         request = (async () => {
             try {
                 const image = await getCardImage(cardId);
-                let url = resolveImageUrl(image?.file_path) ?? null;
+                let url = imageDisplayUrl(image) ?? null;
 
-                if (url) {
+                if (url && !localImageUri(image)) {
                     const ok = await Image.prefetch(url).catch(() => false);
                     if (!ok) url = null; // file missing, show the card without an image
+                    // Seen from the server: keep a copy on the phone for next time.
+                    else if (image) void downloadImageLocally(image);
                 }
 
                 imageUrlCache.set(cardId, url);
@@ -172,8 +172,12 @@ function useCardImage(card?: Card): CardImage {
 /*                              Prompt side hook                              */
 /* -------------------------------------------------------------------------- */
 
-/** Remembers which language each card starts on, until the card is swiped. */
-function usePromptSides() {
+/**
+ * Remembers what each card shows first (the word, the meaning, or only the sound) until it is
+ * swiped. It is chosen from the card's study level the first time the card is needed, so the card
+ * underneath already shows the same thing when it becomes the current card.
+ */
+function usePromptSides(listening: boolean) {
     const sides = useRef(new Map<number, PromptSide>()).current;
 
     const get = (card: Card): PromptSide => {
@@ -181,7 +185,7 @@ function usePromptSides() {
         let side = sides.get(id);
 
         if (!side) {
-            side = Math.random() < 0.5 ? "learning" : "localized";
+            side = pickPromptSide(card.level, listening);
             sides.set(id, side);
         }
 
@@ -419,9 +423,28 @@ function SpeakButton({ onPress, small, style, decorative }: SpeakButtonProps) {
     );
 }
 
+/** The front of a listening card: no text at all, just the sound (tap to hear it again). */
+function AudioPrompt({ onPress }: { onPress?: () => void }) {
+    return (
+        <View style={styles.term}>
+            <Pressable
+                onPress={onPress}
+                disabled={!onPress}
+                hitSlop={12}
+                accessibilityRole="button"
+                accessibilityLabel="Play the word again"
+                style={({ pressed }) => [styles.audioButton, pressed && styles.speakPressed]}
+            >
+                <Ionicons name="volume-high" size={44} color={COLORS.text} />
+            </Pressable>
+            <Text style={styles.audioHint}>Listen</Text>
+        </View>
+    );
+}
+
 interface TermProps {
     card: Card;
-    side: PromptSide;
+    side: Exclude<PromptSide, "audio">;
     image: CardImage;
     size?: "large" | "small";
     onSpeak?: () => void;
@@ -520,10 +543,16 @@ interface CardStackProps {
     currentCard: Card;
     nextCard?: Card;
     ttsCode?: string;
+    /** Exact voice to use (see utils/voices). Without one the phone picks by language. */
+    ttsVoice?: string;
+    /** False when the phone has no voice for the language: nothing is spoken rather than a wrong voice. */
+    speechAvailable?: boolean;
     cardKey: number;
     /** Read the learning text aloud when it appears (the speaker buttons always work). */
     autoSpeak?: boolean;
     showRomanization?: boolean;
+    /** Allow listening-only cards. Off: those reviews show the learning word instead. */
+    listening?: boolean;
     onSwipe: (direction: Direction) => void;
     onDelete: () => void;
 }
@@ -533,12 +562,15 @@ export default function CardStack({
     nextCard,
     cardKey,
     ttsCode,
+    ttsVoice,
+    speechAvailable = true,
     autoSpeak = true,
     showRomanization = true,
+    listening = true,
     onSwipe,
     onDelete,
 }: CardStackProps) {
-    const sides = usePromptSides();
+    const sides = usePromptSides(listening);
 
     const handleSwipe = (direction: Direction) => {
         sides.forget(currentCard);
@@ -554,6 +586,8 @@ export default function CardStack({
                 initialPromptSide={sides.get(currentCard)}
                 nextSide={nextCard ? sides.get(nextCard) : "learning"}
                 ttsCode={ttsCode}
+                ttsVoice={ttsVoice}
+                speechAvailable={speechAvailable}
                 autoSpeak={autoSpeak}
                 showRomanization={showRomanization}
                 onSwipe={handleSwipe}
@@ -573,6 +607,8 @@ interface ActiveCardsProps {
     initialPromptSide: PromptSide;
     nextSide: PromptSide;
     ttsCode?: string;
+    ttsVoice?: string;
+    speechAvailable: boolean;
     autoSpeak: boolean;
     showRomanization: boolean;
     onSwipe: (direction: Direction) => void;
@@ -585,6 +621,8 @@ function ActiveCards({
     initialPromptSide,
     nextSide,
     ttsCode,
+    ttsVoice,
+    speechAvailable,
     autoSpeak,
     showRomanization,
     onSwipe,
@@ -593,7 +631,9 @@ function ActiveCards({
     // The prompt side is frozen for the lifetime of this card (the component is re-keyed per card).
     // The next card's side is remembered per card by usePromptSides, so it is stable even if the next card changes.
     const [promptSide] = useState(initialPromptSide);
-    const answerSide = oppositeSide(promptSide);
+    const answerSide = answerSideFor(promptSide);
+    // On a listening card the word is only revealed on the back, as the small second line.
+    const revealedSide = promptSide === "audio" ? "learning" : promptSide;
 
     const currentImage = useCardImage(currentCard);
     const nextImage = useCardImage(nextCard); // prefetch for the next card
@@ -629,7 +669,9 @@ function ActiveCards({
 
     const speak = (text: string) => {
         Speech.stop();
-        Speech.speak(text, { language: ttsCode, rate: 1.0 });
+        // No voice for this language: stay silent instead of an English voice reading it letter by letter.
+        if (!speechAvailable) return;
+        Speech.speak(text, { language: ttsCode, voice: ttsVoice, rate: 1.0 });
     };
 
     const speakLearning = () => speak(currentCard.learningText);
@@ -639,13 +681,16 @@ function ActiveCards({
     // Read the learning text aloud whenever it becomes visible.
     const learningIsVisible = promptSide === "learning" ? !flipped : flipped;
 
+    // A listening card must be heard, whatever the automatic-pronunciation setting says.
+    const speakOnAppear = promptSide === "audio" || (autoSpeak && learningIsVisible);
+
     useEffect(() => {
-        if (learningIsVisible && autoSpeak) speakLearning();
+        if (speakOnAppear) speakLearning();
 
         return () => {
             Speech.stop();
         };
-    }, [currentCard.id, learningIsVisible, autoSpeak]);
+    }, [currentCard.id, speakOnAppear]);
 
 
     /* ------------------------------ Render ------------------------------- */
@@ -660,13 +705,17 @@ function ActiveCards({
                     <Animated.View
                         style={[styles.cardFace, { opacity: gestures.nextContentOpacity }]}
                     >
-                        <Term
-                            card={nextCard}
-                            side={nextSide}
-                            image={nextImage}
-                            previewSpeaker
-                            showRomanization={showRomanization}
-                        />
+                        {nextSide === "audio" ? (
+                            <AudioPrompt />
+                        ) : (
+                            <Term
+                                card={nextCard}
+                                side={nextSide}
+                                image={nextImage}
+                                previewSpeaker
+                                showRomanization={showRomanization}
+                            />
+                        )}
 
                         {/* Same buttons as the real card, so nothing pops in when it arrives */}
                         <View pointerEvents="none" style={styles.typeButton}>
@@ -697,13 +746,17 @@ function ActiveCards({
                     pointerEvents={flipped ? "none" : "auto"}
                     style={[styles.cardFace, frontStyle]}
                 >
-                    <Term
-                        card={currentCard}
-                        side={promptSide}
-                        image={currentImage}
-                        onSpeak={speakLearning}
-                        showRomanization={showRomanization}
-                    />
+                    {promptSide === "audio" ? (
+                        <AudioPrompt onPress={speakLearning} />
+                    ) : (
+                        <Term
+                            card={currentCard}
+                            side={promptSide}
+                            image={currentImage}
+                            onSpeak={speakLearning}
+                            showRomanization={showRomanization}
+                        />
+                    )}
 
                     <Pressable
                         onPress={() => setTyping(true)}
@@ -743,7 +796,7 @@ function ActiveCards({
                     <View style={styles.secondary}>
                         <Term
                             card={currentCard}
-                            side={promptSide}
+                            side={revealedSide}
                             image={currentImage}
                             size="small"
                             onSpeak={speakLearning}
@@ -900,6 +953,25 @@ const styles = StyleSheet.create({
         height: 120,
         borderRadius: 12,
         marginBottom: 12,
+    },
+
+    /* Listening prompt */
+
+    audioButton: {
+        width: 96,
+        height: 96,
+        borderRadius: 48,
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: COLORS.cardBorder,
+    },
+
+    audioHint: {
+        marginTop: 12,
+        color: COLORS.hint,
+        fontSize: 15,
+        letterSpacing: 1,
+        textTransform: "uppercase",
     },
 
     /* Learning row: [speaker][gap] word [gap][invisible twin] */

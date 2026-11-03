@@ -19,10 +19,10 @@ import { invalidateCardImage } from "@/components/CardStack";
 import {
     ImageSearchResult,
     downloadImage,
-    resolveImageUrl,
     searchImages
 } from "@/services/imageApi";
 
+import { imageDisplayUrl, keepLocalCopy } from "@/services/localImages";
 import { translateText } from "@/services/translationApi";
 import { getLanguage } from "../constants/languages";
 import {
@@ -190,7 +190,7 @@ export default function EditCardScreen() {
             const image = await getCardImage(cardId);
 
             if (image) {
-                setCurrentImageUrl(resolveImageUrl(image.file_path) ?? null);
+                setCurrentImageUrl(imageDisplayUrl(image) ?? null);
             }
 
             // Load deck language (same approach as AddCardScreen)
@@ -245,6 +245,7 @@ export default function EditCardScreen() {
                         selectedImage.photographer,
                         selectedImage.photographerUrl
                     );
+                    await keepLocalCopy(imageId);
                 } catch (error) {
                     console.warn("Image failed, saving card without it:", error);
                     // imageId stays as it was, so the card still saves

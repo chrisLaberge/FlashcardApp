@@ -31,6 +31,7 @@ import {
     searchImages,
 } from "@/services/imageApi";
 
+import { keepLocalCopy } from "@/services/localImages";
 import { translateText } from "@/services/translationApi";
 import { getRomanization } from "@/utils/romanization";
 import { getLanguage } from "../constants/languages";
@@ -367,6 +368,7 @@ export default function AddCardScreen() {
                         selectedImage.photographer,
                         selectedImage.photographerUrl
                     );
+                    await keepLocalCopy(imageId);
                 } catch (error) {
                     console.warn("Image failed, saving card without it:", error);
                     // imageId stays as it was, so the card still saves

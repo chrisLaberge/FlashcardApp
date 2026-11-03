@@ -1,12 +1,13 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import * as Speech from "expo-speech";
 import { useCallback, useRef, useState } from "react";
-import { Alert, Modal, Pressable, StyleSheet, Switch, Text, View } from "react-native";
+import { Alert, Linking, Modal, Platform, Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import CardStack from "../components/CardStack";
 
-import { getTTSLanguageCode } from "@/constants/languages";
+import { getLanguage, getTTSLanguageCode } from "@/constants/languages";
 import { REVIEW_BATCH_SIZE } from "../config";
 import {
   deleteCard,
@@ -22,6 +23,7 @@ import { useFocusedInterval } from "../hooks/useFocusedInterval";
 import { useLearnSettings } from "../hooks/useLearnSettings";
 import { Card } from "../models/Card";
 import { CardProgress } from "../models/CardProgress";
+import { chooseVoice, hasVoiceFor } from "../utils/voices";
 import {
   loadQueue,
   pollDueCards,
@@ -58,6 +60,10 @@ export default function LearnScreen() {
 
   const [selectedDeckId, setSelectedDeckId] = useState<string | undefined>();
   const [ttsCode, setTtsCode] = useState<string | undefined>();
+  // Does this phone have a voice for the deck's language? Listening cards need one.
+  const [voiceAvailable, setVoiceAvailable] = useState(true);
+  const [voiceId, setVoiceId] = useState<string | undefined>();
+  const [languageName, setLanguageName] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   // Bumped when the visible card changes so CardStack remounts cleanly
@@ -86,7 +92,17 @@ export default function LearnScreen() {
       const deck = decks.find((d) => d.id === deckId);
 
       setSelectedDeckId(String(deckId));
-      setTtsCode(getTTSLanguageCode(deck?.language ?? ""));
+      const code = getTTSLanguageCode(deck?.language ?? "");
+      setTtsCode(code);
+      setLanguageName(getLanguage(deck?.language ?? "")?.name ?? "");
+      try {
+        const voices = await Speech.getAvailableVoicesAsync();
+        setVoiceAvailable(hasVoiceFor(voices, code));
+        setVoiceId(chooseVoice(voices, code)?.identifier);
+      } catch {
+        setVoiceAvailable(true); // cannot tell: assume speech works
+        setVoiceId(undefined);
+      }
       setHistory([]);
       setReviewedCount(0);
       setCorrectCount(0);
@@ -162,8 +178,12 @@ export default function LearnScreen() {
 
       // Snapshot progress so the swipe can be undone
       const previousProgress = await getCardProgress(card.id);
-      if (direction === "left") await markCardIncorrect(card.id);
-      else await markCardCorrect(card.id);
+      const newLevel =
+        direction === "left"
+          ? await markCardIncorrect(card.id)
+          : await markCardCorrect(card.id);
+      // The card may be shown again this session (after Again): it must use its new level.
+      if (newLevel !== undefined) card.level = newLevel;
 
       queue.answer(direction);
       setHistory((h) => [...h, { card, direction, previousProgress }]);
@@ -178,7 +198,10 @@ export default function LearnScreen() {
       if (!last) return;
 
       // Restore the DB progress to what it was before the swipe
-      if (last.previousProgress) await restoreCardProgress(last.previousProgress);
+      if (last.previousProgress) {
+        await restoreCardProgress(last.previousProgress);
+        last.card.level = last.previousProgress.level;
+      }
 
       queue.undo(last.card);
       setHistory((h) => h.slice(0, -1));
@@ -207,6 +230,19 @@ export default function LearnScreen() {
     });
   };
 
+  /** Opens the phone's text-to-speech settings, where voice data for a language is installed. */
+  const openVoiceSettings = async () => {
+    try {
+      if (Platform.OS === "android") await Linking.sendIntent("com.android.settings.TTS_SETTINGS");
+      else await Linking.openSettings();
+    } catch {
+      Alert.alert(
+        "Install a voice",
+        "Open Settings, search for \"Text-to-speech output\", and install the voice data for this language.",
+      );
+    }
+  };
+
   const handleAdd = () => {
     router.push({
       pathname: "/addCard",
@@ -225,6 +261,9 @@ export default function LearnScreen() {
   const addButton = <ActionButton label="+ Add" onPress={handleAdd} />;
 
   /* --------------------------------- Screens -------------------------------- */
+
+  // Listening-only cards need sound: switched on, automatic pronunciation on, and a voice for the language.
+  const listening = settings.listeningCards && settings.autoSpeak && voiceAvailable;
 
   // Wait for the stored settings so the first card does not speak when auto-speak is off.
   if (!loadedOnce || !settingsLoaded) {
@@ -317,6 +356,15 @@ export default function LearnScreen() {
         </Pressable>
       </View>
 
+      {!voiceAvailable && (
+        <Pressable onPress={openVoiceSettings} style={styles.voiceNotice} accessibilityRole="button">
+          <Ionicons name="volume-mute-outline" size={18} color={COLORS.accent} />
+          <Text style={styles.voiceNoticeText}>
+            No {languageName || "voice"} voice on this phone, so nothing is spoken. Tap to install one.
+          </Text>
+        </Pressable>
+      )}
+
       <View style={styles.cardArea}>
         <CardStack
           currentCard={currentCard}
@@ -325,8 +373,11 @@ export default function LearnScreen() {
           onSwipe={handleSwipe}
           onDelete={handleDelete}
           ttsCode={ttsCode}
+          ttsVoice={voiceId}
+          speechAvailable={voiceAvailable}
           autoSpeak={settings.autoSpeak}
           showRomanization={settings.showRomanization}
+          listening={listening}
         />
       </View>
 
@@ -360,6 +411,18 @@ export default function LearnScreen() {
               hint="Pinyin, romaji and similar under the word."
               value={settings.showRomanization}
               onChange={(showRomanization) => updateSettings({ showRomanization })}
+            />
+            <SettingRow
+              label="Listening reviews"
+              hint={
+                !settings.autoSpeak
+                  ? "Needs automatic pronunciation. Off: the word is shown instead."
+                  : !voiceAvailable
+                    ? "No voice for this language on this phone, so the word is shown instead."
+                    : "Sometimes play only the sound, with no text, for words you know well. Off: the word is shown instead."
+              }
+              value={settings.listeningCards}
+              onChange={(listeningCards) => updateSettings({ listeningCards })}
             />
 
             <Pressable
@@ -471,6 +534,26 @@ const styles = StyleSheet.create({
 
   gear: {
     padding: 6,
+  },
+
+  voiceNotice: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginHorizontal: 20,
+    marginBottom: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surface,
+  },
+
+  voiceNoticeText: {
+    flex: 1,
+    color: COLORS.muted,
+    fontSize: 13,
   },
 
   modalRoot: {
