@@ -1,10 +1,11 @@
 import NavigationButton from "@/components/NavigationButton";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { useCallback, useRef, useState } from "react";
 import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
 import { getLanguage } from "../constants/languages";
 import { getDecks, getProgressCounts } from "../database/database";
+import { useFocusedInterval } from "../hooks/useFocusedInterval";
 
 
 export default function HomeScreen() {
@@ -17,9 +18,26 @@ export default function HomeScreen() {
     const [selectedDeckFlag, setSelectedDeckFlag] = useState("🌐");
     const [deckSelected, setDeckSelected] = useState(false);
 
-    const { deckId } = useLocalSearchParams<{ deckId?: string }>();
+    // The selected deck lives in storage (written by the decks screen), never in a route param:
+    // a param would keep pointing at an old deck after the selection changes elsewhere.
+    const activeDeckId = selectedDeckId ?? undefined;
 
-    const activeDeckId = deckId ?? selectedDeckId ?? undefined;
+    // Counts refresh when the screen gains focus, every 10 seconds while it is focused (and the
+    // app is in the foreground), and right after a different deck is selected.
+    const latestRequest = useRef(0);
+
+    const loadCounts = useCallback(async (deckId: string | undefined) => {
+        const request = ++latestRequest.current; // only the newest answer is allowed to update the screen
+
+        const counts = deckId
+            ? await getProgressCounts(Number(deckId))
+            : { due: 0, practiced: 0, mastered: 0 };
+        if (request !== latestRequest.current) return;
+
+        setDueCount(counts.due);
+        setPracticedCount(counts.practiced);
+        setMasteredCount(counts.mastered);
+    }, []);
 
     useFocusEffect(
         useCallback(() => {
@@ -27,6 +45,7 @@ export default function HomeScreen() {
                 const lastDeckId = await AsyncStorage.getItem("lastDeckId");
 
                 const reset = () => {
+                    void loadCounts(undefined);
                     setSelectedDeckId(null);
                     setSelectedDeckName("Select a deck");
                     setSelectedDeckFlag("🌐");
@@ -40,6 +59,7 @@ export default function HomeScreen() {
 
                 if (!deck) return reset();
 
+                void loadCounts(String(deck.id));
                 setSelectedDeckId(String(deck.id));
                 setSelectedDeckName(deck.name);
                 setSelectedDeckFlag(getLanguage(deck.language)?.flag ?? "🌐");
@@ -47,36 +67,11 @@ export default function HomeScreen() {
             };
 
             loadDeck();
-        }, [deckId])
-
+        }, [loadCounts])
     );
 
 
-    useFocusEffect(
-        useCallback(() => {
-            const loadProgress = async () => {
-                if (!activeDeckId) {
-                    setDueCount(0);
-                    setPracticedCount(0);
-                    setMasteredCount(0);
-                    return;
-                }
-
-                const counts = await getProgressCounts(Number(activeDeckId));
-
-                setDueCount(counts.due);
-                setPracticedCount(counts.practiced);
-                setMasteredCount(counts.mastered);
-            };
-
-            loadProgress();
-
-            const interval = setInterval(loadProgress, 10000);
-            return () => clearInterval(interval);
-        }, [activeDeckId])
-    );
-
-
+    useFocusedInterval(() => loadCounts(activeDeckId));
 
     const pulse = useRef(new Animated.Value(0)).current;
 

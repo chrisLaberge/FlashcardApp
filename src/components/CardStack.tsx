@@ -7,11 +7,9 @@ import {
     Animated,
     Dimensions,
     Image,
-    KeyboardAvoidingView,
     Modal,
     PanResponder,
     PanResponderGestureState,
-    Platform,
     Pressable,
     StyleProp,
     StyleSheet,
@@ -20,7 +18,9 @@ import {
     View,
     ViewStyle,
 } from "react-native";
+import KeyboardInsetView from "./KeyboardInsetView";
 import { Card } from "../models/Card";
+import { fitText } from "../utils/textFit";
 
 /* -------------------------------------------------------------------------- */
 /*                              Constants & types                             */
@@ -37,6 +37,18 @@ const SWIPE_OUT_DURATION = 250;
 const FLIP_DURATION = 500;
 
 const SPEAK_GAP = 8;
+const SPEAK_LARGE = 44;
+const SPEAK_SMALL = 32;
+
+// Width available to a line of text, used to size words so they are never split across lines.
+// Card margin (learn screen) + card border + face padding.
+const TEXT_AREA_WIDTH = SCREEN_WIDTH - 40 - 4 - 48;
+const LEARNING_WIDTH = {
+    large: TEXT_AREA_WIDTH - 2 * (SPEAK_LARGE + SPEAK_GAP),
+    small: TEXT_AREA_WIDTH - 2 * (SPEAK_SMALL + SPEAK_GAP),
+};
+const LOCALIZED_WIDTH = TEXT_AREA_WIDTH;
+const TEXT_SIZE = { large: 36, small: 18 };
 
 const COLORS = {
     cardBackground: "#ebdbb2",
@@ -362,14 +374,24 @@ interface SpeakButtonProps {
     onPress?: () => void;
     small?: boolean;
     style?: StyleProp<ViewStyle>;
+    /** Draw the button but make it inert: used on the card underneath, so it is already there when that card arrives. */
+    decorative?: boolean;
 }
 
 /**
  * Without `onPress` it renders an invisible spacer of the same size, so the
  * learning row can stay symmetric around the word.
  */
-function SpeakButton({ onPress, small, style }: SpeakButtonProps) {
+function SpeakButton({ onPress, small, style, decorative }: SpeakButtonProps) {
     const size = small ? styles.speakSmall : styles.speakLarge;
+
+    if (!onPress && decorative) {
+        return (
+            <View pointerEvents="none" style={[styles.speakButton, size, style]}>
+                <Ionicons name="volume-high" size={small ? 16 : 22} color={COLORS.text} />
+            </View>
+        );
+    }
 
     if (!onPress) {
         return <View style={[size, styles.invisible, style]} />;
@@ -403,15 +425,31 @@ interface TermProps {
     image: CardImage;
     size?: "large" | "small";
     onSpeak?: () => void;
+    /** Show the speaker even without `onSpeak` (the next card). */
+    previewSpeaker?: boolean;
+    showRomanization?: boolean;
 }
 
 /** One language of a card: learning text (+ romanization + speaker) or image + localized text. */
-function Term({ card, side, image, size = "large", onSpeak }: TermProps) {
+function Term({
+    card,
+    side,
+    image,
+    size = "large",
+    onSpeak,
+    previewSpeaker,
+    showRomanization = true,
+}: TermProps) {
     const small = size === "small";
     const textStyle = small ? styles.textSmall : styles.textLarge;
 
     if (side === "learning") {
-        const romanization = card.romanization?.trim();
+        const romanization = showRomanization ? card.romanization?.trim() : undefined;
+        const fit = fitText(card.learningText, {
+            baseSize: TEXT_SIZE[size],
+            maxWidth: LEARNING_WIDTH[size],
+            maxLines: 2,
+        });
 
         return (
             <View style={styles.term}>
@@ -419,12 +457,13 @@ function Term({ card, side, image, size = "large", onSpeak }: TermProps) {
                     <SpeakButton
                         small={small}
                         onPress={onSpeak}
+                        decorative={previewSpeaker}
                         style={styles.speakGapStart}
                     />
 
                     <Text
-                        style={[textStyle, styles.learningText]}
-                        numberOfLines={2}
+                        style={[textStyle, styles.learningText, { fontSize: fit.fontSize }]}
+                        numberOfLines={fit.numberOfLines}
                         adjustsFontSizeToFit
                         minimumFontScale={0.6}
                     >
@@ -444,6 +483,12 @@ function Term({ card, side, image, size = "large", onSpeak }: TermProps) {
         );
     }
 
+    const localizedFit = fitText(card.localizedText, {
+        baseSize: TEXT_SIZE[size],
+        maxWidth: LOCALIZED_WIDTH,
+        maxLines: 3,
+    });
+
     // Hidden (not removed) until we know if there is an image,
     // so the final layout appears in one go instead of jumping around.
     return (
@@ -456,7 +501,11 @@ function Term({ card, side, image, size = "large", onSpeak }: TermProps) {
                 />
             )}
 
-            <Text style={textStyle} numberOfLines={3} adjustsFontSizeToFit>
+            <Text
+                style={[textStyle, { fontSize: localizedFit.fontSize }]}
+                numberOfLines={localizedFit.numberOfLines}
+                adjustsFontSizeToFit
+            >
                 {card.localizedText}
             </Text>
         </View>
@@ -472,6 +521,9 @@ interface CardStackProps {
     nextCard?: Card;
     ttsCode?: string;
     cardKey: number;
+    /** Read the learning text aloud when it appears (the speaker buttons always work). */
+    autoSpeak?: boolean;
+    showRomanization?: boolean;
     onSwipe: (direction: Direction) => void;
     onDelete: () => void;
 }
@@ -481,6 +533,8 @@ export default function CardStack({
     nextCard,
     cardKey,
     ttsCode,
+    autoSpeak = true,
+    showRomanization = true,
     onSwipe,
     onDelete,
 }: CardStackProps) {
@@ -498,8 +552,10 @@ export default function CardStack({
                 currentCard={currentCard}
                 nextCard={nextCard}
                 initialPromptSide={sides.get(currentCard)}
-                initialNextSide={nextCard ? sides.get(nextCard) : "learning"}
+                nextSide={nextCard ? sides.get(nextCard) : "learning"}
                 ttsCode={ttsCode}
+                autoSpeak={autoSpeak}
+                showRomanization={showRomanization}
                 onSwipe={handleSwipe}
                 onDelete={onDelete}
             />
@@ -515,8 +571,10 @@ interface ActiveCardsProps {
     currentCard: Card;
     nextCard?: Card;
     initialPromptSide: PromptSide;
-    initialNextSide: PromptSide;
+    nextSide: PromptSide;
     ttsCode?: string;
+    autoSpeak: boolean;
+    showRomanization: boolean;
     onSwipe: (direction: Direction) => void;
     onDelete: () => void;
 }
@@ -525,14 +583,16 @@ function ActiveCards({
     currentCard,
     nextCard,
     initialPromptSide,
-    initialNextSide,
+    nextSide,
     ttsCode,
+    autoSpeak,
+    showRomanization,
     onSwipe,
     onDelete,
 }: ActiveCardsProps) {
-    // Frozen for the lifetime of this card (the component is re-keyed per card).
+    // The prompt side is frozen for the lifetime of this card (the component is re-keyed per card).
+    // The next card's side is remembered per card by usePromptSides, so it is stable even if the next card changes.
     const [promptSide] = useState(initialPromptSide);
-    const [nextSide] = useState(initialNextSide);
     const answerSide = oppositeSide(promptSide);
 
     const currentImage = useCardImage(currentCard);
@@ -580,12 +640,13 @@ function ActiveCards({
     const learningIsVisible = promptSide === "learning" ? !flipped : flipped;
 
     useEffect(() => {
-        if (learningIsVisible) speakLearning();
+        if (learningIsVisible && autoSpeak) speakLearning();
 
         return () => {
             Speech.stop();
         };
-    }, [currentCard.id, learningIsVisible]);
+    }, [currentCard.id, learningIsVisible, autoSpeak]);
+
 
     /* ------------------------------ Render ------------------------------- */
 
@@ -599,7 +660,18 @@ function ActiveCards({
                     <Animated.View
                         style={[styles.cardFace, { opacity: gestures.nextContentOpacity }]}
                     >
-                        <Term card={nextCard} side={nextSide} image={nextImage} />
+                        <Term
+                            card={nextCard}
+                            side={nextSide}
+                            image={nextImage}
+                            previewSpeaker
+                            showRomanization={showRomanization}
+                        />
+
+                        {/* Same buttons as the real card, so nothing pops in when it arrives */}
+                        <View pointerEvents="none" style={styles.typeButton}>
+                            <Ionicons name="create-outline" size={20} color={COLORS.text} />
+                        </View>
                     </Animated.View>
                 </Animated.View>
             )}
@@ -630,6 +702,7 @@ function ActiveCards({
                         side={promptSide}
                         image={currentImage}
                         onSpeak={speakLearning}
+                        showRomanization={showRomanization}
                     />
 
                     <Pressable
@@ -652,6 +725,7 @@ function ActiveCards({
                         side={answerSide}
                         image={currentImage}
                         onSpeak={speakLearning}
+                        showRomanization={showRomanization}
                     />
 
                     {!!typed.trim() && (
@@ -673,6 +747,7 @@ function ActiveCards({
                             image={currentImage}
                             size="small"
                             onSpeak={speakLearning}
+                            showRomanization={showRomanization}
                         />
                     </View>
 
@@ -690,11 +765,11 @@ function ActiveCards({
                 visible={typing}
                 transparent
                 animationType="fade"
+                statusBarTranslucent
                 onRequestClose={() => setTyping(false)}
             >
-                <KeyboardAvoidingView
+                <KeyboardInsetView
                     style={styles.modalRoot}
-                    behavior={Platform.OS === "ios" ? "padding" : undefined}
                 >
                     <Pressable style={styles.backdrop} onPress={() => setTyping(false)} />
 
@@ -719,7 +794,7 @@ function ActiveCards({
                             <Text style={styles.checkText}>Check</Text>
                         </Pressable>
                     </View>
-                </KeyboardAvoidingView>
+                </KeyboardInsetView>
             </Modal>
         </>
     );

@@ -57,10 +57,8 @@ export default function DecksScreen() {
                                     String(item.id)
                                 );
 
-                                router.push({
-                                    pathname: "/",
-                                    params: { deckId: String(item.id) },
-                                });
+                                // Home reads the selected deck from storage; go back to it rather than stacking a second copy.
+                                router.dismissTo("/");
                             }}
                             onLongPress={() => setDeckToDelete(item)}
                             style={[s.card, selected && s.cardSelected]}

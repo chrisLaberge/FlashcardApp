@@ -67,6 +67,8 @@ async function openAndPrepareDatabase(): Promise<SQLite.SQLiteDatabase> {
                 last_review_at INTEGER,
                 FOREIGN KEY(card_id) REFERENCES cards(id) ON DELETE CASCADE
             );
+            CREATE INDEX IF NOT EXISTS idx_cards_deck ON cards(deck_id);
+            CREATE INDEX IF NOT EXISTS idx_progress_due ON card_progress(next_review_at);
         `);
 
         // Idempotent migration for databases created before FSRS columns existed.
@@ -310,15 +312,55 @@ export async function markCardIncorrect(cardId: number) {
  */
 const IS_DUE = "(card_progress.next_review_at IS NULL OR card_progress.next_review_at <= ?)";
 
-export async function getDueCards(deckId: number): Promise<Card[]> {
+/**
+ * Cards that already have a schedule come first (oldest due first); never-scheduled cards
+ * follow. Without this, thousands of freshly imported cards would starve overdue reviews
+ * once the learn screen loads cards in batches.
+ */
+const DUE_ORDER = "card_progress.next_review_at IS NULL, card_progress.next_review_at, cards.id";
+
+/** Due cards in review order. `limit` caps how many are loaded (default: all). */
+export async function getDueCards(deckId: number, limit?: number): Promise<Card[]> {
     const database = await getDatabase();
     const rows = await database.getAllAsync<CardRow>(`
         SELECT cards.id, cards.learning_text, cards.localized_text, cards.example_sentence, cards.romanization
         FROM cards JOIN card_progress ON cards.id = card_progress.card_id
         WHERE cards.deck_id = ? AND ${IS_DUE}
-        ORDER BY COALESCE(card_progress.next_review_at, 0), cards.id
-    `, deckId, Date.now());
+        ORDER BY ${DUE_ORDER}
+        LIMIT ?
+    `, deckId, Date.now(), limit ?? -1);
     return rows.map(mapCard);
+}
+
+/** Ids only, in review order: the cheap query the learn screen runs every few seconds. */
+export async function getDueCardIds(deckId: number, limit: number): Promise<number[]> {
+    const database = await getDatabase();
+    const rows = await database.getAllAsync<{ id: number }>(`
+        SELECT cards.id
+        FROM cards JOIN card_progress ON cards.id = card_progress.card_id
+        WHERE cards.deck_id = ? AND ${IS_DUE}
+        ORDER BY ${DUE_ORDER}
+        LIMIT ?
+    `, deckId, Date.now(), limit);
+    return rows.map((row) => row.id);
+}
+
+/** Full cards for the given ids, in the order given. Ids that no longer exist are skipped. */
+export async function getCardsByIds(ids: number[]): Promise<Card[]> {
+    if (ids.length === 0) return [];
+    const database = await getDatabase();
+    const byId = new Map<number, Card>();
+    const CHUNK = 400; // stays well below SQLite's bound-variable limit
+    for (let start = 0; start < ids.length; start += CHUNK) {
+        const chunk = ids.slice(start, start + CHUNK);
+        const rows = await database.getAllAsync<CardRow>(
+            `SELECT id, learning_text, localized_text, example_sentence, romanization
+             FROM cards WHERE id IN (${chunk.map(() => "?").join(",")})`,
+            ...chunk,
+        );
+        for (const row of rows) byId.set(row.id, mapCard(row));
+    }
+    return ids.flatMap((id) => byId.get(id) ?? []);
 }
 
 export async function getDueCardCount(): Promise<number> {

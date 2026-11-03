@@ -2,6 +2,7 @@
 module.exports = {
     preset: "jest-expo",
     testMatch: ["<rootDir>/tests/**/*.test.ts"],
+    setupFiles: ["<rootDir>/tests/helpers/setup.ts"],
     moduleNameMapper: {
         // Tests must never touch a real device database: expo-sqlite is always replaced
         // by an in-memory (or temp-file) Node SQLite adapter.

@@ -2,12 +2,11 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
+import KeyboardInsetView from "@/components/KeyboardInsetView";
 import {
     ActivityIndicator,
     Image,
-    KeyboardAvoidingView,
     Modal,
-    Platform,
     Pressable,
     ScrollView,
     StyleSheet,
@@ -538,8 +537,11 @@ export default function EditCardScreen() {
     // --------------------------------------------------
 
     return (
-        <ScrollView
+        <KeyboardInsetView
             style={styles.container}
+        >
+        <ScrollView
+            style={styles.scroll}
             contentContainerStyle={styles.content}
             keyboardShouldPersistTaps="handled"
         >
@@ -816,9 +818,12 @@ export default function EditCardScreen() {
                 visible={imageModalVisible}
                 animationType="slide"
                 transparent
+                statusBarTranslucent
                 onRequestClose={() => setImageModalVisible(false)}
             >
-                <View style={styles.imageModalOverlay}>
+                <KeyboardInsetView
+                    style={styles.imageModalOverlay}
+                >
                     <View style={styles.imageModal}>
                         <View style={styles.modalHeader}>
                             <Text style={styles.imageModalTitle}>
@@ -924,7 +929,7 @@ export default function EditCardScreen() {
                             </Text>
                         </Pressable>
                     </View>
-                </View>
+                </KeyboardInsetView>
             </Modal>
 
             {/* ---------- Duplicate dialog ---------- */}
@@ -932,11 +937,11 @@ export default function EditCardScreen() {
                 visible={duplicateCard !== null}
                 animationType="slide"
                 transparent
+                statusBarTranslucent
                 onRequestClose={closeDuplicateDialog}
             >
-                <KeyboardAvoidingView
+                <KeyboardInsetView
                     style={styles.imageModalOverlay}
-                    behavior={Platform.OS === "ios" ? "padding" : undefined}
                 >
                     <View style={styles.duplicateContainer}>
                         <View style={styles.modalHeader}>
@@ -1061,9 +1066,10 @@ export default function EditCardScreen() {
                             )}
                         </ScrollView>
                     </View>
-                </KeyboardAvoidingView>
+                </KeyboardInsetView>
             </Modal>
         </ScrollView>
+        </KeyboardInsetView>
     );
 }
 
@@ -1099,6 +1105,10 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: COLORS.bg0,
+    },
+
+    scroll: {
+        flex: 1,
     },
 
     content: {
