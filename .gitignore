@@ -41,3 +41,6 @@ example
 # generated native folders
 /ios
 /android
+
+# Firebase client config; the values the app needs live in src/services/firebase.ts
+google-services.json

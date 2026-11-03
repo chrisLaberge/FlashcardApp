@@ -1,3 +1,5 @@
+import { authHeaders } from "./auth";
+
 const API_URL = "https://flashcard-backend-1097034776784.us-east1.run.app";
 
 export async function translateText(
@@ -8,6 +10,7 @@ export async function translateText(
         method: "POST",
         headers: {
             "Content-Type": "application/json",
+            ...(await authHeaders()),
         },
         body: JSON.stringify({
             text,
