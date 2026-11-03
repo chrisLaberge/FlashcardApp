@@ -543,6 +543,10 @@ interface CardStackProps {
     currentCard: Card;
     nextCard?: Card;
     ttsCode?: string;
+    /** Exact voice to use (see utils/voices). Without one the phone picks by language. */
+    ttsVoice?: string;
+    /** False when the phone has no voice for the language: nothing is spoken rather than a wrong voice. */
+    speechAvailable?: boolean;
     cardKey: number;
     /** Read the learning text aloud when it appears (the speaker buttons always work). */
     autoSpeak?: boolean;
@@ -558,6 +562,8 @@ export default function CardStack({
     nextCard,
     cardKey,
     ttsCode,
+    ttsVoice,
+    speechAvailable = true,
     autoSpeak = true,
     showRomanization = true,
     listening = true,
@@ -580,6 +586,8 @@ export default function CardStack({
                 initialPromptSide={sides.get(currentCard)}
                 nextSide={nextCard ? sides.get(nextCard) : "learning"}
                 ttsCode={ttsCode}
+                ttsVoice={ttsVoice}
+                speechAvailable={speechAvailable}
                 autoSpeak={autoSpeak}
                 showRomanization={showRomanization}
                 onSwipe={handleSwipe}
@@ -599,6 +607,8 @@ interface ActiveCardsProps {
     initialPromptSide: PromptSide;
     nextSide: PromptSide;
     ttsCode?: string;
+    ttsVoice?: string;
+    speechAvailable: boolean;
     autoSpeak: boolean;
     showRomanization: boolean;
     onSwipe: (direction: Direction) => void;
@@ -611,6 +621,8 @@ function ActiveCards({
     initialPromptSide,
     nextSide,
     ttsCode,
+    ttsVoice,
+    speechAvailable,
     autoSpeak,
     showRomanization,
     onSwipe,
@@ -657,7 +669,9 @@ function ActiveCards({
 
     const speak = (text: string) => {
         Speech.stop();
-        Speech.speak(text, { language: ttsCode, rate: 1.0 });
+        // No voice for this language: stay silent instead of an English voice reading it letter by letter.
+        if (!speechAvailable) return;
+        Speech.speak(text, { language: ttsCode, voice: ttsVoice, rate: 1.0 });
     };
 
     const speakLearning = () => speak(currentCard.learningText);

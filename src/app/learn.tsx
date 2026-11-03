@@ -3,11 +3,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import * as Speech from "expo-speech";
 import { useCallback, useRef, useState } from "react";
-import { Alert, Modal, Pressable, StyleSheet, Switch, Text, View } from "react-native";
+import { Alert, Linking, Modal, Platform, Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import CardStack from "../components/CardStack";
 
-import { getTTSLanguageCode } from "@/constants/languages";
+import { getLanguage, getTTSLanguageCode } from "@/constants/languages";
 import { REVIEW_BATCH_SIZE } from "../config";
 import {
   deleteCard,
@@ -23,7 +23,7 @@ import { useFocusedInterval } from "../hooks/useFocusedInterval";
 import { useLearnSettings } from "../hooks/useLearnSettings";
 import { Card } from "../models/Card";
 import { CardProgress } from "../models/CardProgress";
-import { hasVoiceFor } from "../models/StudyMode";
+import { chooseVoice, hasVoiceFor } from "../utils/voices";
 import {
   loadQueue,
   pollDueCards,
@@ -62,6 +62,8 @@ export default function LearnScreen() {
   const [ttsCode, setTtsCode] = useState<string | undefined>();
   // Does this phone have a voice for the deck's language? Listening cards need one.
   const [voiceAvailable, setVoiceAvailable] = useState(true);
+  const [voiceId, setVoiceId] = useState<string | undefined>();
+  const [languageName, setLanguageName] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   // Bumped when the visible card changes so CardStack remounts cleanly
@@ -92,10 +94,14 @@ export default function LearnScreen() {
       setSelectedDeckId(String(deckId));
       const code = getTTSLanguageCode(deck?.language ?? "");
       setTtsCode(code);
+      setLanguageName(getLanguage(deck?.language ?? "")?.name ?? "");
       try {
-        setVoiceAvailable(hasVoiceFor(await Speech.getAvailableVoicesAsync(), code));
+        const voices = await Speech.getAvailableVoicesAsync();
+        setVoiceAvailable(hasVoiceFor(voices, code));
+        setVoiceId(chooseVoice(voices, code)?.identifier);
       } catch {
         setVoiceAvailable(true); // cannot tell: assume speech works
+        setVoiceId(undefined);
       }
       setHistory([]);
       setReviewedCount(0);
@@ -224,6 +230,19 @@ export default function LearnScreen() {
     });
   };
 
+  /** Opens the phone's text-to-speech settings, where voice data for a language is installed. */
+  const openVoiceSettings = async () => {
+    try {
+      if (Platform.OS === "android") await Linking.sendIntent("com.android.settings.TTS_SETTINGS");
+      else await Linking.openSettings();
+    } catch {
+      Alert.alert(
+        "Install a voice",
+        "Open Settings, search for \"Text-to-speech output\", and install the voice data for this language.",
+      );
+    }
+  };
+
   const handleAdd = () => {
     router.push({
       pathname: "/addCard",
@@ -337,6 +356,15 @@ export default function LearnScreen() {
         </Pressable>
       </View>
 
+      {!voiceAvailable && (
+        <Pressable onPress={openVoiceSettings} style={styles.voiceNotice} accessibilityRole="button">
+          <Ionicons name="volume-mute-outline" size={18} color={COLORS.accent} />
+          <Text style={styles.voiceNoticeText}>
+            No {languageName || "voice"} voice on this phone, so nothing is spoken. Tap to install one.
+          </Text>
+        </Pressable>
+      )}
+
       <View style={styles.cardArea}>
         <CardStack
           currentCard={currentCard}
@@ -345,6 +373,8 @@ export default function LearnScreen() {
           onSwipe={handleSwipe}
           onDelete={handleDelete}
           ttsCode={ttsCode}
+          ttsVoice={voiceId}
+          speechAvailable={voiceAvailable}
           autoSpeak={settings.autoSpeak}
           showRomanization={settings.showRomanization}
           listening={listening}
@@ -504,6 +534,26 @@ const styles = StyleSheet.create({
 
   gear: {
     padding: 6,
+  },
+
+  voiceNotice: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginHorizontal: 20,
+    marginBottom: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surface,
+  },
+
+  voiceNoticeText: {
+    flex: 1,
+    color: COLORS.muted,
+    fontSize: 13,
   },
 
   modalRoot: {

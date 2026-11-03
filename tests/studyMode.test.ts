@@ -1,7 +1,6 @@
 import {
     answerSideFor,
     clampLevel,
-    hasVoiceFor,
     initialLevel,
     MASTERED_START_LEVEL,
     MAX_LEVEL,
@@ -106,22 +105,10 @@ describe("levels move with answers", () => {
     });
 });
 
-describe("answer side and voices", () => {
+describe("answer side", () => {
     test("what you are asked for is the opposite of what is shown; listening asks for the meaning", () => {
         expect(answerSideFor("learning")).toBe("localized");
         expect(answerSideFor("localized")).toBe("learning");
         expect(answerSideFor("audio")).toBe("localized");
-    });
-
-    test("a voice matches by language, ignoring region and separator", () => {
-        const voices = [{ language: "en-US" }, { language: "fr_FR" }];
-        expect(hasVoiceFor(voices, "fr-FR")).toBe(true);
-        expect(hasVoiceFor(voices, "fr-CA")).toBe(true);
-        expect(hasVoiceFor(voices, "hy-AM")).toBe(false);
-        expect(hasVoiceFor(voices, undefined)).toBe(false);
-    });
-
-    test("when the device lists no voices at all we assume speech works", () => {
-        expect(hasVoiceFor([], "hy-AM")).toBe(true);
     });
 });

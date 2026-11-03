@@ -80,11 +80,3 @@ export function pickPromptSide(
 export function answerSideFor(prompt: PromptSide): "learning" | "localized" {
     return prompt === "learning" ? "localized" : prompt === "localized" ? "learning" : "localized";
 }
-
-/** True if any of the voices speaks the language (e.g. ttsCode "fr-FR" matches a "fr" voice). */
-export function hasVoiceFor(voices: readonly { language: string }[], ttsCode: string | undefined): boolean {
-    if (!ttsCode) return false;
-    if (voices.length === 0) return true; // some devices report no voices although speech works
-    const wanted = ttsCode.toLowerCase().replace("_", "-").split("-")[0];
-    return voices.some((voice) => voice.language.toLowerCase().replace("_", "-").split("-")[0] === wanted);
-}
