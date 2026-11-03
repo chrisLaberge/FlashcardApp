@@ -2,11 +2,19 @@ import {
     createEmptyCard,
     fsrs,
     Rating,
+    State,
     type Card as FsrsCard,
 } from "ts-fsrs";
+import { REVIEW_INTERVALS } from "./SpacedRepetition";
 
 export const FSRS_RETENTION = 0.9;
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** A card counts as mastered once it is in the Review state with memory stability of 3+ weeks (Anki's "mature" cutoff). */
+export const MASTERED_MIN_STABILITY_DAYS = 21;
+
+/** Floor for converted legacy cards whose old interval was under a day (the old ladder started at 1 minute). */
+const MIN_LEGACY_STABILITY_DAYS = 0.1;
 
 const scheduler = fsrs({
     request_retention: FSRS_RETENTION,
@@ -23,10 +31,28 @@ export function createNewFsrsCard(now: Date = new Date()): FsrsCard {
     return createEmptyCard(now);
 }
 
+/** True when FSRS considers the card well learned: Review state and stability of at least 21 days. */
+export function isMastered(card: FsrsCard): boolean {
+    return card.state === State.Review && card.stability >= MASTERED_MIN_STABILITY_DAYS;
+}
+
 /**
- * Legacy progress has no complete review history, so this is an estimate.
- * It keeps the old due date and review count rather than treating every
- * existing card as entirely new. FSRS becomes authoritative after this review.
+ * The interval (in days) the old fixed-ladder scheduler gave a card with this review count.
+ * A card with review count n was last scheduled REVIEW_INTERVALS[n - 1] ahead.
+ */
+export function legacyIntervalDays(reviewCount: number): number {
+    const index = Math.min(Math.max(reviewCount, 1) - 1, REVIEW_INTERVALS.length - 1);
+    return REVIEW_INTERVALS[index] / DAY_MS;
+}
+
+/**
+ * Converts legacy (pre-FSRS) progress into an FSRS card. There is no review history, so this
+ * is an estimate, but it is anchored on what the old scheduler actually promised:
+ *  - stability  = the interval the old ladder gave the card (never the time left until it is
+ *                 due, which is zero or negative for any card that is actually being reviewed),
+ *  - last_review = due date minus that interval,
+ * so a card the old scheduler had at 60 days is still a 60-day card when it comes due.
+ * FSRS becomes authoritative from the first review onwards.
  */
 export function migrateLegacyFsrsCard(
     reviewCount: number,
@@ -39,21 +65,21 @@ export function migrateLegacyFsrsCard(
         return card;
     }
 
-    const remainingDays = nextReviewAt === undefined
-        ? 1
-        : Math.max(0.1, (nextReviewAt - now.getTime()) / DAY_MS);
+    const intervalDays = Math.max(MIN_LEGACY_STABILITY_DAYS, legacyIntervalDays(reviewCount));
+    const dueMs = nextReviewAt ?? now.getTime();
+    const lastReview = new Date(Math.min(dueMs - intervalDays * DAY_MS, now.getTime()));
 
     return {
         ...card,
-        due: nextReviewAt === undefined ? now : new Date(nextReviewAt),
-        stability: remainingDays,
+        due: new Date(dueMs),
+        stability: intervalDays,
         difficulty: 5,
-        elapsed_days: 0,
-        scheduled_days: remainingDays,
+        elapsed_days: Math.max(0, Math.floor((now.getTime() - lastReview.getTime()) / DAY_MS)),
+        scheduled_days: Math.round(intervalDays),
         reps: reviewCount,
         lapses: 0,
-        state: 2 as FsrsCard["state"],
-        last_review: now,
+        state: State.Review,
+        last_review: lastReview,
     };
 }
 

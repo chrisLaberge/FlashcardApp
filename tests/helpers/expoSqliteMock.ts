@@ -18,10 +18,11 @@ type MockState = {
     nextFile: string | null;
     opened: DatabaseSync[];
     openCalls: number;
+    failNextOpen: boolean;
 };
 
 const g = globalThis as typeof globalThis & { __sqliteMock?: MockState };
-const state: MockState = (g.__sqliteMock ??= { nextFile: null, opened: [], openCalls: 0 });
+const state: MockState = (g.__sqliteMock ??= { nextFile: null, opened: [], openCalls: 0, failNextOpen: false });
 
 function bindable(params: SqlParams): never[] {
     // expo-sqlite accepts either variadic params or a single array.
@@ -59,6 +60,10 @@ export async function openDatabaseAsync(_name: string) {
     state.openCalls += 1;
     // Yield once, like the real native call, so concurrent callers can interleave.
     await Promise.resolve();
+    if (state.failNextOpen) {
+        state.failNextOpen = false;
+        throw new Error("simulated open failure");
+    }
     const raw = new DatabaseSync(state.nextFile ?? ":memory:");
     state.opened.push(raw);
     return new MockSQLiteDatabase(raw);
@@ -68,6 +73,10 @@ export async function openDatabaseAsync(_name: string) {
 
 export function __useFile(file: string | null) {
     state.nextFile = file;
+}
+
+export function __failNextOpen() {
+    state.failNextOpen = true;
 }
 
 export function __openCalls() {
@@ -91,4 +100,5 @@ export function __reset() {
     state.opened = [];
     state.openCalls = 0;
     state.nextFile = null;
+    state.failNextOpen = false;
 }

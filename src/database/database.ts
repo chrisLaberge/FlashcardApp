@@ -1,6 +1,7 @@
 import { CardProgress } from "@/models/CardProgress";
 import {
     deserializeFsrsCard,
+    isMastered,
     migrateLegacyFsrsCard,
     scheduleFsrsReview,
     serializeFsrsCard,
@@ -8,11 +9,25 @@ import {
 import * as SQLite from "expo-sqlite";
 import { Card } from "../models/Card";
 
-let db: SQLite.SQLiteDatabase | null = null;
+let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
-async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
-    if (!db) {
-        db = await SQLite.openDatabaseAsync("flashcards.db");
+/**
+ * The connection is shared through a memoised *promise*, so callers that arrive while the
+ * database is still opening (e.g. two screens mounting together) all wait for the same
+ * connection instead of each opening and initialising their own. A failed start is not
+ * cached, so the next call retries.
+ */
+function getDatabase(): Promise<SQLite.SQLiteDatabase> {
+    dbPromise ??= openAndPrepareDatabase().catch((error) => {
+        dbPromise = null;
+        throw error;
+    });
+    return dbPromise;
+}
+
+async function openAndPrepareDatabase(): Promise<SQLite.SQLiteDatabase> {
+    const db = await SQLite.openDatabaseAsync("flashcards.db");
+    try {
         await db.execAsync(`
             PRAGMA foreign_keys = ON;
             CREATE TABLE IF NOT EXISTS decks (
@@ -68,6 +83,9 @@ async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
             INSERT OR IGNORE INTO card_progress (card_id)
             SELECT id FROM cards
         `);
+    } catch (error) {
+        await db.closeAsync().catch(() => undefined);
+        throw error;
     }
     return db;
 }
@@ -270,7 +288,7 @@ async function reviewCard(cardId: number, direction: "left" | "right") {
         cardId,
         nextReviewCount,
         dueTime,
-        nextReviewCount >= 8,
+        isMastered(scheduledCard),
         serializeFsrsCard(scheduledCard),
         now.getTime(),
     );
@@ -284,12 +302,20 @@ export async function markCardIncorrect(cardId: number) {
     await reviewCard(cardId, "left");
 }
 
+/**
+ * The ONE definition of "due", used by the learn queue and every count so they cannot
+ * disagree. A card is due when it has never been scheduled or its due time has passed.
+ * "Mastered" has no say: a mastered card that comes due is reviewed like any other.
+ * Takes one bound parameter: the current time in ms.
+ */
+const IS_DUE = "(card_progress.next_review_at IS NULL OR card_progress.next_review_at <= ?)";
+
 export async function getDueCards(deckId: number): Promise<Card[]> {
     const database = await getDatabase();
     const rows = await database.getAllAsync<CardRow>(`
         SELECT cards.id, cards.learning_text, cards.localized_text, cards.example_sentence, cards.romanization
         FROM cards JOIN card_progress ON cards.id = card_progress.card_id
-        WHERE cards.deck_id = ? AND (card_progress.next_review_at IS NULL OR card_progress.next_review_at <= ?)
+        WHERE cards.deck_id = ? AND ${IS_DUE}
         ORDER BY COALESCE(card_progress.next_review_at, 0), cards.id
     `, deckId, Date.now());
     return rows.map(mapCard);
@@ -299,21 +325,28 @@ export async function getDueCardCount(): Promise<number> {
     const database = await getDatabase();
     const row = await database.getFirstAsync<{ count: number }>(`
         SELECT COUNT(*) AS count FROM cards JOIN card_progress ON cards.id = card_progress.card_id
-        WHERE card_progress.next_review_at IS NULL OR card_progress.next_review_at <= ?
+        WHERE ${IS_DUE}
     `, Date.now());
     return row?.count ?? 0;
 }
 
+/**
+ * Splits a deck into three groups that always add up to the deck size (the home screen
+ * draws them as one proportional bar):
+ *  - due:       every card that is due now (new, overdue, or a mastered card that came due)
+ *  - practiced: scheduled for later and not mastered
+ *  - mastered:  scheduled for later and mastered
+ */
 export async function getProgressCounts(deckId: number): Promise<{ due: number; practiced: number; mastered: number }> {
     const database = await getDatabase();
     const now = Date.now();
     const row = await database.getFirstAsync<{ due: number | null; practiced: number | null; mastered: number | null }>(`
         SELECT
-          SUM(CASE WHEN cp.mastered = 0 AND (cp.next_review_at IS NULL OR cp.next_review_at <= ?) THEN 1 ELSE 0 END) AS due,
-          SUM(CASE WHEN cp.review_count > 0 AND cp.mastered = 0 AND cp.next_review_at > ? THEN 1 ELSE 0 END) AS practiced,
-          SUM(CASE WHEN cp.mastered = 1 THEN 1 ELSE 0 END) AS mastered
-        FROM cards JOIN card_progress cp ON cards.id = cp.card_id WHERE cards.deck_id = ?
-    `, now, now, deckId);
+          SUM(CASE WHEN ${IS_DUE} THEN 1 ELSE 0 END) AS due,
+          SUM(CASE WHEN NOT ${IS_DUE} AND card_progress.mastered = 0 THEN 1 ELSE 0 END) AS practiced,
+          SUM(CASE WHEN NOT ${IS_DUE} AND card_progress.mastered = 1 THEN 1 ELSE 0 END) AS mastered
+        FROM cards JOIN card_progress ON cards.id = card_progress.card_id WHERE cards.deck_id = ?
+    `, now, now, now, deckId);
     return { due: row?.due ?? 0, practiced: row?.practiced ?? 0, mastered: row?.mastered ?? 0 };
 }
 
