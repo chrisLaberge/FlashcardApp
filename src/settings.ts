@@ -6,12 +6,18 @@ export type LearnSettings = {
     autoSpeak: boolean;
     /** Show the romanization under the learning text. */
     showRomanization: boolean;
+    /**
+     * Allow listening-only reviews (sound, no text) for well-known cards. Off: those reviews show
+     * the learning word instead. Needs automatic pronunciation to be on.
+     */
+    listeningCards: boolean;
 };
 
 /** Defaults match how the app behaved before these settings existed. */
 export const DEFAULT_LEARN_SETTINGS: LearnSettings = {
     autoSpeak: true,
     showRomanization: true,
+    listeningCards: true,
 };
 
 export const LEARN_SETTINGS_KEY = "learnSettings";
@@ -27,6 +33,10 @@ export async function loadLearnSettings(): Promise<LearnSettings> {
                 typeof parsed.showRomanization === "boolean"
                     ? parsed.showRomanization
                     : DEFAULT_LEARN_SETTINGS.showRomanization,
+            listeningCards:
+                typeof parsed.listeningCards === "boolean"
+                    ? parsed.listeningCards
+                    : DEFAULT_LEARN_SETTINGS.listeningCards,
         };
     } catch {
         return DEFAULT_LEARN_SETTINGS; // unreadable or corrupt: fall back rather than break the screen

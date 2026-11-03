@@ -6,6 +6,7 @@ export class CardProgress {
     mastered: boolean;
     fsrsCard?: string;
     lastReviewAt?: number;
+    level: number;
 
     constructor(
         cardId: number,
@@ -15,6 +16,7 @@ export class CardProgress {
         id?: number,
         fsrsCard?: string,
         lastReviewAt?: number,
+        level: number = 0,
     ) {
         this.cardId = cardId;
         this.reviewCount = reviewCount;
@@ -23,5 +25,6 @@ export class CardProgress {
         this.id = id;
         this.fsrsCard = fsrsCard;
         this.lastReviewAt = lastReviewAt;
+        this.level = level;
     }
 }

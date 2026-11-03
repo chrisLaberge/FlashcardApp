@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import * as Speech from "expo-speech";
 import { useCallback, useRef, useState } from "react";
 import { Alert, Modal, Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -22,6 +23,7 @@ import { useFocusedInterval } from "../hooks/useFocusedInterval";
 import { useLearnSettings } from "../hooks/useLearnSettings";
 import { Card } from "../models/Card";
 import { CardProgress } from "../models/CardProgress";
+import { hasVoiceFor } from "../models/StudyMode";
 import {
   loadQueue,
   pollDueCards,
@@ -58,6 +60,8 @@ export default function LearnScreen() {
 
   const [selectedDeckId, setSelectedDeckId] = useState<string | undefined>();
   const [ttsCode, setTtsCode] = useState<string | undefined>();
+  // Does this phone have a voice for the deck's language? Listening cards need one.
+  const [voiceAvailable, setVoiceAvailable] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   // Bumped when the visible card changes so CardStack remounts cleanly
@@ -86,7 +90,13 @@ export default function LearnScreen() {
       const deck = decks.find((d) => d.id === deckId);
 
       setSelectedDeckId(String(deckId));
-      setTtsCode(getTTSLanguageCode(deck?.language ?? ""));
+      const code = getTTSLanguageCode(deck?.language ?? "");
+      setTtsCode(code);
+      try {
+        setVoiceAvailable(hasVoiceFor(await Speech.getAvailableVoicesAsync(), code));
+      } catch {
+        setVoiceAvailable(true); // cannot tell: assume speech works
+      }
       setHistory([]);
       setReviewedCount(0);
       setCorrectCount(0);
@@ -162,8 +172,12 @@ export default function LearnScreen() {
 
       // Snapshot progress so the swipe can be undone
       const previousProgress = await getCardProgress(card.id);
-      if (direction === "left") await markCardIncorrect(card.id);
-      else await markCardCorrect(card.id);
+      const newLevel =
+        direction === "left"
+          ? await markCardIncorrect(card.id)
+          : await markCardCorrect(card.id);
+      // The card may be shown again this session (after Again): it must use its new level.
+      if (newLevel !== undefined) card.level = newLevel;
 
       queue.answer(direction);
       setHistory((h) => [...h, { card, direction, previousProgress }]);
@@ -178,7 +192,10 @@ export default function LearnScreen() {
       if (!last) return;
 
       // Restore the DB progress to what it was before the swipe
-      if (last.previousProgress) await restoreCardProgress(last.previousProgress);
+      if (last.previousProgress) {
+        await restoreCardProgress(last.previousProgress);
+        last.card.level = last.previousProgress.level;
+      }
 
       queue.undo(last.card);
       setHistory((h) => h.slice(0, -1));
@@ -225,6 +242,9 @@ export default function LearnScreen() {
   const addButton = <ActionButton label="+ Add" onPress={handleAdd} />;
 
   /* --------------------------------- Screens -------------------------------- */
+
+  // Listening-only cards need sound: switched on, automatic pronunciation on, and a voice for the language.
+  const listening = settings.listeningCards && settings.autoSpeak && voiceAvailable;
 
   // Wait for the stored settings so the first card does not speak when auto-speak is off.
   if (!loadedOnce || !settingsLoaded) {
@@ -327,6 +347,7 @@ export default function LearnScreen() {
           ttsCode={ttsCode}
           autoSpeak={settings.autoSpeak}
           showRomanization={settings.showRomanization}
+          listening={listening}
         />
       </View>
 
@@ -360,6 +381,18 @@ export default function LearnScreen() {
               hint="Pinyin, romaji and similar under the word."
               value={settings.showRomanization}
               onChange={(showRomanization) => updateSettings({ showRomanization })}
+            />
+            <SettingRow
+              label="Listening reviews"
+              hint={
+                !settings.autoSpeak
+                  ? "Needs automatic pronunciation. Off: the word is shown instead."
+                  : !voiceAvailable
+                    ? "No voice for this language on this phone, so the word is shown instead."
+                    : "Sometimes play only the sound, with no text, for words you know well. Off: the word is shown instead."
+              }
+              value={settings.listeningCards}
+              onChange={(listeningCards) => updateSettings({ listeningCards })}
             />
 
             <Pressable
