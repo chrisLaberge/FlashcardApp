@@ -7,7 +7,7 @@ import { Alert, Linking, Modal, Platform, Pressable, StyleSheet, Switch, Text, V
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import CardStack from "../components/CardStack";
 
-import { getLanguage, getTTSLanguageCode } from "@/constants/languages";
+import { getLanguage, getRemoteVoice, getTTSLanguageCode } from "@/constants/languages";
 import { REVIEW_BATCH_SIZE } from "../config";
 import {
   deleteCard,
@@ -65,6 +65,8 @@ export default function LearnScreen() {
   const [voiceAvailable, setVoiceAvailable] = useState(true);
   const [voiceId, setVoiceId] = useState<string | undefined>();
   const [languageName, setLanguageName] = useState("");
+  // Languages the phone cannot speak get their audio from the server instead.
+  const [remoteVoice, setRemoteVoice] = useState<string | undefined>();
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   // Bumped when the visible card changes so CardStack remounts cleanly
@@ -102,13 +104,21 @@ export default function LearnScreen() {
       const code = getTTSLanguageCode(deck?.language ?? "");
       setTtsCode(code);
       setLanguageName(getLanguage(deck?.language ?? "")?.name ?? "");
-      try {
-        const voices = await Speech.getAvailableVoicesAsync();
-        setVoiceAvailable(hasVoiceFor(voices, code));
-        setVoiceId(chooseVoice(voices, code)?.identifier);
-      } catch {
-        setVoiceAvailable(true); // cannot tell: assume speech works
+      const remote = getRemoteVoice(deck?.language ?? "");
+      setRemoteVoice(remote);
+      if (remote) {
+        // The server speaks this language: no need to look at the phone's voices.
+        setVoiceAvailable(true);
         setVoiceId(undefined);
+      } else {
+        try {
+          const voices = await Speech.getAvailableVoicesAsync();
+          setVoiceAvailable(hasVoiceFor(voices, code));
+          setVoiceId(chooseVoice(voices, code)?.identifier);
+        } catch {
+          setVoiceAvailable(true); // cannot tell: assume speech works
+          setVoiceId(undefined);
+        }
       }
       setHistory([]);
       setReviewedCount(0);
@@ -382,6 +392,7 @@ export default function LearnScreen() {
           onDelete={handleDelete}
           ttsCode={ttsCode}
           ttsVoice={voiceId}
+          remoteVoice={remoteVoice}
           speechAvailable={voiceAvailable}
           autoSpeak={settings.autoSpeak}
           showRomanization={settings.showRomanization}

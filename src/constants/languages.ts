@@ -5,6 +5,11 @@ export type Language = {
     code: string;
     ttsCode: string;
     flag: string;
+    /**
+     * For languages the phone has no voice for: speech comes from the server instead (see
+     * services/tts.ts) and is kept on the phone. `remoteVoice` is the voice id the server knows.
+     */
+    speech?: { remoteVoice: string };
 };
 
 export const languages: Language[] = [
@@ -70,8 +75,10 @@ export const languages: Language[] = [
     { name: "Norwegian", nativeName: "Norsk", code: "no", ttsCode: "nb-NO", flag: "🇳🇴" },
     { name: "Slovak", nativeName: "Slovenčina", code: "sk", ttsCode: "sk-SK", flag: "🇸🇰" },
     { name: "Georgian", nativeName: "ქართული", code: "ka", ttsCode: "ka-GE", flag: "🇬🇪" },
-    { name: "Armenian (Eastern)", nativeName: "Հայերեն", code: "hy", ttsCode: "hy-AM", flag: "🇦🇲" },
-    //{ name: "Armenian (Western)", nativeName: "Արևմտահայերեն", code: "hy", ttsCode: "hy-AM", flag: "🇦🇲" },
+    // Western Armenian: phones only have (at best) Eastern voices, so speech comes from the server.
+    // Translation and romanization still use code "hy". Eastern Armenian is not offered separately
+    // because both would share the code "hy" (decks store the code).
+    { name: "Armenian (Western)", nativeName: "Արևմտահայերեն", code: "hy", ttsCode: "hy-AM", flag: "🇦🇲", speech: { remoteVoice: "hyw" } },
 
     { name: "Lithuanian", nativeName: "Lietuvių", code: "lt", ttsCode: "lt-LT", flag: "🇱🇹" },
     { name: "Catalan", nativeName: "Català", code: "ca", ttsCode: "ca-ES", flag: "🇪🇸" },
@@ -92,3 +99,6 @@ export const getLanguage = (code: string): Language | undefined =>
 export const getTTSLanguageCode = (code: string): string | undefined =>
     languages.find((l) => l.code === code)?.ttsCode;
 
+/** The server voice for a language, if it has one (see Language.speech). */
+export const getRemoteVoice = (code: string): string | undefined =>
+    languages.find((l) => l.code === code)?.speech?.remoteVoice;

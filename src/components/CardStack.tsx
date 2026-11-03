@@ -20,6 +20,7 @@ import {
 } from "react-native";
 import KeyboardInsetView from "./KeyboardInsetView";
 import { Card } from "../models/Card";
+import { prefetchSpeech, speakRemote, stopRemoteSpeech } from "@/services/tts";
 import { answerSideFor, pickPromptSide, type PromptSide } from "../models/StudyMode";
 import { fitText } from "../utils/textFit";
 
@@ -545,6 +546,8 @@ interface CardStackProps {
     ttsCode?: string;
     /** Exact voice to use (see utils/voices). Without one the phone picks by language. */
     ttsVoice?: string;
+    /** Voice id on the server, for languages the phone cannot speak (takes the place of the phone's voice). */
+    remoteVoice?: string;
     /** False when the phone has no voice for the language: nothing is spoken rather than a wrong voice. */
     speechAvailable?: boolean;
     cardKey: number;
@@ -564,6 +567,7 @@ export default function CardStack({
     cardKey,
     ttsCode,
     ttsVoice,
+    remoteVoice,
     speechAvailable = true,
     autoSpeak = true,
     showRomanization = true,
@@ -588,6 +592,7 @@ export default function CardStack({
                 nextSide={nextCard ? sides.get(nextCard) : "learning"}
                 ttsCode={ttsCode}
                 ttsVoice={ttsVoice}
+                remoteVoice={remoteVoice}
                 speechAvailable={speechAvailable}
                 autoSpeak={autoSpeak}
                 showRomanization={showRomanization}
@@ -609,6 +614,7 @@ interface ActiveCardsProps {
     nextSide: PromptSide;
     ttsCode?: string;
     ttsVoice?: string;
+    remoteVoice?: string;
     speechAvailable: boolean;
     autoSpeak: boolean;
     showRomanization: boolean;
@@ -623,6 +629,7 @@ function ActiveCards({
     nextSide,
     ttsCode,
     ttsVoice,
+    remoteVoice,
     speechAvailable,
     autoSpeak,
     showRomanization,
@@ -670,6 +677,10 @@ function ActiveCards({
 
     const speak = (text: string) => {
         Speech.stop();
+        if (remoteVoice) {
+            void speakRemote(remoteVoice, text);
+            return;
+        }
         // No voice for this language: stay silent instead of an English voice reading it letter by letter.
         if (!speechAvailable) return;
         Speech.speak(text, { language: ttsCode, voice: ttsVoice, rate: 1.0 });
@@ -680,6 +691,12 @@ function ActiveCards({
     const exampleText = currentCard.exampleSentence?.trim();
 
     // Read the learning text aloud whenever it becomes visible.
+    // Fetch the next card's audio ahead of time so it plays at once when it arrives.
+    const nextText = nextCard?.learningText;
+    useEffect(() => {
+        if (remoteVoice && nextText) prefetchSpeech(remoteVoice, nextText);
+    }, [remoteVoice, nextText]);
+
     const learningIsVisible = promptSide === "learning" ? !flipped : flipped;
 
     // A listening card must be heard, whatever the automatic-pronunciation setting says.
@@ -690,6 +707,7 @@ function ActiveCards({
 
         return () => {
             Speech.stop();
+            stopRemoteSpeech();
         };
     }, [currentCard.id, speakOnAppear]);
 
