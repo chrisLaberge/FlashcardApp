@@ -553,7 +553,8 @@ interface CardStackProps {
     showRomanization?: boolean;
     /** Allow listening-only cards. Off: those reviews show the learning word instead. */
     listening?: boolean;
-    onSwipe: (direction: Direction) => void;
+    /** `prompt` is what the front of the card showed, for the review log. */
+    onSwipe: (direction: Direction, prompt: PromptSide) => void;
     onDelete: () => void;
 }
 
@@ -572,9 +573,9 @@ export default function CardStack({
 }: CardStackProps) {
     const sides = usePromptSides(listening);
 
-    const handleSwipe = (direction: Direction) => {
+    const handleSwipe = (direction: Direction, prompt: PromptSide) => {
         sides.forget(currentCard);
-        onSwipe(direction);
+        onSwipe(direction, prompt);
     };
 
     return (
@@ -611,7 +612,7 @@ interface ActiveCardsProps {
     speechAvailable: boolean;
     autoSpeak: boolean;
     showRomanization: boolean;
-    onSwipe: (direction: Direction) => void;
+    onSwipe: (direction: Direction, prompt: PromptSide) => void;
     onDelete: () => void;
 }
 
@@ -641,7 +642,7 @@ function ActiveCards({
     const { flipped, flip, frontStyle, backStyle } = useFlip();
     const gestures = useCardGestures({
         canSwipe: flipped,
-        onSwipe,
+        onSwipe: (direction) => onSwipe(direction, promptSide),
         onDelete,
         onTap: flip,
     });

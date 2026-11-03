@@ -17,12 +17,13 @@ import {
   getDueCardIds,
   markCardCorrect,
   markCardIncorrect,
-  restoreCardProgress,
+  undoCardReview,
 } from "../database/database";
 import { useFocusedInterval } from "../hooks/useFocusedInterval";
 import { useLearnSettings } from "../hooks/useLearnSettings";
 import { Card } from "../models/Card";
 import { CardProgress } from "../models/CardProgress";
+import type { PromptSide } from "../models/StudyMode";
 import { chooseVoice, hasVoiceFor } from "../utils/voices";
 import {
   loadQueue,
@@ -73,6 +74,9 @@ export default function LearnScreen() {
   // True while an answer / undo / delete is being saved: further gestures are ignored.
   const busy = useRef(false);
 
+  // When the card now on screen appeared, to log how long each answer took.
+  const shownAt = useRef(0); // set by show() whenever a card appears
+
   /* --------------------------------- Loading -------------------------------- */
 
   /** Copies the queue into screen state. `remount` restarts the card (needed whenever the card on screen changes). */
@@ -80,7 +84,10 @@ export default function LearnScreen() {
     (remount: boolean) => {
       setCurrentCard(queue.current);
       setNextCard(queue.peekNext());
-      if (remount) setCardKey((k) => k + 1);
+      if (remount) {
+        shownAt.current = Date.now();
+        setCardKey((k) => k + 1);
+      }
     },
     [queue],
   );
@@ -171,17 +178,18 @@ export default function LearnScreen() {
     if (queue.upcomingCount < REFILL_BELOW) void refresh("tick");
   };
 
-  const handleSwipe = (direction: "left" | "right") =>
+  const handleSwipe = (direction: "left" | "right", prompt: PromptSide) =>
     runExclusive(async () => {
       const card = queue.current;
       if (card?.id === undefined) return;
 
       // Snapshot progress so the swipe can be undone
       const previousProgress = await getCardProgress(card.id);
+      const info = { prompt, durationMs: Date.now() - shownAt.current };
       const newLevel =
         direction === "left"
-          ? await markCardIncorrect(card.id)
-          : await markCardCorrect(card.id);
+          ? await markCardIncorrect(card.id, info)
+          : await markCardCorrect(card.id, info);
       // The card may be shown again this session (after Again): it must use its new level.
       if (newLevel !== undefined) card.level = newLevel;
 
@@ -199,7 +207,7 @@ export default function LearnScreen() {
 
       // Restore the DB progress to what it was before the swipe
       if (last.previousProgress) {
-        await restoreCardProgress(last.previousProgress);
+        await undoCardReview(last.previousProgress);
         last.card.level = last.previousProgress.level;
       }
 

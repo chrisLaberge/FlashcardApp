@@ -43,7 +43,7 @@ describe("startup and schema", () => {
             .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
             .all()
             .map((r) => (r as { name: string }).name);
-        expect(tables).toEqual(["card_progress", "cards", "decks", "images"]);
+        expect(tables).toEqual(["card_progress", "cards", "decks", "images", "review_log"]);
     });
 
     test("upgrades a pre-FSRS database without losing progress", async () => {

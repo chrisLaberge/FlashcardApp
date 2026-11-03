@@ -70,6 +70,22 @@ async function openAndPrepareDatabase(): Promise<SQLite.SQLiteDatabase> {
                 level INTEGER NOT NULL DEFAULT 0,
                 FOREIGN KEY(card_id) REFERENCES cards(id) ON DELETE CASCADE
             );
+            -- One row per answer. Kept even after a card or deck is deleted, so history (time spent,
+            -- streaks, stats) is never lost. There is deliberately no foreign key.
+            CREATE TABLE IF NOT EXISTS review_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                card_id INTEGER NOT NULL,
+                deck_id INTEGER,
+                reviewed_at INTEGER NOT NULL,
+                correct INTEGER NOT NULL,
+                level_before INTEGER NOT NULL,
+                level_after INTEGER NOT NULL,
+                prompt TEXT,
+                duration_ms INTEGER,
+                due_at INTEGER
+            );
+            CREATE INDEX IF NOT EXISTS idx_review_log_time ON review_log(reviewed_at);
+            CREATE INDEX IF NOT EXISTS idx_review_log_card ON review_log(card_id);
             CREATE INDEX IF NOT EXISTS idx_cards_deck ON cards(deck_id);
             CREATE INDEX IF NOT EXISTS idx_progress_due ON card_progress(next_review_at);
         `);
@@ -312,8 +328,70 @@ export async function restoreCardProgress(progress: CardProgress) {
         progress.fsrsCard ?? null, progress.lastReviewAt ?? null, clampLevel(progress.level), progress.cardId);
 }
 
-/** Saves the answer and returns the card's new study level. */
-async function reviewCard(cardId: number, direction: "left" | "right"): Promise<number | undefined> {
+/** What the learn screen knows about an answer, kept in the review log. */
+export type ReviewInfo = {
+    /** What the front of the card showed: the word, the meaning, or only the sound. */
+    prompt?: "learning" | "localized" | "audio";
+    /** How long the card was on screen before it was answered. */
+    durationMs?: number;
+};
+
+/** A single answer is never counted as more than this (an app left open must not inflate study time). */
+export const MAX_REVIEW_DURATION_MS = 60_000;
+
+/** Saves the answer and its log entry together, and returns the card's new study level. */
+async function reviewCard(cardId: number, direction: "left" | "right", info: ReviewInfo = {}): Promise<number | undefined> {
+    const database = await getDatabase();
+    let newLevel: number | undefined;
+    await database.withTransactionAsync(async () => {
+        newLevel = await applyReview(cardId, direction, info);
+    });
+    return newLevel;
+}
+
+/** Undo: puts the card's progress back exactly as it was and removes the answer from the review log. */
+export async function undoCardReview(progress: CardProgress) {
+    const database = await getDatabase();
+    await database.withTransactionAsync(async () => {
+        await restoreCardProgress(progress);
+        await database.runAsync(
+            "DELETE FROM review_log WHERE id = (SELECT MAX(id) FROM review_log WHERE card_id = ?)",
+            progress.cardId,
+        );
+    });
+}
+
+export type ReviewLogEntry = {
+    cardId: number;
+    deckId: number | null;
+    reviewedAt: number;
+    correct: boolean;
+    durationMs: number | null;
+    prompt: string | null;
+};
+
+/** Answers since a point in time (default: all), oldest first. Feeds streaks, stats and time spent. */
+export async function getReviewLog(sinceMs = 0, deckId?: number): Promise<ReviewLogEntry[]> {
+    const database = await getDatabase();
+    const rows = await database.getAllAsync<{
+        card_id: number; deck_id: number | null; reviewed_at: number; correct: number;
+        duration_ms: number | null; prompt: string | null;
+    }>(`
+        SELECT card_id, deck_id, reviewed_at, correct, duration_ms, prompt FROM review_log
+        WHERE reviewed_at >= ? AND (? IS NULL OR deck_id = ?)
+        ORDER BY reviewed_at, id
+    `, sinceMs, deckId ?? null, deckId ?? null);
+    return rows.map((row) => ({
+        cardId: row.card_id,
+        deckId: row.deck_id,
+        reviewedAt: row.reviewed_at,
+        correct: row.correct === 1,
+        durationMs: row.duration_ms,
+        prompt: row.prompt,
+    }));
+}
+
+async function applyReview(cardId: number, direction: "left" | "right", info: ReviewInfo): Promise<number | undefined> {
     const progress = await getCardProgress(cardId);
     if (!progress) return undefined;
 
@@ -338,15 +416,26 @@ async function reviewCard(cardId: number, direction: "left" | "right"): Promise<
         now.getTime(),
         level,
     );
+
+    const database = await getDatabase();
+    const deck = await database.getFirstAsync<{ deck_id: number }>("SELECT deck_id FROM cards WHERE id = ?", cardId);
+    const duration = info.durationMs === undefined
+        ? null
+        : Math.round(Math.min(Math.max(info.durationMs, 0), MAX_REVIEW_DURATION_MS));
+    await database.runAsync(`
+        INSERT INTO review_log (card_id, deck_id, reviewed_at, correct, level_before, level_after, prompt, duration_ms, due_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, cardId, deck?.deck_id ?? null, now.getTime(), direction === "right" ? 1 : 0,
+        progress.level, level, info.prompt ?? null, duration, dueTime);
     return level;
 }
 
-export async function markCardCorrect(cardId: number) {
-    return reviewCard(cardId, "right");
+export async function markCardCorrect(cardId: number, info?: ReviewInfo) {
+    return reviewCard(cardId, "right", info);
 }
 
-export async function markCardIncorrect(cardId: number) {
-    return reviewCard(cardId, "left");
+export async function markCardIncorrect(cardId: number, info?: ReviewInfo) {
+    return reviewCard(cardId, "left", info);
 }
 
 /**
