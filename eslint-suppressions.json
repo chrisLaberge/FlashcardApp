@@ -1,0 +1,40 @@
+{
+  "src/app/addCard.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/app/editCard.tsx": {
+    "react/no-unescaped-entities": {
+      "count": 1
+    }
+  },
+  "src/app/import.tsx": {
+    "react-hooks/refs": {
+      "count": 4
+    }
+  },
+  "src/app/index.tsx": {
+    "react-hooks/refs": {
+      "count": 4
+    }
+  },
+  "src/app/learn.tsx": {
+    "react-hooks/purity": {
+      "count": 2
+    },
+    "react/no-unescaped-entities": {
+      "count": 2
+    }
+  },
+  "src/components/CardStack.tsx": {
+    "react-hooks/refs": {
+      "count": 18
+    }
+  },
+  "src/hooks/use-color-scheme.web.ts": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  }
+}
