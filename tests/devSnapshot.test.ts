@@ -77,14 +77,17 @@ describe("dev snapshot: what the app shows at export time", () => {
         expect(masteredInQueue).toBe(23);
     });
 
-    test("the home screen currently counts 97 due cards, hiding the 23 mastered ones", async () => {
+    test("the home screen counts the same 120 due cards the learn queue holds", async () => {
         const { db, deckId } = await loadSnapshot();
-        expect((await db.getProgressCounts(deckId)).due).toBe(97);
+        const counts = await db.getProgressCounts(deckId);
+        expect(counts.due).toBe((await db.getDueCards(deckId)).length);
+        expect(counts.due).toBe(120);
     });
 
-    test.failing("KNOWN BUG: home due count equals the learn queue length on real data", async () => {
+    test("To learn + Practiced + Mastered add up to all 190 cards", async () => {
         const { db, deckId } = await loadSnapshot();
-        expect((await db.getProgressCounts(deckId)).due).toBe((await db.getDueCards(deckId)).length);
+        const { due, practiced, mastered } = await db.getProgressCounts(deckId);
+        expect(due + practiced + mastered).toBe(190);
     });
 });
 
@@ -105,7 +108,7 @@ describe("dev snapshot: migrating legacy progress", () => {
         }
     });
 
-    test.failing("KNOWN BUG: answering Good on a due legacy card does not shrink an interval of a week or more", () => {
+    test("answering Good on a due legacy card does not shrink an interval of a week or more", () => {
         const longCards = legacyRows.filter((r) => isDue(r) && r.review_count >= 8); // old interval >= 7 days
         expect(longCards.length).toBeGreaterThan(0);
         for (const row of longCards) {

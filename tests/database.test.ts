@@ -5,7 +5,9 @@ import {
     advanceTime,
     DAY,
     DatabaseModule,
+    failNextOpen,
     freezeTime,
+    HOUR,
     makeTempDir,
     MINUTE,
     openCalls,
@@ -74,7 +76,15 @@ describe("startup and schema", () => {
         }
     });
 
-    test.failing("KNOWN BUG: two screens asking at once open the database only once", async () => {
+    test("a failed start is not cached: the next call retries and works", async () => {
+        const db = startApp();
+        failNextOpen();
+        await expect(db.getDecks()).rejects.toThrow("simulated open failure");
+        await expect(db.getDecks()).resolves.toEqual([]);
+        expect(openCalls()).toBe(2);
+    });
+
+    test("two screens asking at once open the database only once", async () => {
         const db = startApp();
         await Promise.all([db.getDecks(), db.getDecks()]);
         expect(openCalls()).toBe(1);
@@ -258,6 +268,28 @@ describe("due cards and counts", () => {
         expect(await db.getProgressCounts(deckId)).toEqual({ due: 2, practiced: 1, mastered: 1 });
     });
 
+    test("due + practiced + mastered always add up to the deck size", async () => {
+        const { db, deckId } = await newDeckWithCards(0);
+        const raw = rawDb();
+        seedCard(raw, deckId, 1); // new
+        seedCard(raw, deckId, 2, { review_count: 4, next_review_at: T0 - DAY }); // overdue
+        seedCard(raw, deckId, 3, { review_count: 4, next_review_at: T0 + DAY }); // practiced
+        seedCard(raw, deckId, 4, { review_count: 9, next_review_at: T0 + 30 * DAY, mastered: 1 }); // mastered
+        seedCard(raw, deckId, 5, { review_count: 9, next_review_at: T0 - DAY, mastered: 1 }); // mastered but due
+        const counts = await db.getProgressCounts(deckId);
+        expect(counts).toEqual({ due: 3, practiced: 1, mastered: 1 });
+        expect(counts.due + counts.practiced + counts.mastered).toBe(5);
+    });
+
+    test("a mastered card that comes due moves from Mastered to To learn on its due date", async () => {
+        const { db, deckId } = await newDeckWithCards(0);
+        seedCard(rawDb(), deckId, 1, { review_count: 9, next_review_at: T0 + 1 * HOUR, mastered: 1 });
+        expect(await db.getProgressCounts(deckId)).toEqual({ due: 0, practiced: 0, mastered: 1 });
+        advanceTime(1 * HOUR);
+        expect(await db.getProgressCounts(deckId)).toEqual({ due: 1, practiced: 0, mastered: 0 });
+        expect(await dueIds(db, deckId)).toEqual([1]);
+    });
+
     test("a deck with no cards reports zeros", async () => {
         const db = startApp();
         const deckId = await db.addDeck("Empty", "zh");
@@ -265,7 +297,7 @@ describe("due cards and counts", () => {
         expect(await dueIds(db, deckId)).toEqual([]);
     });
 
-    test.failing("KNOWN BUG: the home count and the learn queue agree about a due mastered card", async () => {
+    test("the home count and the learn queue agree about a due mastered card", async () => {
         const { db, deckId } = await newDeckWithCards(0);
         seedCard(rawDb(), deckId, 1, { review_count: 9, next_review_at: T0 - DAY, mastered: 1 });
         const queue = await dueIds(db, deckId);
@@ -273,7 +305,7 @@ describe("due cards and counts", () => {
         expect((await db.getProgressCounts(deckId)).due).toBe(queue.length); // ...so home must count it
     });
 
-    test.failing("KNOWN BUG: failing a card repeatedly does not make it mastered", async () => {
+    test("failing a card repeatedly does not make it mastered", async () => {
         const { db, ids } = await newDeckWithCards(1);
         for (let i = 0; i < 8; i++) {
             await db.markCardIncorrect(ids[0]);
@@ -282,7 +314,7 @@ describe("due cards and counts", () => {
         expect((await db.getCardProgress(ids[0]))?.mastered).toBe(false);
     });
 
-    test.failing("KNOWN BUG: failing a mastered card clears its mastered flag", async () => {
+    test("failing a mastered card clears its mastered flag", async () => {
         const { db, deckId } = await newDeckWithCards(0);
         seedCard(rawDb(), deckId, 1, { review_count: 9, next_review_at: T0 - DAY, mastered: 1 });
         await db.markCardIncorrect(1);

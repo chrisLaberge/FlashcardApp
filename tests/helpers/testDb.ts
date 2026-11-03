@@ -34,6 +34,11 @@ export function rawDb(): DatabaseSync {
     return sqliteMock.__lastRawDatabase();
 }
 
+/** Makes the next openDatabaseAsync call throw (to test failed starts). */
+export function failNextOpen() {
+    sqliteMock.__failNextOpen();
+}
+
 export function openCalls(): number {
     return sqliteMock.__openCalls();
 }
