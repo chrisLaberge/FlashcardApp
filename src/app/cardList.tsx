@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import {
+    Alert,
     FlatList,
     Pressable,
     StyleSheet,
@@ -11,6 +12,7 @@ import {
 } from "react-native";
 import { getCardsPage } from "../database/database";
 import { Card } from "../models/Card";
+import { exportDatabase } from "../utils/exportDatabase";
 
 export default function CardsScreen() {
 
@@ -86,13 +88,24 @@ export default function CardsScreen() {
     const handleImport = () => {
         router.push("/import");
     };
-
-    const importButton = <ActionButton label="Import" onPress={handleImport} />;
+    const handleExport = async () => {
+        try {
+            await exportDatabase();
+        } catch (error) {
+            Alert.alert(
+                "Export failed",
+                error instanceof Error ? error.message : String(error)
+            );
+        }
+    };
 
 
     return (
         <View style={styles.container}>
-            {importButton}
+            <View style={styles.actionRow}>
+                <ActionButton label="Export" onPress={handleExport} />
+                <ActionButton label="Import" onPress={handleImport} />
+            </View>
 
             <View style={styles.searchContainer}>
                 <TextInput
@@ -107,7 +120,6 @@ export default function CardsScreen() {
                     {cards.length}
                 </Text>
             </View>
-
 
             <FlatList
                 style={styles.list}
@@ -153,7 +165,7 @@ export default function CardsScreen() {
                 ListFooterComponent={
                     loading && cards.length > 0
                         ? <Text style={styles.emptyText}>Loading more...</Text>
-                        : null
+                        : undefined
                 }
             />
 
@@ -310,5 +322,10 @@ const styles = StyleSheet.create({
         color: COLORS.link,
         fontSize: 14,
         fontWeight: "500",
+    },
+    actionRow: {
+        flexDirection: "row",
+        justifyContent: "flex-end",
+        gap: 10,
     },
 });

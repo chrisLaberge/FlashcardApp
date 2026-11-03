@@ -248,7 +248,7 @@ export async function restoreCardProgress(progress: CardProgress) {
         UPDATE card_progress SET review_count = ?, next_review_at = ?, mastered = ?,
             fsrs_card = ?, last_review_at = ? WHERE card_id = ?
     `, progress.reviewCount, progress.nextReviewAt ?? null, progress.mastered ? 1 : 0,
-    progress.fsrsCard ?? null, progress.lastReviewAt ?? null, progress.cardId);
+        progress.fsrsCard ?? null, progress.lastReviewAt ?? null, progress.cardId);
 }
 
 async function reviewCard(cardId: number, direction: "left" | "right") {
@@ -336,4 +336,10 @@ export async function getDecks() {
 export async function deleteDeck(id: number) {
     const database = await getDatabase();
     await database.runAsync("DELETE FROM decks WHERE id = ?", id);
+}
+
+/** Returns a complete, consistent snapshot of the database as bytes (read-only). */
+export async function serializeDatabase(): Promise<Uint8Array> {
+    const database = await getDatabase();
+    return database.serializeAsync();
 }
