@@ -1,3 +1,5 @@
+import { authHeaders } from "./auth";
+
 export const API_URL = "https://flashcard-backend-1097034776784.us-east1.run.app";
 
 export type ImageSearchResult = {
@@ -14,7 +16,8 @@ export async function searchImages(
     query: string
 ): Promise<ImageSearchResult[]> {
     const response = await fetch(
-        `${API_URL}/images/search?query=${encodeURIComponent(query)}`
+        `${API_URL}/images/search?query=${encodeURIComponent(query)}`,
+        { headers: await authHeaders() }
     );
 
     if (!response.ok) {
@@ -44,6 +47,7 @@ export async function downloadImage(image: ImageSearchResult) {
             method: "POST",
             headers: {
                 "Content-Type": blob.type || "image/jpeg",
+                ...(await authHeaders()),
             },
             body: blob,
         }

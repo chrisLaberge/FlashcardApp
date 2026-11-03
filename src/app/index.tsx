@@ -170,6 +170,13 @@ export default function HomeScreen() {
                 <Text style={styles.secondaryText}>Progress</Text>
             </Pressable>
 
+            <Pressable
+                style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
+                onPress={() => router.push("/account")}
+            >
+                <Text style={styles.secondaryText}>Account</Text>
+            </Pressable>
+
             <View style={styles.statsBox}>
                 <View style={styles.bar}>
                     <View style={{ flex: dueCount, backgroundColor: "#b8bb26" }} />

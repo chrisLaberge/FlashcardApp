@@ -1,6 +1,7 @@
 import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from "expo-audio";
 import { Directory, File, Paths } from "expo-file-system";
 import { normalizeSpeechText, ttsCacheName } from "../utils/ttsCache";
+import { authHeaders } from "./auth";
 import { API_URL } from "./imageApi";
 
 /**
@@ -52,13 +53,14 @@ export function ensureSpeechFile(voice: string, text: string): Promise<string | 
     if (!request) {
         request = (async () => {
             try {
+                const headers = { "Content-Type": "application/json", ...(await authHeaders()) };
                 const controller = new AbortController();
                 const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
                 let response: Response;
                 try {
                     response = await fetch(`${API_URL}/tts`, {
                         method: "POST",
-                        headers: { "Content-Type": "application/json" },
+                        headers,
                         body: JSON.stringify({ text: clean, voice }),
                         signal: controller.signal,
                     });
