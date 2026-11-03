@@ -5,7 +5,7 @@
  * simply takes the XP back. The numbers below are meant to be tuned; nothing else depends on them.
  */
 
-import { streaks, totals, type DayStats, type LoggedReview } from "./Stats";
+import { dailyStats, localDay, streaks, totals, type DayStats, type LoggedReview } from "./Stats";
 
 /* ----------------------------------- XP ----------------------------------- */
 
@@ -129,4 +129,33 @@ export function nextMilestones(all: readonly Milestone[]): Milestone[] {
         }
     }
     return next;
+}
+
+/* ------------------------------ upload to the server ------------------------------ */
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+/** The server accepts at most this many days per upload. */
+export const MAX_UPLOAD_DAYS = 400;
+
+export type UploadDay = { day: string; reviews: number; correct: number; timeMs: number; xp: number };
+
+/**
+ * One summary per day for the leaderboard: the most recent days only, with every number kept
+ * inside what the server accepts (e.g. a day can never claim more than 24 hours).
+ */
+export function daysForUpload(reviews: readonly LoggedReview[]): UploadDay[] {
+    const xpByDay = new Map<string, number>();
+    for (const review of reviews) {
+        const day = localDay(review.reviewedAt);
+        xpByDay.set(day, (xpByDay.get(day) ?? 0) + xpForReview(review));
+    }
+    return dailyStats(reviews)
+        .slice(-MAX_UPLOAD_DAYS)
+        .map((d) => ({
+            day: d.day,
+            reviews: d.reviews,
+            correct: d.correct,
+            timeMs: Math.min(DAY_MS, Math.max(0, Math.round(d.timeMs))),
+            xp: xpByDay.get(d.day) ?? 0,
+        }));
 }

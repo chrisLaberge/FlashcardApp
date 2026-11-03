@@ -1,7 +1,9 @@
 process.env.TZ = "America/Toronto";
 
 import {
+    daysForUpload,
     levelProgress,
+    MAX_UPLOAD_DAYS,
     milestones,
     nextMilestones,
     totalXp,
@@ -123,5 +125,40 @@ describe("milestones", () => {
         expect(next.map((m) => m.id)).toEqual(["reviews-500", "streak-3", "time-1", "level-10"].filter((id) => next.some((m) => m.id === id)));
         expect(next.find((m) => m.id.startsWith("reviews"))!.target).toBe(500);
         expect(new Set(next.map((m) => m.id.split("-")[0])).size).toBe(next.length);
+    });
+});
+
+describe("daysForUpload", () => {
+    test("one entry per local day with reviews, correct, time and XP", () => {
+        const list = [
+            review(at(2026, 11, 2, 9), true, "learning", 4000),
+            review(at(2026, 11, 2, 10), false, "audio", 6000),
+            review(at(2026, 11, 3, 9), true, "audio", 8000),
+        ];
+        expect(daysForUpload(list)).toEqual([
+            { day: "2026-11-02", reviews: 2, correct: 1, timeMs: 10000, xp: 10 + 2 },
+            { day: "2026-11-03", reviews: 1, correct: 1, timeMs: 8000, xp: 20 },
+        ]);
+    });
+
+    test("only the most recent days are sent, oldest dropped", () => {
+        const list: LoggedReview[] = [];
+        for (let i = 0; i < MAX_UPLOAD_DAYS + 5; i++) list.push(review(at(2025, 1, 1) + i * 24 * 3600 * 1000));
+        const days = daysForUpload(list);
+        expect(days).toHaveLength(MAX_UPLOAD_DAYS);
+        expect(days[days.length - 1].day).toBe(daysForUpload(list.slice(-1))[0].day);
+    });
+
+    test("never claims more than 24 hours in a day, and unknown durations count as zero", () => {
+        const list = [review(at(2026, 11, 3, 9), true, "learning", 90_000_000), review(at(2026, 11, 3, 10), true, "learning", null)];
+        expect(daysForUpload(list)[0].timeMs).toBe(24 * 60 * 60 * 1000);
+        expect(daysForUpload([review(at(2026, 11, 3), true, "learning", null)])[0].timeMs).toBe(0);
+    });
+
+    test("XP per day never exceeds what the server allows (20 per review)", () => {
+        const list = Array.from({ length: 50 }, (_, i) => review(at(2026, 11, 3, 9) + i * 1000, true, "audio"));
+        const [day] = daysForUpload(list);
+        expect(day.xp).toBeLessThanOrEqual(day.reviews * 20);
+        expect(daysForUpload([])).toEqual([]);
     });
 });

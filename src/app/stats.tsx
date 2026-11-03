@@ -1,6 +1,6 @@
-import { useFocusEffect } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { getReviewLog } from "../database/database";
 import { levelProgress, milestones, nextMilestones, totalXp, type Milestone } from "../models/Progression";
 import { dailyStats, localDay, shiftDay, streaks, totals, type LoggedReview } from "../models/Stats";
@@ -129,6 +129,15 @@ export default function StatsScreen() {
                     </View>
                 )}
             </View>
+
+            <View style={s.links}>
+                <Pressable style={s.linkButton} onPress={() => router.push("/leaderboard")}>
+                    <Text style={s.linkText}>🏆 Leaderboard</Text>
+                </Pressable>
+                <Pressable style={s.linkButton} onPress={() => router.push("/friends")}>
+                    <Text style={s.linkText}>👥 Friends</Text>
+                </Pressable>
+            </View>
         </ScrollView>
     );
 }
@@ -166,5 +175,8 @@ const s = StyleSheet.create({
     goalRow: { flexDirection: "row", justifyContent: "space-between" },
     goalTitle: { color: "#ebdbb2", fontSize: 14 },
     badges: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+    links: { flexDirection: "row", gap: 14 },
+    linkButton: { flex: 1, backgroundColor: "#504945", borderRadius: 12, paddingVertical: 14, alignItems: "center" },
+    linkText: { color: "#ebdbb2", fontSize: 15, fontWeight: "600" },
     badge: { color: "#ebdbb2", backgroundColor: "#504945", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, fontSize: 13 },
 });
