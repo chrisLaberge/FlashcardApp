@@ -1,3 +1,7 @@
+/**
+ * The fixed intervals of the original scheduler. Only used to convert old cards to FSRS and to
+ * read old CSV exports; new reviews are scheduled by FSRS (see FsrsScheduler).
+ */
 export const REVIEW_INTERVALS = [
     1 * 60 * 1000,           // 1 minute
     3 * 60 * 1000,           // 3 minutes
@@ -14,41 +18,3 @@ export const REVIEW_INTERVALS = [
     120 * 24 * 60 * 60 * 1000, // 120 days
     180 * 24 * 60 * 60 * 1000, // 180 days
 ];
-
-export function getNextReview(
-    reviewCount: number
-): {
-    reviewCount: number;
-    nextReviewAt: number;
-    mastered: boolean;
-} {
-    const newReviewCount = reviewCount + 1;
-
-    const interval =
-        REVIEW_INTERVALS[
-        Math.min(
-            newReviewCount - 1,
-            REVIEW_INTERVALS.length - 1
-        )
-        ];
-
-    return {
-        reviewCount: newReviewCount,
-        nextReviewAt: Date.now() + interval,
-        mastered: newReviewCount >= 8,
-    };
-}
-
-export function getFailedReview(
-    reviewCount: number
-): {
-    reviewCount: number;
-    nextReviewAt: number;
-    mastered: boolean;
-} {
-    return {
-        reviewCount: Math.max(0, reviewCount - 2),
-        nextReviewAt: Date.now(),
-        mastered: false,
-    };
-}

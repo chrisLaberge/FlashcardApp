@@ -51,6 +51,18 @@ class MockSQLiteDatabase {
         return row ? ({ ...row } as T) : null;
     }
 
+    /** Like expo-sqlite: commits if the task resolves, rolls back (and rethrows) if it throws. */
+    async withTransactionAsync(task: () => Promise<void>): Promise<void> {
+        this.raw.exec("BEGIN");
+        try {
+            await task();
+            this.raw.exec("COMMIT");
+        } catch (error) {
+            this.raw.exec("ROLLBACK");
+            throw error;
+        }
+    }
+
     async closeAsync(): Promise<void> {
         this.raw.close();
     }
