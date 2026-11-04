@@ -5,10 +5,16 @@
 - Sign-in (Google + email), backend token checks, rate limits, size limits.
 - In-app account deletion (Account tab) and online-data deletion (Friends), matching the backend `DELETE /social/me`.
 - Pixabay credit line shown above image search results.
-- Privacy policy draft: `docs/privacy-policy.html`.
+- Privacy policy draft: `hosting/public/privacy/index.html`, published with Firebase Hosting (see below).
 
 ## You need to do
-1. Fill `[YOUR CONTACT EMAIL]` in the privacy policy and host it at a public URL (Firebase Hosting in project `stompacard-7a65b` is free and simple). Play Console asks for the URL, and for the data-safety form use the "What we collect" list in the policy.
+1. Fill `[YOUR CONTACT EMAIL]` (twice) in `hosting/public/privacy/index.html`, then publish it (Cloud Shell, from the repo folder):
+   ```
+   cd hosting
+   npx firebase-tools login --no-localhost
+   npx firebase-tools deploy --only hosting --project stompacard-7a65b
+   ```
+   The policy is then at `https://stompacard-7a65b.web.app/privacy`. Play Console asks for that URL, and for the data-safety form use the list of what is collected in the policy. Re-run the deploy after any edit.
 2. Set `AUTH_MODE=enforce` on the Cloud Run service once every phone is on a build that signs in.
 3. Add the Play App Signing SHA-1 to the Firebase Android app once the app is on Play (Google sign-in will otherwise fail for Play installs).
 
