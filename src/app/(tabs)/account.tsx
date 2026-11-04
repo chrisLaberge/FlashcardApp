@@ -4,6 +4,7 @@ import { deleteAccount } from "../../services/account";
 import { useUser } from "../../hooks/useUser";
 import { resetPassword, signInWithEmail, signInWithGoogle, signOut, signUpWithEmail } from "../../services/auth";
 import { authErrorMessage, isPlausibleEmail } from "../../utils/authErrors";
+import DailyGoalSettings from "../../components/DailyGoalSettings";
 import ThemePicker from "../../components/ThemePicker";
 import { useTheme } from "../../theme/ThemeProvider";
 import type { Palette } from "../../theme/themes";
@@ -73,6 +74,7 @@ export default function AccountScreen() {
                     <Text style={s.secondaryText}>Sign out</Text>
                 </Pressable>
                 {message ? <Text style={s.error}>{message}</Text> : null}
+                <DailyGoalSettings />
                 <ThemePicker />
                 <Pressable onPress={confirmDelete} disabled={busy}>
                     <Text style={s.danger}>Delete account</Text>
@@ -129,6 +131,7 @@ export default function AccountScreen() {
                         <Text style={s.link}>Forgot password?</Text>
                     </Pressable>
                 )}
+                <DailyGoalSettings />
                 <ThemePicker />
             </ScrollView>
         </KeyboardAvoidingView>

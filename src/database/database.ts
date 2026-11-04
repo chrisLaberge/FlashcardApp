@@ -172,13 +172,18 @@ export async function getCards(deckId: number): Promise<Card[]> {
 export async function getCardsPage(deckId: number, limit: number, offset: number, search = ""): Promise<Card[]> {
     const database = await getDatabase();
     const term = `%${search.trim()}%`;
-    const rows = await database.getAllAsync<CardRow>(`
-        SELECT id, learning_text, localized_text, example_sentence, romanization
-        FROM cards WHERE deck_id = ?
-          AND (? = '' OR learning_text LIKE ? OR localized_text LIKE ? OR COALESCE(example_sentence, '') LIKE ?)
-        ORDER BY id LIMIT ? OFFSET ?
+    const rows = await database.getAllAsync<CardRow & { next_review_at: number | null }>(`
+        SELECT c.id, c.learning_text, c.localized_text, c.example_sentence, c.romanization, p.next_review_at
+        FROM cards c LEFT JOIN card_progress p ON p.card_id = c.id
+        WHERE c.deck_id = ?
+          AND (? = '' OR c.learning_text LIKE ? OR c.localized_text LIKE ? OR COALESCE(c.example_sentence, '') LIKE ?)
+        ORDER BY c.id LIMIT ? OFFSET ?
     `, deckId, search.trim(), term, term, term, limit, offset);
-    return rows.map(mapCard);
+    return rows.map((row) => {
+        const card = mapCard(row);
+        if (row.next_review_at) card.nextReviewAt = row.next_review_at;
+        return card;
+    });
 }
 
 export async function addCard(learningText: string, localizedText: string, exampleSentence: string, romanization: string, deckId: number) {

@@ -20,6 +20,7 @@ import {
   undoCardReview,
 } from "../database/database";
 import { scheduleAchievementCheck } from "../services/achievementUnlocks";
+import { scheduleReminderRefresh } from "../services/dailyGoal";
 import { useFocusedInterval } from "../hooks/useFocusedInterval";
 import { useLearnSettings } from "../hooks/useLearnSettings";
 import { Card } from "../models/Card";
@@ -211,6 +212,7 @@ export default function LearnScreen() {
 
       queue.answer(direction);
       scheduleAchievementCheck();
+      scheduleReminderRefresh();
       setHistory((h) => [...h, { card, direction, previousProgress }]);
       setReviewedCount((count) => count + 1);
       if (direction === "right") setCorrectCount((count) => count + 1);

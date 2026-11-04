@@ -6,8 +6,9 @@ import { getCardsAdded, getReviewLog, type CardsAdded } from "../../database/dat
 import { achievements, TIERS, tierSummary, type Achievement } from "../../models/Achievements";
 import { getBonusXp } from "../../services/achievementUnlocks";
 import { countByDay } from "../../models/Calendar";
+import { streakWithFreezes } from "../../models/StreakFreeze";
 import { levelProgress, totalXp } from "../../models/Progression";
-import { dailyStats, localDay, streaks, totals, type DayStats, type LoggedReview } from "../../models/Stats";
+import { dailyStats, localDay, totals, type DayStats, type LoggedReview } from "../../models/Stats";
 import { useTheme } from "../../theme/ThemeProvider";
 import type { Palette } from "../../theme/themes";
 
@@ -19,6 +20,7 @@ type Summary = {
     current: number;
     longest: number;
     studiedToday: boolean;
+    freezes: number;
     today: string;
     reviewDays: Map<string, DayStats>;
     addedDays: Map<string, number>;
@@ -28,7 +30,8 @@ type Summary = {
 function summarize(log: LoggedReview[], added: CardsAdded, bonusXp: number, nowMs: number): Summary {
     const days = dailyStats(log);
     const sum = totals(log);
-    const run = streaks(days, nowMs);
+    const today = localDay(nowMs);
+    const run = streakWithFreezes(days.filter((d) => d.reviews > 0).map((d) => d.day), today);
     return {
         xp: totalXp(log) + bonusXp, // reviews plus achievement bonuses
         reviews: sum.reviews,
@@ -37,7 +40,8 @@ function summarize(log: LoggedReview[], added: CardsAdded, bonusXp: number, nowM
         current: run.current,
         longest: run.longest,
         studiedToday: run.studiedToday,
-        today: localDay(nowMs),
+        today,
+        freezes: run.freezes,
         reviewDays: new Map(days.map((d) => [d.day, d])),
         addedDays: countByDay(added.addedAt, localDay),
         achievements: achievements({ reviews: log, cardsAdded: added.addedAt.length + added.undated, nowMs }),
@@ -85,7 +89,7 @@ export default function StatsScreen() {
             </View>
 
             <View style={s.grid}>
-                <Tile label="Streak" value={`${summary.current} 🔥`} note={summary.studiedToday ? "done today" : "study today to keep it"} />
+                <Tile label="Streak" value={`${summary.current} 🔥`} note={`${summary.studiedToday ? "done today" : "study today"} · ${summary.freezes} ❄️`} />
                 <Tile label="Best streak" value={String(summary.longest)} note="days" />
                 <Tile label="Reviews" value={summary.reviews.toLocaleString("en-US")} note={`${summary.accuracy}% correct`} />
                 <Tile label="Time" value={formatTime(summary.timeMs)} note="in reviews" />

@@ -67,8 +67,8 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 
 export const getProfile = async () => (await request<{ profile: Profile | null }>("GET", "/me")).profile;
 export const saveUsername = async (username: string) => (await request<{ profile: Profile }>("POST", "/me", { username })).profile;
-export const uploadDays = async (days: UploadDay[], bonusXp = 0) =>
-    (await request<{ profile: Profile }>("PUT", "/me/days", { days, bonusXp })).profile;
+export const uploadDays = async (days: UploadDay[], bonusXp = 0, freezeDays: string[] = []) =>
+    (await request<{ profile: Profile }>("PUT", "/me/days", { days, bonusXp, freezeDays })).profile;
 export const deleteMyData = () => request<void>("DELETE", "/me");
 
 export const getFriends = () => request<Friends>("GET", "/friends");

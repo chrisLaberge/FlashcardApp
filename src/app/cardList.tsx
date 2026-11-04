@@ -11,6 +11,7 @@ import {
     View
 } from "react-native";
 import { getCardsPage } from "../database/database";
+import { formatTimeRemaining } from "../utils/timeRemaining";
 import { Card } from "../models/Card";
 import { exportDatabase } from "../utils/exportDatabase";
 import { useTheme } from "../theme/ThemeProvider";
@@ -153,6 +154,9 @@ export default function CardsScreen() {
                             <Text style={styles.example}>
                                 {card.exampleSentence}
                             </Text>
+                            <Text style={styles.due}>
+                                Next review: {formatTimeRemaining(card.nextReviewAt)}
+                            </Text>
                         </View>
                         <Text style={styles.arrow}>›</Text>
                     </Pressable>
@@ -270,6 +274,7 @@ const makeStyles = (t: Palette) => {
         fontSize: 16,
     },
 
+    due: { color: t.muted, fontSize: 12, marginTop: 4 },
     arrow: {
         color: t.gold,
         fontSize: 30,

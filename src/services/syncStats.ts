@@ -1,5 +1,7 @@
 import { getAchievementUnlocks, getReviewLog } from "../database/database";
 import { bonusXpFor } from "../models/Achievements";
+import { localDay } from "../models/Stats";
+import { streakWithFreezes } from "../models/StreakFreeze";
 import { daysForUpload } from "../models/Progression";
 import { uploadDays, type Profile } from "./social";
 
@@ -19,7 +21,8 @@ export function syncStats(force = false): Promise<Profile | null> {
     running = (async () => {
         const days = daysForUpload(await getReviewLog());
         if (days.length === 0) return null;
-        const profile = await uploadDays(days, bonusXpFor(await getAchievementUnlocks()));
+        const frozen = streakWithFreezes(days.filter((d) => d.reviews > 0).map((d) => d.day), localDay(Date.now())).frozenDays;
+        const profile = await uploadDays(days, bonusXpFor(await getAchievementUnlocks()), frozen);
         lastSync = Date.now();
         return profile;
     })().finally(() => {

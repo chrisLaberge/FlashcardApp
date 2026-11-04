@@ -410,3 +410,21 @@ describe("achievement unlocks", () => {
         expect(all.find((u) => u.track === "reviews" && u.tier === 1)?.unlockedAt).toBe(T0); // first time kept
     });
 });
+
+describe("card list shows when each card is next due", () => {
+    test("new cards have no date, reviewed cards show theirs, and search still works", async () => {
+        const { db, deckId, ids } = await newDeckWithCards(3);
+        await db.markCardCorrect(ids[0], { prompt: "learning", durationMs: 1000 });
+        const progress = await db.getCardProgress(ids[0]);
+        expect(progress?.nextReviewAt).toBeGreaterThan(T0);
+
+        const page = await db.getCardsPage(deckId, 10, 0);
+        expect(page.map((c) => c.id)).toEqual(ids);
+        expect(page[0].nextReviewAt).toBe(progress?.nextReviewAt);
+        expect(page[1].nextReviewAt).toBeUndefined();
+
+        const found = await db.getCardsPage(deckId, 10, 0, "front 2");
+        expect(found.map((c) => c.id)).toEqual([ids[2]]);
+        expect((await db.getCardsPage(deckId, 1, 1)).map((c) => c.id)).toEqual([ids[1]]);
+    });
+});
