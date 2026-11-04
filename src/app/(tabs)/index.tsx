@@ -1,3 +1,4 @@
+import DailyGoalCard from "@/components/DailyGoalCard";
 import NavigationButton from "@/components/NavigationButton";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect } from "expo-router";
@@ -166,6 +167,8 @@ export default function HomeScreen() {
             >
                 <Text style={styles.secondaryText}>My Cards</Text>
             </Pressable>
+
+            <DailyGoalCard />
 
             <View style={styles.statsBox}>
                 <View style={styles.bar}>

@@ -37,7 +37,8 @@
       ],
       "expo-sqlite",
       "expo-sharing",
-      "@react-native-google-signin/google-signin"
+      "@react-native-google-signin/google-signin",
+      "expo-notifications"
     ],
     "experiments": {
       "typedRoutes": true,

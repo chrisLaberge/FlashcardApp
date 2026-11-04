@@ -1,5 +1,4 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { getSpeechTrail } from "../services/tts";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import * as Speech from "expo-speech";
@@ -21,6 +20,7 @@ import {
   undoCardReview,
 } from "../database/database";
 import { scheduleAchievementCheck } from "../services/achievementUnlocks";
+import { scheduleReminderRefresh } from "../services/dailyGoal";
 import { useFocusedInterval } from "../hooks/useFocusedInterval";
 import { useLearnSettings } from "../hooks/useLearnSettings";
 import { Card } from "../models/Card";
@@ -212,6 +212,7 @@ export default function LearnScreen() {
 
       queue.answer(direction);
       scheduleAchievementCheck();
+      scheduleReminderRefresh();
       setHistory((h) => [...h, { card, direction, previousProgress }]);
       setReviewedCount((count) => count + 1);
       if (direction === "right") setCorrectCount((count) => count + 1);
@@ -452,16 +453,6 @@ export default function LearnScreen() {
               onChange={(listeningCards) => updateSettings({ listeningCards })}
             />
 
-            {remoteVoice ? (
-              <View style={styles.trailBox}>
-                <Text style={styles.trailTitle}>Server voice, last events</Text>
-                {(settingsOpen ? getSpeechTrail() : []).map((line, i) => (
-                  <Text key={i} style={styles.trailLine}>{line}</Text>
-                ))}
-                {settingsOpen && getSpeechTrail().length === 0 ? <Text style={styles.trailLine}>nothing yet</Text> : null}
-              </View>
-            ) : null}
-
             <Pressable
               onPress={() => setSettingsOpen(false)}
               accessibilityRole="button"
@@ -619,9 +610,6 @@ const makeStyles = (t: Palette) => {
     padding: 20,
   },
 
-  trailBox: { marginTop: 8, gap: 2 },
-  trailTitle: { color: COLORS.muted, fontSize: 12, fontWeight: "600" },
-  trailLine: { color: COLORS.muted, fontSize: 11 },
   settingsTitle: {
     color: COLORS.text,
     fontSize: 20,

@@ -38,6 +38,7 @@ import {
     setCardImage,
     updateCard,
 } from "../database/database";
+import { formatTimeRemaining } from "../utils/timeRemaining";
 import { getRomanization } from "../utils/romanization";
 
 import { CardProgress } from "../models/CardProgress";
@@ -1083,34 +1084,6 @@ export default function EditCardScreen() {
         </ScrollView>
         </KeyboardInsetView>
     );
-}
-
-function formatTimeRemaining(nextReviewAt?: number): string {
-    if (!nextReviewAt) {
-        return "Now";
-    }
-
-    const remaining = nextReviewAt - Date.now();
-
-    if (remaining <= 0) {
-        return "Now";
-    }
-
-    const minutes = Math.ceil(remaining / (60 * 1000));
-
-    if (minutes < 60) {
-        return `${minutes} min`;
-    }
-
-    const hours = Math.ceil(minutes / 60);
-
-    if (hours < 24) {
-        return `${hours} hr`;
-    }
-
-    const days = Math.ceil(hours / 24);
-
-    return `${days} day${days === 1 ? "" : "s"}`;
 }
 
 const makeStyles = (t: Palette) => {

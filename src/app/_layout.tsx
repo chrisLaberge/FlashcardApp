@@ -3,6 +3,7 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import AchievementToast from "../components/AchievementToast";
 import { scheduleAchievementCheck } from "../services/achievementUnlocks";
+import { refreshReminders } from "../services/dailyGoal";
 import { backfillLocalImages } from "../services/localImages";
 import { ThemeProvider, useTheme, useThemeControls } from "../theme/ThemeProvider";
 
@@ -38,6 +39,7 @@ export default function RootLayout() {
     void backfillLocalImages();
     // Award anything already earned (e.g. right after updating); a no-op once recorded.
     scheduleAchievementCheck(4000);
+    void refreshReminders();
   }, []);
 
   return (

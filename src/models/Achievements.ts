@@ -5,7 +5,8 @@
  */
 
 import { totalXp } from "./Progression";
-import { dailyStats, streaks, totals, type LoggedReview } from "./Stats";
+import { dailyStats, localDay, totals, type LoggedReview } from "./Stats";
+import { streakWithFreezes } from "./StreakFreeze";
 
 export const TIERS = [
     { id: "bronze", name: "Bronze", color: "#cd7f32" },
@@ -92,7 +93,7 @@ export function achievementValues({ reviews, cardsAdded, nowMs }: AchievementInp
     return {
         reviews: sum.reviews,
         correct: reviews.filter((r) => r.correct).length,
-        streak: streaks(days, nowMs).longest,
+        streak: streakWithFreezes(days.filter((d) => d.reviews > 0).map((d) => d.day), localDay(nowMs)).longest,
         days: days.filter((d) => d.reviews > 0).length,
         time: Math.floor(sum.timeMs / HOUR_MS),
         bigday: days.reduce((max, d) => Math.max(max, d.reviews), 0),

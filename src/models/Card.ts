@@ -6,6 +6,8 @@ export class Card {
     id?: number;
     /** Study level (see StudyMode). Only filled in when cards are loaded for review. */
     level?: number;
+    /** When the card is next due. Only filled in by the card list. */
+    nextReviewAt?: number;
 
     constructor(
         learningText: string,
