@@ -9,7 +9,7 @@ import { pickAndRestoreBackup } from "../utils/restoreBackup";
 import { useTheme } from "../theme/ThemeProvider";
 import type { Palette } from "../theme/themes";
 
-type Deck = { id: number; name: string; language: string; card_count: number };
+type Deck = { id: number; name: string; language: string; card_count: number; due_count: number };
 
 export default function DecksScreen() {
     const t = useTheme();
@@ -132,6 +132,11 @@ export default function DecksScreen() {
                                 <Text style={[s.language, selected && s.onAccent]}>
                                     {lang ? `${lang.name} · ${lang.nativeName}` : item.language}
                                 </Text>
+                                {item.card_count > 0 && (
+                                    <Text style={[item.due_count > 0 ? s.due : s.caughtUp, selected && s.onAccent]}>
+                                        {item.due_count > 0 ? `${item.due_count} due` : "All caught up ✓"}
+                                    </Text>
+                                )}
                             </View>
 
                             <View style={s.countBox}>
@@ -218,6 +223,8 @@ const makeS = (t: Palette) => StyleSheet.create({
     countBox: { alignItems: "center", marginLeft: 12 },
     count: { color: t.blue, fontSize: 28, fontWeight: "bold" },
     countLabel: { color: t.muted, fontSize: 12 },
+    due: { color: t.yellow, fontSize: 13, fontWeight: "700", marginTop: 3 },
+    caughtUp: { color: t.green, fontSize: 13, marginTop: 3 },
     onAccent: { color: t.bg },
 
     restoreBox: {

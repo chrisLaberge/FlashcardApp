@@ -119,6 +119,9 @@ export default function StatsScreen() {
                     <Text style={s.linkText}>👥 Friends</Text>
                 </Pressable>
             </View>
+            <Pressable style={[s.linkButton, { flex: 0, marginTop: 10 }]} onPress={() => router.push("/addedWords")}>
+                <Text style={s.linkText}>📖 Words you added</Text>
+            </Pressable>
         </ScrollView>
     );
 }

@@ -9,6 +9,7 @@ import {
 import * as SQLite from "expo-sqlite";
 import { Card } from "../models/Card";
 import { parseStoredExplanation, type Explanation } from "../models/Explanation";
+import type { AddedWord } from "../models/AddedWords";
 import { parseStoredLookup, type Lookup } from "../models/Lookup";
 import { clampLevel, MASTERED_START_LEVEL, nextLevel } from "../models/StudyMode";
 
@@ -507,6 +508,20 @@ export async function getCardsAdded(): Promise<CardsAdded> {
     return { addedAt: rows.map((row) => row.added_at), undated: undated?.n ?? 0 };
 }
 
+/** The newest words still in the app that were added, newest first (a deleted card is gone from the list). */
+export async function getAddedWords(limit = 500): Promise<AddedWord[]> {
+    const database = await getDatabase();
+    const rows = await database.getAllAsync<{ id: number; learning_text: string; localized_text: string; deck_name: string | null; added_at: number }>(`
+        SELECT cards.id, cards.learning_text, cards.localized_text, decks.name AS deck_name, card_add_log.added_at
+        FROM card_add_log
+        JOIN cards ON cards.id = card_add_log.card_id
+        LEFT JOIN decks ON decks.id = cards.deck_id
+        ORDER BY card_add_log.added_at DESC, card_add_log.id DESC
+        LIMIT ?
+    `, limit);
+    return rows.map((r) => ({ id: r.id, learningText: r.learning_text, localizedText: r.localized_text, deckName: r.deck_name ?? "", addedAt: r.added_at }));
+}
+
 async function applyReview(cardId: number, direction: "left" | "right", info: ReviewInfo): Promise<number | undefined> {
     const progress = await getCardProgress(cardId);
     if (!progress) return undefined;
@@ -652,13 +667,17 @@ export async function addDeck(name: string, language: string) {
     return result.lastInsertRowId;
 }
 
+/** Every deck with its number of cards and how many of them are due for review right now. */
 export async function getDecks() {
     const database = await getDatabase();
-    return database.getAllAsync<{ id: number; name: string; language: string; card_count: number }>(`
-        SELECT decks.id, decks.name, decks.language, COUNT(cards.id) AS card_count
-        FROM decks LEFT JOIN cards ON cards.deck_id = decks.id
+    return database.getAllAsync<{ id: number; name: string; language: string; card_count: number; due_count: number }>(`
+        SELECT decks.id, decks.name, decks.language, COUNT(cards.id) AS card_count,
+            COALESCE(SUM(CASE WHEN card_progress.card_id IS NOT NULL AND ${IS_DUE} THEN 1 ELSE 0 END), 0) AS due_count
+        FROM decks
+        LEFT JOIN cards ON cards.deck_id = decks.id
+        LEFT JOIN card_progress ON card_progress.card_id = cards.id
         GROUP BY decks.id ORDER BY decks.id
-    `);
+    `, Date.now());
 }
 
 export async function deleteDeck(id: number) {
