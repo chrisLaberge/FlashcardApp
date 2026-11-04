@@ -147,7 +147,10 @@ export async function speakRemote(voice: string, text: string): Promise<boolean>
             // On Android, `false` makes the library refuse to start playback while the ringer is on
             // silent or vibrate (it never even reports "playing"). The phone's own voices play
             // regardless of the ringer, and this audio was asked for, so allow it.
-            await setAudioModeAsync({ playsInSilentMode: true });
+            // "mixWithOthers" also skips Android's audio focus request: when the system refuses focus
+            // (another app holds it, a call, ...) expo-audio silently does not play at all, which
+            // looks exactly like "loaded, play() called, never playing".
+            await setAudioModeAsync({ playsInSilentMode: true, interruptionMode: "mixWithOthers" });
             audioModeSet = true;
         }
         const next = createAudioPlayer({ uri });
