@@ -18,6 +18,8 @@ export function authErrorMessage(error: unknown): string {
             return "This account has been disabled.";
         case "auth/too-many-requests":
             return "Too many attempts. Wait a few minutes and try again.";
+        case "auth/requires-recent-login":
+            return "For your security, sign out, sign in again, and then delete the account.";
         case "auth/network-request-failed":
             return "No connection. Check your internet and try again.";
         case "auth/account-exists-with-different-credential":

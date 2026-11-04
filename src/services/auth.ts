@@ -1,6 +1,7 @@
 import { GoogleSignin, statusCodes } from "@react-native-google-signin/google-signin";
 import {
     createUserWithEmailAndPassword,
+    deleteUser,
     GoogleAuthProvider,
     sendPasswordResetEmail,
     signInWithCredential,
@@ -8,6 +9,7 @@ import {
     signOut as firebaseSignOut,
 } from "firebase/auth";
 import { auth, GOOGLE_WEB_CLIENT_ID } from "./firebase";
+import { deleteMyData } from "./social";
 
 let googleConfigured = false;
 
@@ -68,4 +70,17 @@ export async function authHeaders(): Promise<Record<string, string>> {
     } catch {
         return {};
     }
+}
+
+/**
+ * Deletes the online profile, stats and friendships, then the sign-in account itself.
+ * Firebase only allows deleting an account shortly after signing in; otherwise it throws
+ * "auth/requires-recent-login" and the caller should ask the user to sign in again first.
+ * Decks and progress on this phone are not touched.
+ */
+export async function deleteAccount() {
+    const user = auth.currentUser;
+    if (!user) return;
+    await deleteMyData();
+    await deleteUser(user);
 }

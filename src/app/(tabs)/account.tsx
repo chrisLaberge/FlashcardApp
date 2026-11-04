@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useUser } from "../../hooks/useUser";
-import { resetPassword, signInWithEmail, signInWithGoogle, signOut, signUpWithEmail } from "../../services/auth";
+import { deleteAccount, resetPassword, signInWithEmail, signInWithGoogle, signOut, signUpWithEmail } from "../../services/auth";
 import { authErrorMessage, isPlausibleEmail } from "../../utils/authErrors";
 
 export default function AccountScreen() {
@@ -39,6 +39,16 @@ export default function AccountScreen() {
         });
     };
 
+    const confirmDelete = () =>
+        Alert.alert(
+            "Delete account?",
+            "This permanently deletes your sign-in account, username, friends and uploaded stats from the server. Your decks and progress on this phone are kept.",
+            [
+                { text: "Cancel", style: "cancel" },
+                { text: "Delete", style: "destructive", onPress: () => void run(deleteAccount) },
+            ],
+        );
+
     if (user === undefined) {
         return <View style={[s.container, s.center]}><ActivityIndicator color="#83a598" /></View>;
     }
@@ -57,6 +67,9 @@ export default function AccountScreen() {
                     <Text style={s.secondaryText}>Sign out</Text>
                 </Pressable>
                 {message ? <Text style={s.error}>{message}</Text> : null}
+                <Pressable onPress={confirmDelete} disabled={busy}>
+                    <Text style={s.danger}>Delete account</Text>
+                </Pressable>
             </View>
         );
     }
@@ -133,6 +146,7 @@ const s = StyleSheet.create({
     googleText: { color: "#282828", fontSize: 16, fontWeight: "bold" },
     or: { color: "#7c6f64", textAlign: "center", fontSize: 13 },
     link: { color: "#83a598", textAlign: "center", fontSize: 14, paddingVertical: 4 },
+    danger: { color: "#fb4934", textAlign: "center", fontSize: 14, paddingVertical: 12 },
     error: { color: "#fb4934", textAlign: "center", fontSize: 14 },
     pressed: { opacity: 0.7 },
 });
