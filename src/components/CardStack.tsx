@@ -22,6 +22,7 @@ import {
 import ExplainSheet from "./ExplainSheet";
 import LookupSheet from "./LookupSheet";
 import TappableText from "./TappableText";
+import { orderedRange, textOfWords, wordCount, type WordRange } from "../models/Selection";
 import KeyboardInsetView from "./KeyboardInsetView";
 import { Card } from "../models/Card";
 import { prefetchSpeech, speakRemote, stopRemoteSpeech } from "@/services/tts";
@@ -464,8 +465,15 @@ interface TermProps {
     /** Show the speaker even without `onSpeak` (the next card). */
     previewSpeaker?: boolean;
     showRomanization?: boolean;
-    /** When set, the words of the learning text can be tapped (held: the whole text). */
-    onLookup?: (text: string, context: string) => void;
+    /** When set, the words of the learning text can be tapped, or held to pick several. */
+    picker?: Picker;
+}
+
+/** What a block of text needs to let its words be picked. */
+interface Picker {
+    selection: WordRange | null;
+    onWord: (index: number) => void;
+    onHold: (index: number) => void;
 }
 
 /** One language of a card: learning text (+ romanization + speaker) or image + localized text. */
@@ -477,7 +485,7 @@ function Term({
     onSpeak,
     previewSpeaker,
     showRomanization = true,
-    onLookup,
+    picker,
 }: TermProps) {
     const t = useTheme();
     const styles = useMemo(() => makeStyles(t), [t]);
@@ -502,11 +510,12 @@ function Term({
                         style={styles.speakGapStart}
                     />
 
-                    {onLookup ? (
+                    {picker ? (
                         <TappableText
                             text={card.learningText}
-                            onWord={(word) => onLookup(word, card.learningText)}
-                            onSentence={(whole) => onLookup(whole, whole)}
+                            selection={picker.selection}
+                            onWord={picker.onWord}
+                            onHold={picker.onHold}
                             style={[textStyle, styles.learningText, { fontSize: fit.fontSize }]}
                             numberOfLines={fit.numberOfLines}
                             adjustsFontSizeToFit
@@ -688,7 +697,26 @@ function ActiveCards({
     const [explaining, setExplaining] = useState(false);
     // The word or sentence being looked up, and the sentence it was tapped in.
     const [lookup, setLookup] = useState<{ text: string; context: string } | null>(null);
-    const openLookup = languageName ? (text: string, context: string) => setLookup({ text, context }) : undefined;
+    // Words picked by holding one and tapping another: which text they are in, and the first and last.
+    const [picked, setPicked] = useState<{ block: "term" | "example"; text: string; anchor: number; end: number } | null>(null);
+    const pickerFor = (block: "term" | "example", text: string): Picker | undefined => {
+        if (!languageName) return undefined;
+        const here = picked?.block === block ? picked : null;
+        return {
+            selection: here ? orderedRange(here.anchor, here.end) : null,
+            // A tap defines that word, or stretches the picked words up to it.
+            onWord: (index) => {
+                if (here) setPicked({ ...here, end: index });
+                else {
+                    setPicked(null);
+                    setLookup({ text: textOfWords(text, index, index), context: text });
+                }
+            },
+            onHold: (index) => setPicked({ block, text, anchor: index, end: index }),
+        };
+    };
+    const pickedRange = picked ? orderedRange(picked.anchor, picked.end) : null;
+    const pickedText = picked && pickedRange ? textOfWords(picked.text, pickedRange.from, pickedRange.to) : "";
     const answerSide = answerSideFor(promptSide);
     // On a listening card the word is only revealed on the back, as the small second line.
     const revealedSide = promptSide === "audio" ? "learning" : promptSide;
@@ -739,6 +767,7 @@ function ActiveCards({
     const speakLearning = () => speak(currentCard.learningText);
 
     const exampleText = currentCard.exampleSentence?.trim();
+    const examplePicker = exampleText ? pickerFor("example", exampleText) : undefined;
 
     // Read the learning text aloud whenever it becomes visible.
     // Fetch the next card's audio ahead of time so it plays at once when it arrives.
@@ -848,7 +877,7 @@ function ActiveCards({
                         image={currentImage}
                         onSpeak={speakLearning}
                         showRomanization={showRomanization}
-                        onLookup={openLookup}
+                        picker={pickerFor("term", currentCard.learningText)}
                     />
 
                     {!!typed.trim() && (
@@ -871,18 +900,19 @@ function ActiveCards({
                             size="small"
                             onSpeak={speakLearning}
                             showRomanization={showRomanization}
-                            onLookup={openLookup}
+                            picker={pickerFor("term", currentCard.learningText)}
                         />
                     </View>
 
                     {!!exampleText && (
                         <View style={styles.exampleRow}>
                             <SpeakButton small onPress={() => speak(exampleText)} />
-                            {openLookup ? (
+                            {examplePicker ? (
                                 <TappableText
                                     text={exampleText}
-                                    onWord={(word) => openLookup(word, exampleText)}
-                                    onSentence={(whole) => openLookup(whole, whole)}
+                                    selection={examplePicker.selection}
+                                    onWord={examplePicker.onWord}
+                                    onHold={examplePicker.onHold}
                                     style={styles.exampleText}
                                 />
                             ) : (
@@ -912,6 +942,39 @@ function ActiveCards({
                     card={currentCard}
                     languageName={languageName}
                 />
+            )}
+
+            {picked && pickedRange && (
+                <View style={styles.pickBar}>
+                    <Text style={styles.pickText} numberOfLines={1}>
+                        {pickedText}
+                    </Text>
+                    <Text style={styles.pickHint}>Tap another word to extend</Text>
+                    <View style={styles.pickButtons}>
+                        <Pressable
+                            style={[styles.pickButton, { backgroundColor: t.green }]}
+                            onPress={() => {
+                                setLookup({ text: pickedText, context: picked.text });
+                                setPicked(null);
+                            }}
+                            accessibilityLabel="Define the picked words"
+                        >
+                            <Text style={styles.pickButtonText}>Define</Text>
+                        </Pressable>
+                        {(pickedRange.from > 0 || pickedRange.to < wordCount(picked.text) - 1) && (
+                            <Pressable
+                                style={[styles.pickButton, styles.pickButtonQuiet]}
+                                onPress={() => setPicked({ ...picked, anchor: 0, end: Math.max(0, wordCount(picked.text) - 1) })}
+                                accessibilityLabel="Pick the whole text"
+                            >
+                                <Text style={styles.pickQuietText}>All</Text>
+                            </Pressable>
+                        )}
+                        <Pressable style={[styles.pickButton, styles.pickButtonQuiet]} onPress={() => setPicked(null)} accessibilityLabel="Cancel">
+                            <Text style={styles.pickQuietText}>✕</Text>
+                        </Pressable>
+                    </View>
+                </View>
             )}
 
             {!!languageName && lookup && (
@@ -1144,6 +1207,25 @@ const makeStyles = (t: Palette) => {
 
     /* Example sentence */
 
+    pickBar: {
+        position: "absolute",
+        left: 16,
+        right: 16,
+        bottom: 12,
+        backgroundColor: t.surfaceHigh,
+        borderRadius: 14,
+        padding: 12,
+        gap: 4,
+        borderWidth: 1,
+        borderColor: t.surfaceTop,
+    },
+    pickText: { color: t.text, fontSize: 17, fontWeight: "700" },
+    pickHint: { color: t.muted, fontSize: 12 },
+    pickButtons: { flexDirection: "row", gap: 8, marginTop: 6 },
+    pickButton: { borderRadius: 10, paddingVertical: 8, paddingHorizontal: 18, alignItems: "center", justifyContent: "center" },
+    pickButtonText: { color: t.bg, fontSize: 15, fontWeight: "bold" },
+    pickButtonQuiet: { backgroundColor: t.surface },
+    pickQuietText: { color: t.text, fontSize: 15, fontWeight: "600" },
     exampleRow: {
         width: "100%",
         flexDirection: "row",
