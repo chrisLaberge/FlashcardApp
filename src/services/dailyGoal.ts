@@ -9,6 +9,8 @@ import { localDay } from "../models/Stats";
 const KEY = "daily-goal";
 const CHANNEL = "study-reminders";
 
+let queued: Promise<void> | undefined;
+
 export async function loadGoalSettings(): Promise<GoalSettings> {
     try {
         return parseGoalSettings(await AsyncStorage.getItem(KEY));
@@ -47,7 +49,14 @@ export async function requestReminderPermission(): Promise<boolean> {
  * Makes the scheduled reminders match the settings: the next seven evenings, minus today's if the
  * goal is already met. Cheap to call again whenever something changes.
  */
-export async function refreshReminders(): Promise<void> {
+export function refreshReminders(): Promise<void> {
+    // Runs never overlap (two at once each cancel, then both schedule: every reminder twice).
+    // A call made while one is running waits for it, then runs once more with the latest settings.
+    queued = (queued ?? Promise.resolve()).then(applyReminders, applyReminders);
+    return queued;
+}
+
+async function applyReminders(): Promise<void> {
     try {
         await Notifications.cancelAllScheduledNotificationsAsync();
         const settings = await loadGoalSettings();

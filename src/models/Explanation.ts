@@ -7,11 +7,12 @@ export type Explanation = {
 };
 
 /**
- * Changes whenever the words on the card change, so an edited card gets a fresh explanation
- * instead of an out-of-date one.
+ * Changes whenever the word or its meaning changes, so an edited card gets a fresh explanation
+ * instead of an out-of-date one. The example sentence is left out on purpose: writing or editing
+ * it must not throw away an explanation that is still right.
  */
-export function explanationSignature(card: { learningText: string; localizedText: string; exampleSentence: string }): string {
-    return [card.learningText, card.localizedText, card.exampleSentence].map((s) => s.trim().toLowerCase()).join("\u0001");
+export function explanationSignature(card: { learningText: string; localizedText: string; exampleSentence?: string }): string {
+    return [card.learningText, card.localizedText].map((s) => s.trim().toLowerCase()).join("\u0001");
 }
 
 /** Reads a stored explanation; null if it is missing or not the right shape. */
