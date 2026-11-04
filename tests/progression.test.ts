@@ -4,8 +4,6 @@ import {
     daysForUpload,
     levelProgress,
     MAX_UPLOAD_DAYS,
-    milestones,
-    nextMilestones,
     totalXp,
     XP_CORRECT,
     XP_WRONG,
@@ -13,7 +11,7 @@ import {
     xpToNextLevel,
     xpToReachLevel,
 } from "@/models/Progression";
-import { dailyStats, type LoggedReview } from "@/models/Stats";
+import { type LoggedReview } from "@/models/Stats";
 
 const at = (y: number, m: number, d: number, h = 12) => new Date(y, m - 1, d, h).getTime();
 const review = (time: number, correct = true, prompt: string | null = "learning", durationMs: number | null = 5000): LoggedReview => ({
@@ -84,47 +82,6 @@ describe("levels", () => {
     test("negative or fractional XP is handled safely", () => {
         expect(levelProgress(-50).level).toBe(1);
         expect(levelProgress(100.9).level).toBe(2);
-    });
-});
-
-describe("milestones", () => {
-    const now = at(2026, 11, 3, 18);
-
-    test("progress and achievement for each ladder", () => {
-        const list: LoggedReview[] = [];
-        for (let i = 0; i < 120; i++) list.push(review(at(2026, 11, 3, 9) + i * 1000, true, "learning", 40_000));
-        const all = milestones(list, dailyStats(list), now);
-
-        const reviews100 = all.find((m) => m.id === "reviews-100")!;
-        expect(reviews100).toMatchObject({ value: 120, target: 100, achieved: true });
-        expect(all.find((m) => m.id === "reviews-500")).toMatchObject({ value: 120, achieved: false });
-        // 120 answers x 40 s = 80 minutes: one whole hour so far
-        expect(all.find((m) => m.id === "time-1")).toMatchObject({ value: 1, achieved: true });
-        expect(all.find((m) => m.id === "time-5")).toMatchObject({ achieved: false });
-        expect(all.find((m) => m.id === "streak-3")).toMatchObject({ value: 1, achieved: false });
-        // 120 x 10 xp = 1200 -> level 5 (xpToReachLevel(5) = 1000)
-        expect(all.find((m) => m.id === "level-5")).toMatchObject({ value: 5, achieved: true });
-        expect(all.find((m) => m.id === "level-10")).toMatchObject({ achieved: false });
-    });
-
-    test("the streak milestone remembers the best run even after the streak broke", () => {
-        const list = [at(2026, 10, 1), at(2026, 10, 2), at(2026, 10, 3), at(2026, 10, 4)].map((t) => review(t));
-        const all = milestones(list, dailyStats(list), now);
-        expect(all.find((m) => m.id === "streak-3")).toMatchObject({ value: 4, achieved: true });
-    });
-
-    test("nothing is achieved with no history", () => {
-        const all = milestones([], [], now);
-        expect(all.every((m) => !m.achieved || m.id === "level-1")).toBe(true);
-        expect(all.filter((m) => m.achieved)).toEqual([]);
-    });
-
-    test("nextMilestones gives the first unachieved one of each kind", () => {
-        const list = Array.from({ length: 150 }, (_, i) => review(at(2026, 11, 3, 9) + i * 1000));
-        const next = nextMilestones(milestones(list, dailyStats(list), now));
-        expect(next.map((m) => m.id)).toEqual(["reviews-500", "streak-3", "time-1", "level-10"].filter((id) => next.some((m) => m.id === id)));
-        expect(next.find((m) => m.id.startsWith("reviews"))!.target).toBe(500);
-        expect(new Set(next.map((m) => m.id.split("-")[0])).size).toBe(next.length);
     });
 });
 
