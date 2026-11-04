@@ -402,6 +402,7 @@ export default function LearnScreen() {
           ttsCode={ttsCode}
           ttsVoice={voiceId}
           remoteVoice={remoteVoice}
+          languageName={languageName}
           speechAvailable={voiceAvailable}
           autoSpeak={settings.autoSpeak}
           showRomanization={settings.showRomanization}

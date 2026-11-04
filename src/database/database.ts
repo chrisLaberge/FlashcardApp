@@ -8,6 +8,7 @@ import {
 } from "@/models/FsrsScheduler";
 import * as SQLite from "expo-sqlite";
 import { Card } from "../models/Card";
+import { parseStoredExplanation, type Explanation } from "../models/Explanation";
 import { clampLevel, MASTERED_START_LEVEL, nextLevel } from "../models/StudyMode";
 
 let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
@@ -98,6 +99,14 @@ async function openAndPrepareDatabase(): Promise<SQLite.SQLiteDatabase> {
                 tier INTEGER NOT NULL,
                 unlocked_at INTEGER NOT NULL,
                 PRIMARY KEY (track, tier)
+            );
+            -- AI explanations kept on the phone, so each card is asked about once and works offline.
+            CREATE TABLE IF NOT EXISTS card_explanations (
+                card_id INTEGER PRIMARY KEY,
+                signature TEXT NOT NULL,
+                data TEXT NOT NULL,
+                created_at INTEGER NOT NULL,
+                FOREIGN KEY(card_id) REFERENCES cards(id) ON DELETE CASCADE
             );
             CREATE INDEX IF NOT EXISTS idx_card_add_log_time ON card_add_log(added_at);
             CREATE INDEX IF NOT EXISTS idx_review_log_time ON review_log(reviewed_at);
@@ -411,6 +420,23 @@ export async function getReviewLog(sinceMs = 0, deckId?: number): Promise<Review
         durationMs: row.duration_ms,
         prompt: row.prompt,
     }));
+}
+
+/** The saved explanation for a card, or null if there is none or the card's words changed since. */
+export async function getCardExplanation(cardId: number, signature: string): Promise<Explanation | null> {
+    const database = await getDatabase();
+    const row = await database.getFirstAsync<{ signature: string; data: string }>(
+        "SELECT signature, data FROM card_explanations WHERE card_id = ?", cardId,
+    );
+    return row && row.signature === signature ? parseStoredExplanation(row.data) : null;
+}
+
+export async function saveCardExplanation(cardId: number, signature: string, explanation: Explanation): Promise<void> {
+    const database = await getDatabase();
+    await database.runAsync(
+        "INSERT OR REPLACE INTO card_explanations (card_id, signature, data, created_at) VALUES (?, ?, ?, ?)",
+        cardId, signature, JSON.stringify(explanation), Date.now(),
+    );
 }
 
 export type AchievementUnlock = { track: string; tier: number; unlockedAt: number };

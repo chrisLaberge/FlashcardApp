@@ -43,7 +43,7 @@ describe("startup and schema", () => {
             .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
             .all()
             .map((r) => (r as { name: string }).name);
-        expect(tables).toEqual(["achievement_unlocks", "card_add_log", "card_progress", "cards", "decks", "images", "review_log"]);
+        expect(tables).toEqual(["achievement_unlocks", "card_add_log", "card_explanations", "card_progress", "cards", "decks", "images", "review_log"]);
     });
 
     test("upgrades a pre-FSRS database without losing progress", async () => {
@@ -426,5 +426,29 @@ describe("card list shows when each card is next due", () => {
         const found = await db.getCardsPage(deckId, 10, 0, "front 2");
         expect(found.map((c) => c.id)).toEqual([ids[2]]);
         expect((await db.getCardsPage(deckId, 1, 1)).map((c) => c.id)).toEqual([ids[1]]);
+    });
+});
+
+describe("saved card explanations", () => {
+    const explanation = { definition: "A fruit.", grammar: ["Feminine."], examples: [{ text: "a", translation: "b" }] };
+
+    test("saved once, found again, and ignored when the card's words changed", async () => {
+        const { db, ids } = await newDeckWithCards(1);
+        expect(await db.getCardExplanation(ids[0], "sig-1")).toBeNull();
+        await db.saveCardExplanation(ids[0], "sig-1", explanation);
+        expect(await db.getCardExplanation(ids[0], "sig-1")).toEqual(explanation);
+        expect(await db.getCardExplanation(ids[0], "sig-2")).toBeNull(); // the card was edited
+
+        await db.saveCardExplanation(ids[0], "sig-2", { ...explanation, definition: "New." });
+        expect((await db.getCardExplanation(ids[0], "sig-2"))?.definition).toBe("New.");
+        expect(await db.getCardExplanation(ids[0], "sig-1")).toBeNull(); // replaced, not kept alongside
+    });
+
+    test("deleting the card deletes its explanation", async () => {
+        const { db, ids } = await newDeckWithCards(1);
+        await db.saveCardExplanation(ids[0], "s", explanation);
+        await db.deleteCard(ids[0]);
+        const left = rawDb().prepare("SELECT COUNT(*) AS n FROM card_explanations").get() as { n: number };
+        expect(left.n).toBe(0);
     });
 });
