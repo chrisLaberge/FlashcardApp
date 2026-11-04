@@ -4,7 +4,7 @@
  * Undo or a restore cannot leave it out of step.
  */
 
-import { levelProgress, totalXp } from "./Progression";
+import { totalXp } from "./Progression";
 import { dailyStats, streaks, totals, type LoggedReview } from "./Stats";
 
 export const TIERS = [
@@ -31,20 +31,27 @@ type Track = {
 const n = (value: number) => value.toLocaleString("en-US");
 
 const TRACKS: readonly Track[] = [
-    { id: "reviews", title: "Card reviewer", icon: "🃏", goal: (v) => `Review ${n(v)} cards`, targets: [10, 100, 1000, 5000, 10000, 50000] },
-    { id: "correct", title: "Sharp mind", icon: "🎯", goal: (v) => `Answer ${n(v)} cards correctly`, targets: [10, 100, 500, 2500, 7500, 25000] },
-    { id: "streak", title: "On a roll", icon: "🔥", goal: (v) => `Study ${n(v)} days in a row`, targets: [3, 7, 14, 30, 100, 365] },
-    { id: "days", title: "Regular", icon: "📅", goal: (v) => `Study on ${n(v)} different days`, targets: [3, 10, 30, 100, 200, 365] },
-    { id: "time", title: "Time well spent", icon: "⏱️", goal: (v) => `Spend ${n(v)} hours in reviews`, targets: [1, 5, 10, 25, 50, 100] },
-    { id: "bigday", title: "Marathon", icon: "🏃", goal: (v) => `Review ${n(v)} cards in one day`, targets: [20, 50, 100, 200, 300, 500] },
-    { id: "added", title: "Collector", icon: "🗂️", goal: (v) => `Add ${n(v)} cards`, targets: [10, 50, 100, 500, 1000, 2500] },
-    { id: "level", title: "Level up", icon: "⭐", goal: (v) => `Reach player level ${n(v)}`, targets: [3, 5, 10, 20, 35, 50] },
-    { id: "xp", title: "XP hoarder", icon: "💎", goal: (v) => `Earn ${n(v)} XP`, targets: [100, 1000, 5000, 25000, 100000, 250000] },
-    { id: "audio", title: "Good ear", icon: "🎧", goal: (v) => `Answer ${n(v)} listening cards correctly`, targets: [10, 50, 200, 500, 1000, 2500] },
-    { id: "localized", title: "Translator", icon: "🌍", goal: (v) => `Answer ${n(v)} translation cards correctly`, targets: [10, 50, 200, 500, 1000, 2500] },
-    { id: "early", title: "Early bird", icon: "🌅", goal: (v) => `Review ${n(v)} cards before 8 am`, targets: [10, 50, 100, 250, 500, 1000] },
-    { id: "night", title: "Night owl", icon: "🦉", goal: (v) => `Review ${n(v)} cards after 10 pm`, targets: [10, 50, 100, 250, 500, 1000] },
+    { id: "reviews", title: "Card Shark", icon: "🃏", goal: (v) => `Review ${n(v)} cards`, targets: [10, 100, 1000, 5000, 10000, 50000] },
+    { id: "correct", title: "Sharpshooter", icon: "🎯", goal: (v) => `Answer ${n(v)} cards correctly`, targets: [10, 100, 500, 2500, 7500, 25000] },
+    { id: "streak", title: "Wildfire", icon: "🔥", goal: (v) => `Study ${n(v)} days in a row`, targets: [3, 7, 14, 30, 100, 365] },
+    { id: "days", title: "Creature of Habit", icon: "📅", goal: (v) => `Study on ${n(v)} different days`, targets: [3, 10, 30, 100, 200, 365] },
+    { id: "time", title: "Clocking In", icon: "⏱️", goal: (v) => `Spend ${n(v)} hours in reviews`, targets: [1, 5, 10, 25, 50, 100] },
+    { id: "bigday", title: "Cram Session", icon: "🏃", goal: (v) => `Review ${n(v)} cards in one day`, targets: [20, 50, 100, 200, 300, 500] },
+    { id: "added", title: "Pack Rat", icon: "🗂️", goal: (v) => `Add ${n(v)} cards`, targets: [10, 50, 100, 500, 1000, 2500] },
+    { id: "xp", title: "Sage", icon: "💎", goal: (v) => `Earn ${n(v)} XP`, targets: [100, 1000, 5000, 25000, 100000, 250000] },
+    { id: "audio", title: "All Ears", icon: "🎧", goal: (v) => `Answer ${n(v)} listening cards correctly`, targets: [10, 50, 200, 500, 1000, 2500] },
+    { id: "localized", title: "Rosetta", icon: "🌍", goal: (v) => `Answer ${n(v)} translation cards correctly`, targets: [10, 50, 200, 500, 1000, 2500] },
+    { id: "early", title: "Early Bird", icon: "🌅", goal: (v) => `Review ${n(v)} cards before 8 am`, targets: [10, 50, 100, 250, 500, 1000] },
+    { id: "night", title: "Night Owl", icon: "🦉", goal: (v) => `Review ${n(v)} cards after 10 pm`, targets: [10, 50, 100, 250, 500, 1000] },
 ];
+
+/** Bonus XP for earning each tier, bronze first. Keep tracks x sum(this) under the server's MAX_BONUS_XP (25,000). */
+export const TIER_BONUS_XP = [25, 50, 100, 200, 400, 800] as const;
+
+/** Bonus XP from a list of earned tiers (each has a 1-based `tier`). */
+export function bonusXpFor(unlocks: readonly { tier: number }[]): number {
+    return unlocks.reduce((sum, u) => sum + (TIER_BONUS_XP[u.tier - 1] ?? 0), 0);
+}
 
 export type Achievement = {
     id: string;
@@ -82,7 +89,6 @@ export function achievementValues({ reviews, cardsAdded, nowMs }: AchievementInp
         if (review.correct && review.prompt === "audio") audio++;
         if (review.correct && review.prompt === "localized") localized++;
     }
-    const xp = totalXp(reviews);
     return {
         reviews: sum.reviews,
         correct: reviews.filter((r) => r.correct).length,
@@ -91,8 +97,7 @@ export function achievementValues({ reviews, cardsAdded, nowMs }: AchievementInp
         time: Math.floor(sum.timeMs / HOUR_MS),
         bigday: days.reduce((max, d) => Math.max(max, d.reviews), 0),
         added: cardsAdded,
-        level: levelProgress(xp).level,
-        xp,
+        xp: totalXp(reviews), // from reviews only: the bonus XP achievements give does not count towards more achievements
         audio,
         localized,
         early,
@@ -120,6 +125,19 @@ export function achievements(input: AchievementInput): Achievement[] {
             fraction,
         };
     });
+}
+
+export type EarnedTier = { track: string; tier: number };
+
+/** Every (track, tier) the achievements say is earned right now. */
+export function earnedTiers(list: readonly Achievement[]): EarnedTier[] {
+    return list.flatMap((a) => Array.from({ length: a.tier }, (_, i) => ({ track: a.id, tier: i + 1 })));
+}
+
+/** Earned tiers that are not in the already-recorded list. */
+export function newlyEarned(list: readonly Achievement[], recorded: readonly EarnedTier[]): EarnedTier[] {
+    const have = new Set(recorded.map((r) => `${r.track}:${r.tier}`));
+    return earnedTiers(list).filter((e) => !have.has(`${e.track}:${e.tier}`));
 }
 
 export function tierSummary(list: readonly Achievement[]): { earned: number; total: number } {

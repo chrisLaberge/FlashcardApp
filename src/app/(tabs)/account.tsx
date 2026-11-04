@@ -61,7 +61,7 @@ export default function AccountScreen() {
 
     if (user) {
         return (
-            <ScrollView style={s.container} contentContainerStyle={s.content}>
+            <ScrollView style={s.scroll} contentContainerStyle={s.scrollContent}>
                 <View style={s.card}>
                     <Text style={s.heading}>Signed in</Text>
                     <Text style={s.email}>{user.email ?? user.displayName ?? "Your account"}</Text>
@@ -83,7 +83,7 @@ export default function AccountScreen() {
 
     return (
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-            <ScrollView style={s.container} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
+            <ScrollView style={s.scroll} contentContainerStyle={s.scrollContent} keyboardShouldPersistTaps="handled">
                 <Text style={s.title}>{mode === "signIn" ? "Sign in" : "Create account"}</Text>
                 <Text style={s.muted}>The app works without an account. Sign in for friends and the leaderboard.</Text>
 
@@ -137,6 +137,8 @@ export default function AccountScreen() {
 
 const makeS = (t: Palette) => StyleSheet.create({
     container: { flex: 1, backgroundColor: t.bg, padding: 20 },
+    scroll: { flex: 1, backgroundColor: t.bg },
+    scrollContent: { padding: 20, paddingBottom: 80, gap: 14 },
     content: { gap: 14, alignItems: "stretch" },
     center: { alignItems: "center", justifyContent: "center" },
     title: { color: t.text, fontSize: 24, fontWeight: "bold", textAlign: "center", marginTop: 10 },

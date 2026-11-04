@@ -1,9 +1,11 @@
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState, useMemo } from "react";
 import { ActivityIndicator, Alert, Pressable, ScrollView, Share, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import Avatar from "../components/Avatar";
+import { AVATARS } from "../constants/avatars";
 import { useUser } from "../hooks/useUser";
 import {
-    acceptRequest, deleteMyData, getFriends, getProfile, removeFriend, removeRequest, requestFriend, saveUsername, setShowGlobal,
+    acceptRequest, deleteMyData, getFriends, getProfile, removeFriend, removeRequest, requestFriend, saveUsername, setAvatar, setShowGlobal,
     type Friends, type Person, type Profile,
 } from "../services/social";
 import { useTheme } from "../theme/ThemeProvider";
@@ -121,6 +123,9 @@ export default function FriendsScreen() {
     return (
         <ScrollView style={s.container} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
             <View style={s.card}>
+                <View style={{ alignItems: "center" }}>
+                    <Avatar avatar={profile.avatar} name={profile.username} size={72} />
+                </View>
                 <Text style={s.muted}>Your friend code</Text>
                 <Text style={s.code} selectable>{profile.friendCode.slice(0, 4)}-{profile.friendCode.slice(4)}</Text>
                 <View style={s.row}>
@@ -128,6 +133,23 @@ export default function FriendsScreen() {
                     <Pressable style={[s.smallButton, s.secondary]} onPress={() => { setUsername(profile.username); setEditingName(true); }}>
                         <Text style={s.secondaryText}>@{profile.username}</Text>
                     </Pressable>
+                </View>
+            </View>
+
+            <View style={s.card}>
+                <Text style={s.heading}>Profile picture</Text>
+                <View style={s.avatarGrid}>
+                    {AVATARS.map((a) => (
+                        <Pressable
+                            key={a}
+                            disabled={busy}
+                            onPress={() => run(() => setAvatar(a))}
+                            style={[s.avatarOption, profile.avatar === a && s.avatarOn]}
+                            accessibilityLabel={`Use ${a} as your picture`}
+                        >
+                            <Text style={s.avatarEmoji}>{a}</Text>
+                        </Pressable>
+                    ))}
                 </View>
             </View>
 
@@ -175,7 +197,7 @@ export default function FriendsScreen() {
                     <Text style={s.heading}>Requests</Text>
                     {friends.incoming.map((p) => (
                         <View key={p.uid} style={s.personRow}>
-                            <Text style={s.name}>{p.username}</Text>
+                            <View style={s.nameWithPicture}><Avatar avatar={p.avatar} name={p.username} size={34} /><Text style={s.name}>{p.username}</Text></View>
                             <View style={s.row}>
                                 <Pressable style={[s.smallButton, s.primary]} onPress={() => run(() => acceptRequest(p.uid))}><Text style={s.primaryText}>Accept</Text></Pressable>
                                 <Pressable style={[s.smallButton, s.secondary]} onPress={() => run(() => removeRequest(p.uid))}><Text style={s.secondaryText}>Decline</Text></Pressable>
@@ -190,7 +212,7 @@ export default function FriendsScreen() {
                 {friends.friends.length === 0 && <Text style={s.muted}>No friends yet. Share your code or add theirs above.</Text>}
                 {friends.friends.map((p) => (
                     <Pressable key={p.uid} style={s.personRow} onLongPress={() => confirmRemove(p)}>
-                        <Text style={s.name}>{p.username}</Text>
+                        <View style={s.nameWithPicture}><Avatar avatar={p.avatar} name={p.username} size={34} /><Text style={s.name}>{p.username}</Text></View>
                         <Text style={s.muted}>Level {p.level} · {p.currentStreak} 🔥</Text>
                     </Pressable>
                 ))}
@@ -202,7 +224,7 @@ export default function FriendsScreen() {
                     <Text style={s.heading}>Waiting for them</Text>
                     {friends.outgoing.map((p) => (
                         <View key={p.uid} style={s.personRow}>
-                            <Text style={s.name}>{p.username}</Text>
+                            <View style={s.nameWithPicture}><Avatar avatar={p.avatar} name={p.username} size={34} /><Text style={s.name}>{p.username}</Text></View>
                             <Pressable onPress={() => run(() => removeRequest(p.uid))}><Text style={s.link}>Cancel</Text></Pressable>
                         </View>
                     ))}
@@ -216,6 +238,11 @@ export default function FriendsScreen() {
 }
 
 const makeS = (t: Palette) => StyleSheet.create({
+    nameWithPicture: { flexDirection: "row", alignItems: "center", gap: 10, flexShrink: 1 },
+    avatarGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, justifyContent: "center" },
+    avatarOption: { width: 48, height: 48, borderRadius: 24, alignItems: "center", justifyContent: "center", backgroundColor: t.surfaceHigh, borderWidth: 2, borderColor: "transparent" },
+    avatarOn: { borderColor: t.yellow },
+    avatarEmoji: { fontSize: 24 },
     container: { flex: 1, backgroundColor: t.bg, padding: 20 },
     content: { gap: 14, paddingBottom: 60 },
     switchCard: { flexDirection: "row", alignItems: "center", gap: 12 },

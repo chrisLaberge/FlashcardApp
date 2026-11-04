@@ -1,4 +1,4 @@
-import { achievements, achievementValues, TIERS, tierSummary } from "../src/models/Achievements";
+import { achievements, achievementValues, bonusXpFor, earnedTiers, newlyEarned, TIER_BONUS_XP, TIERS, tierSummary } from "../src/models/Achievements";
 import type { LoggedReview } from "../src/models/Stats";
 
 const at = (y: number, m: number, d: number, h = 12) => new Date(y, m - 1, d, h).getTime();
@@ -85,10 +85,26 @@ describe("achievements", () => {
         expect(achievementValues({ reviews, cardsAdded: 0, nowMs: NOW }).time).toBe(2);
     });
 
-    test("XP and player level follow the same rules as the Progress screen", () => {
-        const reviews = many(60, NOW); // 60 x 10 XP = 600 XP: level 4 starts at 600, level 5 at 1000
+    test("XP counts review XP only, and there is no player-level track any more", () => {
+        const reviews = many(60, NOW); // 60 x 10 XP
         const v = achievementValues({ reviews, cardsAdded: 0, nowMs: NOW });
         expect(v.xp).toBe(600);
-        expect(v.level).toBe(4);
+        expect(achievements({ reviews, cardsAdded: 0, nowMs: NOW }).map((a) => a.id)).not.toContain("level");
+    });
+
+    test("bonus XP: bigger for higher tiers, and the most anyone can earn stays under the server cap", () => {
+        expect([...TIER_BONUS_XP]).toEqual([...TIER_BONUS_XP].sort((a, b) => a - b));
+        expect(bonusXpFor([{ tier: 1 }, { tier: 2 }, { tier: 3 }])).toBe(25 + 50 + 100);
+        const tracks = achievements({ reviews: [], cardsAdded: 0, nowMs: NOW }).length;
+        expect(tracks * bonusXpFor([1, 2, 3, 4, 5, 6].map((tier) => ({ tier })))).toBeLessThanOrEqual(25_000);
+    });
+
+    test("newly earned tiers are the earned ones that were not recorded yet", () => {
+        const list = achievements({ reviews: many(100, NOW), cardsAdded: 0, nowMs: NOW });
+        expect(earnedTiers(list).filter((e) => e.track === "reviews")).toEqual([{ track: "reviews", tier: 1 }, { track: "reviews", tier: 2 }]);
+        const fresh = newlyEarned(list, [{ track: "reviews", tier: 1 }]);
+        expect(fresh).toContainEqual({ track: "reviews", tier: 2 });
+        expect(fresh).not.toContainEqual({ track: "reviews", tier: 1 });
+        expect(newlyEarned(list, earnedTiers(list))).toEqual([]);
     });
 });

@@ -1,4 +1,5 @@
-import { getReviewLog } from "../database/database";
+import { getAchievementUnlocks, getReviewLog } from "../database/database";
+import { bonusXpFor } from "../models/Achievements";
 import { daysForUpload } from "../models/Progression";
 import { uploadDays, type Profile } from "./social";
 
@@ -18,7 +19,7 @@ export function syncStats(force = false): Promise<Profile | null> {
     running = (async () => {
         const days = daysForUpload(await getReviewLog());
         if (days.length === 0) return null;
-        const profile = await uploadDays(days);
+        const profile = await uploadDays(days, bonusXpFor(await getAchievementUnlocks()));
         lastSync = Date.now();
         return profile;
     })().finally(() => {

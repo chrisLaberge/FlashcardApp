@@ -4,6 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import ActivityCalendar from "../../components/ActivityCalendar";
 import { getCardsAdded, getReviewLog, type CardsAdded } from "../../database/database";
 import { achievements, TIERS, tierSummary, type Achievement } from "../../models/Achievements";
+import { getBonusXp } from "../../services/achievementUnlocks";
 import { countByDay } from "../../models/Calendar";
 import { levelProgress, totalXp } from "../../models/Progression";
 import { dailyStats, localDay, streaks, totals, type DayStats, type LoggedReview } from "../../models/Stats";
@@ -21,16 +22,15 @@ type Summary = {
     today: string;
     reviewDays: Map<string, DayStats>;
     addedDays: Map<string, number>;
-    undated: number;
     achievements: Achievement[];
 };
 
-function summarize(log: LoggedReview[], added: CardsAdded, nowMs: number): Summary {
+function summarize(log: LoggedReview[], added: CardsAdded, bonusXp: number, nowMs: number): Summary {
     const days = dailyStats(log);
     const sum = totals(log);
     const run = streaks(days, nowMs);
     return {
-        xp: totalXp(log),
+        xp: totalXp(log) + bonusXp, // reviews plus achievement bonuses
         reviews: sum.reviews,
         accuracy: sum.accuracy,
         timeMs: sum.timeMs,
@@ -40,7 +40,6 @@ function summarize(log: LoggedReview[], added: CardsAdded, nowMs: number): Summa
         today: localDay(nowMs),
         reviewDays: new Map(days.map((d) => [d.day, d])),
         addedDays: countByDay(added.addedAt, localDay),
-        undated: added.undated,
         achievements: achievements({ reviews: log, cardsAdded: added.addedAt.length + added.undated, nowMs }),
     };
 }
@@ -59,8 +58,8 @@ export default function StatsScreen() {
     useFocusEffect(
         useCallback(() => {
             let active = true;
-            Promise.all([getReviewLog(), getCardsAdded()]).then(([log, added]) => {
-                if (active) setSummary(summarize(log, added, Date.now()));
+            Promise.all([getReviewLog(), getCardsAdded(), getBonusXp()]).then(([log, added, bonusXp]) => {
+                if (active) setSummary(summarize(log, added, bonusXp, Date.now()));
             });
             return () => {
                 active = false;
@@ -92,7 +91,7 @@ export default function StatsScreen() {
                 <Tile label="Time" value={formatTime(summary.timeMs)} note="in reviews" />
             </View>
 
-            <ActivityCalendar reviewDays={summary.reviewDays} addedDays={summary.addedDays} undated={summary.undated} today={summary.today} />
+            <ActivityCalendar reviewDays={summary.reviewDays} addedDays={summary.addedDays} today={summary.today} />
 
             <Pressable style={s.card} onPress={() => router.push("/achievements")} accessibilityRole="button">
                 <View style={s.goalRow}>

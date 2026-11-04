@@ -43,7 +43,7 @@ describe("startup and schema", () => {
             .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
             .all()
             .map((r) => (r as { name: string }).name);
-        expect(tables).toEqual(["card_add_log", "card_progress", "cards", "decks", "images", "review_log"]);
+        expect(tables).toEqual(["achievement_unlocks", "card_add_log", "card_progress", "cards", "decks", "images", "review_log"]);
     });
 
     test("upgrades a pre-FSRS database without losing progress", async () => {
@@ -397,5 +397,16 @@ describe("cards added log", () => {
             stopApp();
             tmp.cleanup();
         }
+    });
+});
+
+describe("achievement unlocks", () => {
+    test("recording is permanent and repeating it changes nothing", async () => {
+        const db = startApp();
+        await db.recordAchievementUnlocks([{ track: "reviews", tier: 1 }, { track: "streak", tier: 1 }], T0);
+        await db.recordAchievementUnlocks([{ track: "reviews", tier: 1 }, { track: "reviews", tier: 2 }], T0 + 5000);
+        const all = await db.getAchievementUnlocks();
+        expect(all.map((u) => `${u.track}:${u.tier}`).sort()).toEqual(["reviews:1", "reviews:2", "streak:1"]);
+        expect(all.find((u) => u.track === "reviews" && u.tier === 1)?.unlockedAt).toBe(T0); // first time kept
     });
 });

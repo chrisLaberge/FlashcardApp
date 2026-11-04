@@ -10,55 +10,33 @@ type Props = {
     reviewDays: ReadonlyMap<string, DayStats>;
     /** Cards added per day. */
     addedDays: ReadonlyMap<string, number>;
-    /** Cards added before dates were recorded (they cannot be placed on the calendar). */
-    undated: number;
     /** Today as "YYYY-MM-DD". */
     today: string;
 };
 
 const WEEKDAYS = ["M", "T", "W", "T", "F", "S", "S"];
 const SHADES = ["", "40", "80", "BF", "FF"] as const; // alpha steps appended to the colour
-const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
-function formatMinutes(ms: number): string {
-    const minutes = Math.round(ms / 60000);
-    return minutes < 60 ? `${minutes} min` : `${Math.floor(minutes / 60)} h ${minutes % 60} min`;
-}
-
 /** A month calendar coloured by how much happened each day, like GitHub's contribution squares. */
-export default function ActivityCalendar({ reviewDays, addedDays, undated, today }: Props) {
+export default function ActivityCalendar({ reviewDays, addedDays, today }: Props) {
     const t = useTheme();
     const s = useMemo(() => makeS(t), [t]);
     const [mode, setMode] = useState<"reviews" | "added">("reviews");
     const [cursor, setCursor] = useState(() => ({ year: Number(today.slice(0, 4)), month: Number(today.slice(5, 7)) - 1 }));
-    const [selected, setSelected] = useState<string | null>(null);
+    const [selected, setSelected] = useState<string>(today);
 
     const grid = useMemo(() => monthGrid(cursor.year, cursor.month), [cursor]);
+    const shown = selected;
     const color = mode === "reviews" ? t.green : t.blue;
     const countOf = (day: string) => (mode === "reviews" ? (reviewDays.get(day)?.reviews ?? 0) : (addedDays.get(day) ?? 0));
 
     const monthDays = grid.weeks.flat().flatMap((cell) => (cell ? [cell.day] : []));
     const max = Math.max(0, ...monthDays.map(countOf));
-    const total = monthDays.reduce((sum, day) => sum + countOf(day), 0);
-    const activeDays = monthDays.filter((day) => countOf(day) > 0).length;
 
     const atCurrentMonth = cursor.year === Number(today.slice(0, 4)) && cursor.month === Number(today.slice(5, 7)) - 1;
     const move = (delta: number) => {
         setCursor((c) => shiftMonth(c.year, c.month, delta));
-        setSelected(null);
+        setSelected(today);
     };
-
-    const detail = (() => {
-        if (!selected) return null;
-        const [y, m, d] = selected.split("-").map(Number);
-        const label = `${MONTH_NAMES[m - 1]} ${d}, ${y}`;
-        const review = reviewDays.get(selected);
-        const added = addedDays.get(selected) ?? 0;
-        const parts: string[] = [];
-        if (review) parts.push(`${review.reviews} reviews`, `${Math.round((review.correct / review.reviews) * 100)}% correct`, formatMinutes(review.timeMs));
-        if (added) parts.push(`${added} ${added === 1 ? "card" : "cards"} added`);
-        return `${label}: ${parts.length ? parts.join(" · ") : "nothing"}`;
-    })();
 
     return (
         <View style={s.card}>
@@ -91,7 +69,7 @@ export default function ActivityCalendar({ reviewDays, addedDays, undated, today
                         const isToday = cell.day === today;
                         const isFuture = cell.day > today;
                         return (
-                            <Pressable key={ci} style={s.cellSlot} onPress={() => setSelected(cell.day === selected ? null : cell.day)} disabled={isFuture}>
+                            <Pressable key={ci} style={s.cellSlot} onPress={() => setSelected(cell.day)} disabled={isFuture}>
                                 <View
                                     style={[
                                         s.cell,
@@ -109,17 +87,16 @@ export default function ActivityCalendar({ reviewDays, addedDays, undated, today
                 </View>
             ))}
 
-            <Text style={s.summary}>
-                {total === 0
-                    ? mode === "reviews" ? "No reviews this month." : "No cards added this month."
-                    : mode === "reviews"
-                        ? `${total.toLocaleString("en-US")} reviews on ${activeDays} ${activeDays === 1 ? "day" : "days"}`
-                        : `${total.toLocaleString("en-US")} ${total === 1 ? "card" : "cards"} added on ${activeDays} ${activeDays === 1 ? "day" : "days"}`}
-            </Text>
-            {detail ? <Text style={s.detail}>{detail}</Text> : <Text style={s.hint}>Tap a day for details.</Text>}
-            {mode === "added" && undated > 0 ? (
-                <Text style={s.hint}>{undated.toLocaleString("en-US")} older {undated === 1 ? "card was" : "cards were"} added before dates were recorded, so they are not on the calendar.</Text>
-            ) : null}
+            <View style={s.counts}>
+                <View style={s.count}>
+                    <Text style={s.countValue}>{reviewDays.get(shown)?.reviews ?? 0}</Text>
+                    <Text style={s.countLabel}>Cards reviewed</Text>
+                </View>
+                <View style={s.count}>
+                    <Text style={s.countValue}>{addedDays.get(shown) ?? 0}</Text>
+                    <Text style={s.countLabel}>Cards added</Text>
+                </View>
+            </View>
         </View>
     );
 }
@@ -140,7 +117,8 @@ const makeS = (t: Palette) => StyleSheet.create({
     cellSlot: { flex: 1, aspectRatio: 1, padding: 2 },
     cell: { flex: 1, borderRadius: 6, alignItems: "center", justifyContent: "center" },
     date: { color: t.text, fontSize: 12 },
-    summary: { color: t.text, textAlign: "center", marginTop: 8, fontSize: 14 },
-    detail: { color: t.yellow, textAlign: "center", fontSize: 13 },
-    hint: { color: t.muted, textAlign: "center", fontSize: 12 },
+    counts: { flexDirection: "row", marginTop: 10, gap: 10 },
+    count: { flex: 1, backgroundColor: t.bg, borderRadius: 10, paddingVertical: 10, alignItems: "center" },
+    countValue: { color: t.text, fontSize: 22, fontWeight: "bold" },
+    countLabel: { color: t.muted, fontSize: 12 },
 });

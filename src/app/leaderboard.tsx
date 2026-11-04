@@ -1,8 +1,9 @@
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState, useMemo } from "react";
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import Avatar from "../components/Avatar";
 import { useUser } from "../hooks/useUser";
-import { ApiError, getGlobalLeaderboard, getLeaderboard, type GlobalBoard, type LeaderboardEntry, type Period } from "../services/social";
+import { ApiError, getGlobalLeaderboard, getLeaderboard, type GlobalBoard, type LeaderboardEntry } from "../services/social";
 import { syncStats } from "../services/syncStats";
 import { useTheme } from "../theme/ThemeProvider";
 import type { Palette } from "../theme/themes";
@@ -12,21 +13,20 @@ export default function LeaderboardScreen() {
     const s = useMemo(() => makeS(t), [t]);
     const user = useUser();
     const [scope, setScope] = useState<"friends" | "global">("friends");
-    const [period, setPeriod] = useState<Period>("week");
     const [entries, setEntries] = useState<LeaderboardEntry[] | null>(null);
     const [global, setGlobal] = useState<GlobalBoard | null>(null);
     const [error, setError] = useState("");
     const [needsProfile, setNeedsProfile] = useState(false);
 
-    const load = useCallback(async (which: Period, where: "friends" | "global") => {
+    const load = useCallback(async (where: "friends" | "global") => {
         setError("");
         try {
             // Upload first so your own row is up to date; a failed upload should not hide the board.
             await syncStats().catch(() => null);
             if (where === "global") {
-                setGlobal(await getGlobalLeaderboard(which));
+                setGlobal(await getGlobalLeaderboard("all"));
             } else {
-                setEntries(await getLeaderboard(which));
+                setEntries(await getLeaderboard("all"));
             }
             setNeedsProfile(false);
         } catch (e) {
@@ -37,7 +37,7 @@ export default function LeaderboardScreen() {
         }
     }, []);
 
-    useFocusEffect(useCallback(() => { if (user) void load(period, scope); }, [user, period, scope, load]));
+    useFocusEffect(useCallback(() => { if (user) void load(scope); }, [user, scope, load]));
 
     if (user === undefined) return <View style={[s.container, s.center]}><ActivityIndicator color={t.blue} /></View>;
 
@@ -62,14 +62,6 @@ export default function LeaderboardScreen() {
                 ))}
             </View>
 
-            <View style={s.toggle}>
-                {(["week", "all"] as const).map((p) => (
-                    <Pressable key={p} style={[s.tab, period === p && s.tabOn]} onPress={() => { setEntries(null); setGlobal(null); setPeriod(p); }}>
-                        <Text style={[s.tabText, period === p && s.tabTextOn]}>{p === "week" ? "This week" : "All time"}</Text>
-                    </Pressable>
-                ))}
-            </View>
-
             {error ? <Text style={s.error}>{error}</Text> : null}
 
             {scope === "global" ? (
@@ -80,7 +72,7 @@ export default function LeaderboardScreen() {
                         data={global.entries}
                         keyExtractor={(e) => e.uid}
                         contentContainerStyle={{ gap: 8, paddingBottom: 60 }}
-                        ListEmptyComponent={<Text style={s.muted}>No one has earned XP {period === "week" ? "this week" : "yet"}. Be the first!</Text>}
+                        ListEmptyComponent={<Text style={s.muted}>No one has earned XP yet. Be the first!</Text>}
                         ListFooterComponent={
                             !global.me.visible ? (
                                 <Pressable onPress={() => router.push("/friends")}>
@@ -97,6 +89,7 @@ export default function LeaderboardScreen() {
                         renderItem={({ item }) => (
                             <View style={[s.row, item.isMe && s.me]}>
                                 <Text style={s.rank}>{item.rank === 1 ? "🥇" : item.rank === 2 ? "🥈" : item.rank === 3 ? "🥉" : item.rank}</Text>
+                                <Avatar avatar={item.avatar} name={item.username} size={38} />
                                 <View style={{ flex: 1 }}>
                                     <Text style={s.name} numberOfLines={1}>{item.username}{item.isMe ? " (you)" : ""}</Text>
                                     <Text style={s.muted}>Level {item.level} · {item.currentStreak} 🔥</Text>
@@ -124,6 +117,7 @@ export default function LeaderboardScreen() {
                     renderItem={({ item }) => (
                         <View style={[s.row, item.isMe && s.me]}>
                             <Text style={s.rank}>{item.rank === 1 ? "🥇" : item.rank === 2 ? "🥈" : item.rank === 3 ? "🥉" : item.rank}</Text>
+                            <Avatar avatar={item.avatar} name={item.username} size={38} />
                             <View style={{ flex: 1 }}>
                                 <Text style={s.name} numberOfLines={1}>{item.username}{item.isMe ? " (you)" : ""}</Text>
                                 <Text style={s.muted}>Level {item.level} · {item.currentStreak} 🔥</Text>

@@ -91,6 +91,14 @@ async function openAndPrepareDatabase(): Promise<SQLite.SQLiteDatabase> {
                 card_id INTEGER NOT NULL,
                 added_at INTEGER NOT NULL
             );
+            -- Achievement tiers already awarded (and their bonus XP). Permanent: undoing a review or deleting
+            -- cards never takes an achievement back.
+            CREATE TABLE IF NOT EXISTS achievement_unlocks (
+                track TEXT NOT NULL,
+                tier INTEGER NOT NULL,
+                unlocked_at INTEGER NOT NULL,
+                PRIMARY KEY (track, tier)
+            );
             CREATE INDEX IF NOT EXISTS idx_card_add_log_time ON card_add_log(added_at);
             CREATE INDEX IF NOT EXISTS idx_review_log_time ON review_log(reviewed_at);
             CREATE INDEX IF NOT EXISTS idx_review_log_card ON review_log(card_id);
@@ -400,6 +408,30 @@ export async function getReviewLog(sinceMs = 0, deckId?: number): Promise<Review
     }));
 }
 
+export type AchievementUnlock = { track: string; tier: number; unlockedAt: number };
+
+export async function getAchievementUnlocks(): Promise<AchievementUnlock[]> {
+    const database = await getDatabase();
+    const rows = await database.getAllAsync<{ track: string; tier: number; unlocked_at: number }>(
+        "SELECT track, tier, unlocked_at FROM achievement_unlocks ORDER BY unlocked_at, track, tier",
+    );
+    return rows.map((row) => ({ track: row.track, tier: row.tier, unlockedAt: row.unlocked_at }));
+}
+
+/** Records newly earned tiers. Ones already recorded are left alone, so this can safely be repeated. */
+export async function recordAchievementUnlocks(unlocks: readonly { track: string; tier: number }[], atMs = Date.now()): Promise<void> {
+    if (unlocks.length === 0) return;
+    const database = await getDatabase();
+    await database.withTransactionAsync(async () => {
+        for (const unlock of unlocks) {
+            await database.runAsync(
+                "INSERT OR IGNORE INTO achievement_unlocks (track, tier, unlocked_at) VALUES (?, ?, ?)",
+                unlock.track, unlock.tier, atMs,
+            );
+        }
+    });
+}
+
 export type CardsAdded = {
     /** When each card was added, oldest first. */
     addedAt: number[];
@@ -591,7 +623,7 @@ export type RestoreResult = {
 
 export class RestoreError extends Error {}
 
-const RESTORE_TABLES = ["decks", "images", "cards", "card_progress", "review_log", "card_add_log"] as const;
+const RESTORE_TABLES = ["decks", "images", "cards", "card_progress", "review_log", "card_add_log", "achievement_unlocks"] as const;
 
 async function columnNames(db: RestoreSource, table: string): Promise<string[]> {
     const rows = await db.getAllAsync<{ name: string }>(`PRAGMA table_info(${table})`);
