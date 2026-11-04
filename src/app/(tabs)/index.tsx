@@ -3,9 +3,9 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useRef, useState } from "react";
 import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
-import { getLanguage } from "../constants/languages";
-import { getDecks, getProgressCounts } from "../database/database";
-import { useFocusedInterval } from "../hooks/useFocusedInterval";
+import { getLanguage } from "../../constants/languages";
+import { getDecks, getProgressCounts } from "../../database/database";
+import { useFocusedInterval } from "../../hooks/useFocusedInterval";
 
 
 export default function HomeScreen() {
@@ -73,7 +73,7 @@ export default function HomeScreen() {
 
     useFocusedInterval(() => loadCounts(activeDeckId));
 
-    const pulse = useRef(new Animated.Value(0)).current;
+    const [pulse] = useState(() => new Animated.Value(0));
 
     useFocusEffect(useCallback(() => {
         if (deckSelected) {
@@ -161,20 +161,6 @@ export default function HomeScreen() {
                 onPress={() => router.push("/cardList")}
             >
                 <Text style={styles.secondaryText}>My Cards</Text>
-            </Pressable>
-
-            <Pressable
-                style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
-                onPress={() => router.push("/stats")}
-            >
-                <Text style={styles.secondaryText}>Progress</Text>
-            </Pressable>
-
-            <Pressable
-                style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
-                onPress={() => router.push("/account")}
-            >
-                <Text style={styles.secondaryText}>Account</Text>
             </Pressable>
 
             <View style={styles.statsBox}>

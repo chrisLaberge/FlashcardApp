@@ -19,6 +19,9 @@ export default function RootLayout() {
           fontWeight: "bold",
         },
       }}
-    />
+    >
+      {/* Study, Progress and Account live in the bottom tabs, which bring their own header. */}
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+    </Stack>
   );
 }
