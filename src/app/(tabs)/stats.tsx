@@ -1,9 +1,9 @@
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { getReviewLog } from "../database/database";
-import { levelProgress, milestones, nextMilestones, totalXp, type Milestone } from "../models/Progression";
-import { dailyStats, localDay, shiftDay, streaks, totals, type LoggedReview } from "../models/Stats";
+import { getReviewLog } from "../../database/database";
+import { levelProgress, milestones, nextMilestones, totalXp, type Milestone } from "../../models/Progression";
+import { dailyStats, localDay, shiftDay, streaks, totals, type LoggedReview } from "../../models/Stats";
 
 type Summary = {
     xp: number;

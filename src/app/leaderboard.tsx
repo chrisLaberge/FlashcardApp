@@ -2,31 +2,38 @@ import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { useUser } from "../hooks/useUser";
-import { ApiError, getLeaderboard, type LeaderboardEntry, type Period } from "../services/social";
+import { ApiError, getGlobalLeaderboard, getLeaderboard, type GlobalBoard, type LeaderboardEntry, type Period } from "../services/social";
 import { syncStats } from "../services/syncStats";
 
 export default function LeaderboardScreen() {
     const user = useUser();
+    const [scope, setScope] = useState<"friends" | "global">("friends");
     const [period, setPeriod] = useState<Period>("week");
     const [entries, setEntries] = useState<LeaderboardEntry[] | null>(null);
+    const [global, setGlobal] = useState<GlobalBoard | null>(null);
     const [error, setError] = useState("");
     const [needsProfile, setNeedsProfile] = useState(false);
 
-    const load = useCallback(async (which: Period) => {
+    const load = useCallback(async (which: Period, where: "friends" | "global") => {
         setError("");
         try {
             // Upload first so your own row is up to date; a failed upload should not hide the board.
             await syncStats().catch(() => null);
-            setEntries(await getLeaderboard(which));
+            if (where === "global") {
+                setGlobal(await getGlobalLeaderboard(which));
+            } else {
+                setEntries(await getLeaderboard(which));
+            }
             setNeedsProfile(false);
         } catch (e) {
             if (e instanceof ApiError && e.status === 404) setNeedsProfile(true);
             else setError(e instanceof Error ? e.message : String(e));
             setEntries([]);
+            setGlobal({ entries: [], me: { visible: true, xp: 0, rank: null } });
         }
     }, []);
 
-    useFocusEffect(useCallback(() => { if (user) void load(period); }, [user, period, load]));
+    useFocusEffect(useCallback(() => { if (user) void load(period, scope); }, [user, period, scope, load]));
 
     if (user === undefined) return <View style={[s.container, s.center]}><ActivityIndicator color="#83a598" /></View>;
 
@@ -44,8 +51,16 @@ export default function LeaderboardScreen() {
     return (
         <View style={s.container}>
             <View style={s.toggle}>
+                {(["friends", "global"] as const).map((w) => (
+                    <Pressable key={w} style={[s.tab, scope === w && s.tabOn]} onPress={() => { setEntries(null); setGlobal(null); setScope(w); }}>
+                        <Text style={[s.tabText, scope === w && s.tabTextOn]}>{w === "friends" ? "Friends" : "🌍 Global"}</Text>
+                    </Pressable>
+                ))}
+            </View>
+
+            <View style={s.toggle}>
                 {(["week", "all"] as const).map((p) => (
-                    <Pressable key={p} style={[s.tab, period === p && s.tabOn]} onPress={() => { setEntries(null); setPeriod(p); }}>
+                    <Pressable key={p} style={[s.tab, period === p && s.tabOn]} onPress={() => { setEntries(null); setGlobal(null); setPeriod(p); }}>
                         <Text style={[s.tabText, period === p && s.tabTextOn]}>{p === "week" ? "This week" : "All time"}</Text>
                     </Pressable>
                 ))}
@@ -53,7 +68,41 @@ export default function LeaderboardScreen() {
 
             {error ? <Text style={s.error}>{error}</Text> : null}
 
-            {entries === null ? (
+            {scope === "global" ? (
+                global === null ? (
+                    <ActivityIndicator color="#83a598" style={{ marginTop: 40 }} />
+                ) : (
+                    <FlatList
+                        data={global.entries}
+                        keyExtractor={(e) => e.uid}
+                        contentContainerStyle={{ gap: 8, paddingBottom: 60 }}
+                        ListEmptyComponent={<Text style={s.muted}>No one has earned XP {period === "week" ? "this week" : "yet"}. Be the first!</Text>}
+                        ListFooterComponent={
+                            !global.me.visible ? (
+                                <Pressable onPress={() => router.push("/friends")}>
+                                    <Text style={s.link}>You are hidden from this board. Change it in Friends.</Text>
+                                </Pressable>
+                            ) : global.me.rank !== null && !global.entries.some((e) => e.isMe) ? (
+                                <View style={[s.row, s.me]}>
+                                    <Text style={s.rank}>#{global.me.rank}</Text>
+                                    <Text style={[s.name, { flex: 1 }]}>You</Text>
+                                    <Text style={s.xp}>{global.me.xp.toLocaleString("en-US")} XP</Text>
+                                </View>
+                            ) : undefined
+                        }
+                        renderItem={({ item }) => (
+                            <View style={[s.row, item.isMe && s.me]}>
+                                <Text style={s.rank}>{item.rank === 1 ? "🥇" : item.rank === 2 ? "🥈" : item.rank === 3 ? "🥉" : item.rank}</Text>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={s.name} numberOfLines={1}>{item.username}{item.isMe ? " (you)" : ""}</Text>
+                                    <Text style={s.muted}>Level {item.level} · {item.currentStreak} 🔥</Text>
+                                </View>
+                                <Text style={s.xp}>{item.xp.toLocaleString("en-US")} XP</Text>
+                            </View>
+                        )}
+                    />
+                )
+            ) : entries === null ? (
                 <ActivityIndicator color="#83a598" style={{ marginTop: 40 }} />
             ) : (
                 <FlatList
@@ -90,7 +139,7 @@ const s = StyleSheet.create({
     container: { flex: 1, backgroundColor: "#282828", padding: 20 },
     center: { alignItems: "center", justifyContent: "center", gap: 14 },
     heading: { color: "#ebdbb2", fontSize: 18, fontWeight: "600" },
-    toggle: { flexDirection: "row", backgroundColor: "#3c3836", borderRadius: 12, padding: 4, marginBottom: 14 },
+    toggle: { flexDirection: "row", backgroundColor: "#3c3836", borderRadius: 12, padding: 4, marginBottom: 10 },
     tab: { flex: 1, paddingVertical: 10, borderRadius: 9, alignItems: "center" },
     tabOn: { backgroundColor: "#504945" },
     tabText: { color: "#a89984", fontWeight: "600" },

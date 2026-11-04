@@ -1,9 +1,8 @@
-import { router } from "expo-router";
 import { useState } from "react";
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { useUser } from "../hooks/useUser";
-import { resetPassword, signInWithEmail, signInWithGoogle, signOut, signUpWithEmail } from "../services/auth";
-import { authErrorMessage, isPlausibleEmail } from "../utils/authErrors";
+import { useUser } from "../../hooks/useUser";
+import { resetPassword, signInWithEmail, signInWithGoogle, signOut, signUpWithEmail } from "../../services/auth";
+import { authErrorMessage, isPlausibleEmail } from "../../utils/authErrors";
 
 export default function AccountScreen() {
     const user = useUser();
@@ -110,9 +109,6 @@ export default function AccountScreen() {
                         <Text style={s.link}>Forgot password?</Text>
                     </Pressable>
                 )}
-                <Pressable onPress={() => router.back()}>
-                    <Text style={s.muted}>Not now</Text>
-                </Pressable>
             </ScrollView>
         </KeyboardAvoidingView>
     );

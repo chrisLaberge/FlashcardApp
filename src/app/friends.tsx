@@ -1,9 +1,9 @@
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Pressable, ScrollView, Share, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { useUser } from "../hooks/useUser";
 import {
-    acceptRequest, deleteMyData, getFriends, getProfile, removeFriend, removeRequest, requestFriend, saveUsername,
+    acceptRequest, deleteMyData, getFriends, getProfile, removeFriend, removeRequest, requestFriend, saveUsername, setShowGlobal,
     type Friends, type Person, type Profile,
 } from "../services/social";
 
@@ -69,7 +69,7 @@ export default function FriendsScreen() {
         return (
             <View style={[s.container, s.center]}>
                 <Text style={s.heading}>{profile ? "Change username" : "Pick a username"}</Text>
-                <Text style={s.muted}>Friends see this name on the leaderboard. 3 to 20 letters, numbers or underscores. Your email is never shown.</Text>
+                <Text style={s.muted}>Every username is unique. It is shown to your friends and, unless you turn it off, on the global leaderboard with your level and XP. 3 to 20 letters, numbers or underscores. Your email is never shown.</Text>
                 <TextInput
                     style={s.input}
                     value={username}
@@ -125,6 +125,19 @@ export default function FriendsScreen() {
                         <Text style={s.secondaryText}>@{profile.username}</Text>
                     </Pressable>
                 </View>
+            </View>
+
+            <View style={[s.card, s.switchCard]}>
+                <View style={{ flex: 1, gap: 2 }}>
+                    <Text style={s.heading}>Global leaderboard</Text>
+                    <Text style={s.muted}>Show my username, level and XP to everyone</Text>
+                </View>
+                <Switch
+                    value={profile.showGlobal}
+                    disabled={busy}
+                    onValueChange={(value) => run(() => setShowGlobal(value))}
+                    trackColor={{ true: "#b8bb26", false: "#504945" }}
+                />
             </View>
 
             <View style={s.card}>
@@ -201,6 +214,7 @@ export default function FriendsScreen() {
 const s = StyleSheet.create({
     container: { flex: 1, backgroundColor: "#282828", padding: 20 },
     content: { gap: 14, paddingBottom: 60 },
+    switchCard: { flexDirection: "row", alignItems: "center", gap: 12 },
     center: { alignItems: "center", justifyContent: "center", gap: 14 },
     card: { backgroundColor: "#3c3836", borderRadius: 14, padding: 16, gap: 10 },
     heading: { color: "#ebdbb2", fontSize: 18, fontWeight: "600" },

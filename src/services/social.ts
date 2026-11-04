@@ -11,12 +11,21 @@ export type Profile = {
     totalTimeMs: number;
     currentStreak: number;
     longestStreak: number;
+    /** Shown on the global leaderboard. */
+    showGlobal: boolean;
 };
 
 export type Person = { uid: string; username: string; level: number; totalXp: number; currentStreak: number };
 export type Friends = { friends: Person[]; incoming: Person[]; outgoing: Person[] };
 export type Period = "week" | "all";
 export type LeaderboardEntry = Person & { rank: number; xp: number; isMe: boolean };
+
+export type GlobalRow = { rank: number; uid: string; username: string; level: number; xp: number; currentStreak: number; isMe: boolean };
+export type GlobalBoard = {
+    entries: GlobalRow[];
+    /** Your own standing, even when you are outside the top list. `rank` is null with no XP or when hidden. */
+    me: { visible: boolean; xp: number; rank: number | null };
+};
 
 export class ApiError extends Error {
     constructor(public status: number, message: string) {
@@ -68,3 +77,7 @@ export const removeFriend = (uid: string) => request<void>("DELETE", `/friends/$
 
 export const getLeaderboard = async (period: Period) =>
     (await request<{ period: Period; entries: LeaderboardEntry[] }>("GET", `/leaderboard?period=${period}`)).entries;
+
+export const getGlobalLeaderboard = (period: Period) => request<GlobalBoard & { period: Period }>("GET", `/leaderboard/global?period=${period}`);
+export const setShowGlobal = async (showGlobal: boolean) =>
+    (await request<{ profile: Profile }>("PUT", "/me/settings", { showGlobal })).profile;
