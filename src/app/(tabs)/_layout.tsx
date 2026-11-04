@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router/js-tabs";
+import { useTheme } from "../../theme/ThemeProvider";
 
 const ICONS = {
     index: "book",
@@ -8,15 +9,16 @@ const ICONS = {
 } as const;
 
 export default function TabsLayout() {
+    const t = useTheme();
     return (
         <Tabs
             screenOptions={({ route }) => ({
-                headerStyle: { backgroundColor: "#282828" },
-                headerTintColor: "#ebdbb2",
+                headerStyle: { backgroundColor: t.bg },
+                headerTintColor: t.text,
                 headerTitleStyle: { fontWeight: "bold" },
-                tabBarStyle: { backgroundColor: "#282828", borderTopColor: "#3c3836" },
-                tabBarActiveTintColor: "#fabd2f",
-                tabBarInactiveTintColor: "#a89984",
+                tabBarStyle: { backgroundColor: t.bg, borderTopColor: t.surface },
+                tabBarActiveTintColor: t.yellow,
+                tabBarInactiveTintColor: t.muted,
                 tabBarIcon: ({ color, size }) => (
                     <Ionicons name={ICONS[route.name as keyof typeof ICONS] ?? "ellipse"} size={size} color={color as string} />
                 ),

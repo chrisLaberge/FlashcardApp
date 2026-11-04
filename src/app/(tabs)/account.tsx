@@ -1,11 +1,16 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { deleteAccount } from "../../services/account";
 import { useUser } from "../../hooks/useUser";
 import { resetPassword, signInWithEmail, signInWithGoogle, signOut, signUpWithEmail } from "../../services/auth";
 import { authErrorMessage, isPlausibleEmail } from "../../utils/authErrors";
+import ThemePicker from "../../components/ThemePicker";
+import { useTheme } from "../../theme/ThemeProvider";
+import type { Palette } from "../../theme/themes";
 
 export default function AccountScreen() {
+    const t = useTheme();
+    const s = useMemo(() => makeS(t), [t]);
     const user = useUser();
     const [mode, setMode] = useState<"signIn" | "signUp">("signIn");
     const [email, setEmail] = useState("");
@@ -51,12 +56,12 @@ export default function AccountScreen() {
         );
 
     if (user === undefined) {
-        return <View style={[s.container, s.center]}><ActivityIndicator color="#83a598" /></View>;
+        return <View style={[s.container, s.center]}><ActivityIndicator color={t.blue} /></View>;
     }
 
     if (user) {
         return (
-            <View style={s.container}>
+            <ScrollView style={s.container} contentContainerStyle={s.content}>
                 <View style={s.card}>
                     <Text style={s.heading}>Signed in</Text>
                     <Text style={s.email}>{user.email ?? user.displayName ?? "Your account"}</Text>
@@ -68,10 +73,11 @@ export default function AccountScreen() {
                     <Text style={s.secondaryText}>Sign out</Text>
                 </Pressable>
                 {message ? <Text style={s.error}>{message}</Text> : null}
+                <ThemePicker />
                 <Pressable onPress={confirmDelete} disabled={busy}>
                     <Text style={s.danger}>Delete account</Text>
                 </Pressable>
-            </View>
+            </ScrollView>
         );
     }
 
@@ -90,7 +96,7 @@ export default function AccountScreen() {
                 <TextInput
                     style={s.input}
                     placeholder="Email"
-                    placeholderTextColor="#7c6f64"
+                    placeholderTextColor={t.subtle}
                     autoCapitalize="none"
                     autoComplete="email"
                     keyboardType="email-address"
@@ -100,7 +106,7 @@ export default function AccountScreen() {
                 <TextInput
                     style={s.input}
                     placeholder="Password"
-                    placeholderTextColor="#7c6f64"
+                    placeholderTextColor={t.subtle}
                     secureTextEntry
                     autoCapitalize="none"
                     autoComplete={mode === "signUp" ? "new-password" : "current-password"}
@@ -112,7 +118,7 @@ export default function AccountScreen() {
                 {message ? <Text style={s.error}>{message}</Text> : null}
 
                 <Pressable style={({ pressed }) => [s.button, s.primary, pressed && s.pressed]} onPress={submit} disabled={busy}>
-                    {busy ? <ActivityIndicator color="#282828" /> : <Text style={s.primaryText}>{mode === "signIn" ? "Sign in" : "Create account"}</Text>}
+                    {busy ? <ActivityIndicator color={t.bg} /> : <Text style={s.primaryText}>{mode === "signIn" ? "Sign in" : "Create account"}</Text>}
                 </Pressable>
 
                 <Pressable onPress={() => { setMode(mode === "signIn" ? "signUp" : "signIn"); setMessage(""); }}>
@@ -123,31 +129,32 @@ export default function AccountScreen() {
                         <Text style={s.link}>Forgot password?</Text>
                     </Pressable>
                 )}
+                <ThemePicker />
             </ScrollView>
         </KeyboardAvoidingView>
     );
 }
 
-const s = StyleSheet.create({
-    container: { flex: 1, backgroundColor: "#282828", padding: 20 },
+const makeS = (t: Palette) => StyleSheet.create({
+    container: { flex: 1, backgroundColor: t.bg, padding: 20 },
     content: { gap: 14, alignItems: "stretch" },
     center: { alignItems: "center", justifyContent: "center" },
-    title: { color: "#ebdbb2", fontSize: 24, fontWeight: "bold", textAlign: "center", marginTop: 10 },
-    heading: { color: "#ebdbb2", fontSize: 18, fontWeight: "600" },
-    email: { color: "#83a598", fontSize: 17 },
-    muted: { color: "#a89984", fontSize: 13, textAlign: "center" },
-    card: { backgroundColor: "#3c3836", borderRadius: 14, padding: 16, gap: 8, marginBottom: 16 },
-    input: { backgroundColor: "#3c3836", color: "#ebdbb2", borderRadius: 10, padding: 14, fontSize: 16 },
+    title: { color: t.text, fontSize: 24, fontWeight: "bold", textAlign: "center", marginTop: 10 },
+    heading: { color: t.text, fontSize: 18, fontWeight: "600" },
+    email: { color: t.blue, fontSize: 17 },
+    muted: { color: t.muted, fontSize: 13, textAlign: "center" },
+    card: { backgroundColor: t.surface, borderRadius: 14, padding: 16, gap: 8, marginBottom: 16 },
+    input: { backgroundColor: t.surface, color: t.text, borderRadius: 10, padding: 14, fontSize: 16 },
     button: { borderRadius: 10, paddingVertical: 14, alignItems: "center" },
-    primary: { backgroundColor: "#b8bb26" },
-    primaryText: { color: "#282828", fontSize: 16, fontWeight: "bold" },
-    secondary: { backgroundColor: "#504945" },
-    secondaryText: { color: "#ebdbb2", fontSize: 16, fontWeight: "600" },
-    google: { backgroundColor: "#ebdbb2" },
-    googleText: { color: "#282828", fontSize: 16, fontWeight: "bold" },
-    or: { color: "#7c6f64", textAlign: "center", fontSize: 13 },
-    link: { color: "#83a598", textAlign: "center", fontSize: 14, paddingVertical: 4 },
-    danger: { color: "#fb4934", textAlign: "center", fontSize: 14, paddingVertical: 12 },
-    error: { color: "#fb4934", textAlign: "center", fontSize: 14 },
+    primary: { backgroundColor: t.green },
+    primaryText: { color: t.bg, fontSize: 16, fontWeight: "bold" },
+    secondary: { backgroundColor: t.surfaceHigh },
+    secondaryText: { color: t.text, fontSize: 16, fontWeight: "600" },
+    google: { backgroundColor: t.text },
+    googleText: { color: t.bg, fontSize: 16, fontWeight: "bold" },
+    or: { color: t.subtle, textAlign: "center", fontSize: 13 },
+    link: { color: t.blue, textAlign: "center", fontSize: 14, paddingVertical: 4 },
+    danger: { color: t.red, textAlign: "center", fontSize: 14, paddingVertical: 12 },
+    error: { color: t.red, textAlign: "center", fontSize: 14 },
     pressed: { opacity: 0.7 },
 });

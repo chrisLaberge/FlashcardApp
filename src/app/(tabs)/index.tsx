@@ -1,14 +1,18 @@
 import NavigationButton from "@/components/NavigationButton";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef, useState, useMemo } from "react";
 import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
 import { getLanguage } from "../../constants/languages";
 import { getDecks, getProgressCounts } from "../../database/database";
 import { useFocusedInterval } from "../../hooks/useFocusedInterval";
+import { useTheme } from "../../theme/ThemeProvider";
+import type { Palette } from "../../theme/themes";
 
 
 export default function HomeScreen() {
+    const t = useTheme();
+    const styles = useMemo(() => makeStyles(t), [t]);
     const [dueCount, setDueCount] = useState(0);
     const [practicedCount, setPracticedCount] = useState(0);
     const [masteredCount, setMasteredCount] = useState(0);
@@ -104,7 +108,7 @@ export default function HomeScreen() {
 
     const borderColor = pulse.interpolate({
         inputRange: [0, 1],
-        outputRange: ["#504945", "#fabd2f"],
+        outputRange: [t.surfaceHigh, t.yellow],
     });
 
 
@@ -112,9 +116,9 @@ export default function HomeScreen() {
         <View style={styles.container}>
             <Animated.View
                 style={{
-                    backgroundColor: "#3c3836",
+                    backgroundColor: t.surface,
                     borderWidth: deckSelected ? 1 : 2,
-                    borderColor: deckSelected ? "#504945" : "#fabd2f",
+                    borderColor: deckSelected ? t.surfaceHigh : t.yellow,
                     borderRadius: 8,
                     marginBottom: 16,
                     opacity: deckSelected
@@ -165,22 +169,22 @@ export default function HomeScreen() {
 
             <View style={styles.statsBox}>
                 <View style={styles.bar}>
-                    <View style={{ flex: dueCount, backgroundColor: "#b8bb26" }} />
-                    <View style={{ flex: practicedCount, backgroundColor: "#83a598" }} />
-                    <View style={{ flex: masteredCount, backgroundColor: "#fabd2f" }} />
+                    <View style={{ flex: dueCount, backgroundColor: t.green }} />
+                    <View style={{ flex: practicedCount, backgroundColor: t.blue }} />
+                    <View style={{ flex: masteredCount, backgroundColor: t.yellow }} />
                 </View>
 
                 <View style={styles.row}>
                     <View style={styles.stat}>
-                        <Text style={[styles.statNumber, { color: "#b8bb26" }]}>{dueCount}</Text>
+                        <Text style={[styles.statNumber, { color: t.green }]}>{dueCount}</Text>
                         <Text style={styles.statLabel}>To learn</Text>
                     </View>
                     <View style={styles.stat}>
-                        <Text style={[styles.statNumber, { color: "#83a598" }]}>{practicedCount}</Text>
+                        <Text style={[styles.statNumber, { color: t.blue }]}>{practicedCount}</Text>
                         <Text style={styles.statLabel}>Practiced</Text>
                     </View>
                     <View style={styles.stat}>
-                        <Text style={[styles.statNumber, { color: "#fabd2f" }]}>{masteredCount}</Text>
+                        <Text style={[styles.statNumber, { color: t.yellow }]}>{masteredCount}</Text>
                         <Text style={styles.statLabel}>Mastered</Text>
                     </View>
                 </View>
@@ -191,8 +195,8 @@ export default function HomeScreen() {
     );
 }
 
-const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: "#282828", padding: 20, paddingTop: 70 },
+const makeStyles = (t: Palette) => StyleSheet.create({
+    container: { flex: 1, backgroundColor: t.bg, padding: 20, paddingTop: 70 },
     pressed: { opacity: 0.7 },
 
     deckButton: {
@@ -201,34 +205,34 @@ const styles = StyleSheet.create({
         paddingVertical: 9,
         paddingHorizontal: 12,
     },
-    deckName: { flex: 1, color: "#ebdbb2", fontSize: 15, fontWeight: "600" },
+    deckName: { flex: 1, color: t.text, fontSize: 15, fontWeight: "600" },
     flag: { fontSize: 20, marginLeft: 8 },
-    arrow: { color: "#a89984", fontSize: 10, marginLeft: 8 },
+    arrow: { color: t.muted, fontSize: 10, marginLeft: 8 },
 
     startButton: {
-        backgroundColor: "#d79921",
+        backgroundColor: t.gold,
         paddingVertical: 28,
         borderRadius: 14,
         alignItems: "center",
         marginBottom: 12,
     },
-    startText: { color: "#282828", fontSize: 24, fontWeight: "bold" },
+    startText: { color: t.bg, fontSize: 24, fontWeight: "bold" },
 
     secondaryButton: {
-        backgroundColor: "#3c3836",
+        backgroundColor: t.surface,
         borderWidth: 1,
-        borderColor: "#504945",
+        borderColor: t.surfaceHigh,
         paddingVertical: 15,
         borderRadius: 12,
         alignItems: "center",
         marginBottom: 24,
     },
-    secondaryText: { color: "#ebdbb2", fontSize: 17, fontWeight: "bold" },
+    secondaryText: { color: t.text, fontSize: 17, fontWeight: "bold" },
 
     statsBox: {
-        backgroundColor: "#3c3836",
+        backgroundColor: t.surface,
         borderWidth: 1,
-        borderColor: "#504945",
+        borderColor: t.surfaceHigh,
         borderRadius: 12,
         padding: 16,
     },
@@ -237,11 +241,11 @@ const styles = StyleSheet.create({
         height: 6,
         borderRadius: 3,
         overflow: "hidden",
-        backgroundColor: "#504945",
+        backgroundColor: t.surfaceHigh,
         marginBottom: 14,
     },
     row: { flexDirection: "row" },
     stat: { flex: 1, alignItems: "center" },
     statNumber: { fontSize: 22, fontWeight: "bold" },
-    statLabel: { color: "#a89984", fontSize: 13, marginTop: 2 },
+    statLabel: { color: t.muted, fontSize: 13, marginTop: 2 },
 });

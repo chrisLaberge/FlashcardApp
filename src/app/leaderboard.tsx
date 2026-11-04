@@ -1,11 +1,15 @@
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useState, useMemo } from "react";
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { useUser } from "../hooks/useUser";
 import { ApiError, getGlobalLeaderboard, getLeaderboard, type GlobalBoard, type LeaderboardEntry, type Period } from "../services/social";
 import { syncStats } from "../services/syncStats";
+import { useTheme } from "../theme/ThemeProvider";
+import type { Palette } from "../theme/themes";
 
 export default function LeaderboardScreen() {
+    const t = useTheme();
+    const s = useMemo(() => makeS(t), [t]);
     const user = useUser();
     const [scope, setScope] = useState<"friends" | "global">("friends");
     const [period, setPeriod] = useState<Period>("week");
@@ -35,7 +39,7 @@ export default function LeaderboardScreen() {
 
     useFocusEffect(useCallback(() => { if (user) void load(period, scope); }, [user, period, scope, load]));
 
-    if (user === undefined) return <View style={[s.container, s.center]}><ActivityIndicator color="#83a598" /></View>;
+    if (user === undefined) return <View style={[s.container, s.center]}><ActivityIndicator color={t.blue} /></View>;
 
     if (!user || needsProfile) {
         return (
@@ -70,7 +74,7 @@ export default function LeaderboardScreen() {
 
             {scope === "global" ? (
                 global === null ? (
-                    <ActivityIndicator color="#83a598" style={{ marginTop: 40 }} />
+                    <ActivityIndicator color={t.blue} style={{ marginTop: 40 }} />
                 ) : (
                     <FlatList
                         data={global.entries}
@@ -103,7 +107,7 @@ export default function LeaderboardScreen() {
                     />
                 )
             ) : entries === null ? (
-                <ActivityIndicator color="#83a598" style={{ marginTop: 40 }} />
+                <ActivityIndicator color={t.blue} style={{ marginTop: 40 }} />
             ) : (
                 <FlatList
                     data={entries}
@@ -135,23 +139,23 @@ export default function LeaderboardScreen() {
     );
 }
 
-const s = StyleSheet.create({
-    container: { flex: 1, backgroundColor: "#282828", padding: 20 },
+const makeS = (t: Palette) => StyleSheet.create({
+    container: { flex: 1, backgroundColor: t.bg, padding: 20 },
     center: { alignItems: "center", justifyContent: "center", gap: 14 },
-    heading: { color: "#ebdbb2", fontSize: 18, fontWeight: "600" },
-    toggle: { flexDirection: "row", backgroundColor: "#3c3836", borderRadius: 12, padding: 4, marginBottom: 10 },
+    heading: { color: t.text, fontSize: 18, fontWeight: "600" },
+    toggle: { flexDirection: "row", backgroundColor: t.surface, borderRadius: 12, padding: 4, marginBottom: 10 },
     tab: { flex: 1, paddingVertical: 10, borderRadius: 9, alignItems: "center" },
-    tabOn: { backgroundColor: "#504945" },
-    tabText: { color: "#a89984", fontWeight: "600" },
-    tabTextOn: { color: "#ebdbb2" },
-    row: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "#3c3836", borderRadius: 12, padding: 14 },
-    me: { borderWidth: 1, borderColor: "#fabd2f" },
-    rank: { color: "#ebdbb2", fontSize: 20, width: 34, textAlign: "center" },
-    name: { color: "#ebdbb2", fontSize: 16, fontWeight: "600" },
-    muted: { color: "#a89984", fontSize: 13, textAlign: "center" },
-    xp: { color: "#b8bb26", fontSize: 16, fontWeight: "bold" },
-    link: { color: "#83a598", textAlign: "center", fontSize: 14, paddingVertical: 10 },
-    error: { color: "#fb4934", textAlign: "center", marginBottom: 10 },
-    button: { backgroundColor: "#b8bb26", borderRadius: 10, paddingVertical: 14, paddingHorizontal: 24 },
-    buttonText: { color: "#282828", fontSize: 16, fontWeight: "bold" },
+    tabOn: { backgroundColor: t.surfaceHigh },
+    tabText: { color: t.muted, fontWeight: "600" },
+    tabTextOn: { color: t.text },
+    row: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: t.surface, borderRadius: 12, padding: 14 },
+    me: { borderWidth: 1, borderColor: t.yellow },
+    rank: { color: t.text, fontSize: 20, width: 34, textAlign: "center" },
+    name: { color: t.text, fontSize: 16, fontWeight: "600" },
+    muted: { color: t.muted, fontSize: 13, textAlign: "center" },
+    xp: { color: t.green, fontSize: 16, fontWeight: "bold" },
+    link: { color: t.blue, textAlign: "center", fontSize: 14, paddingVertical: 10 },
+    error: { color: t.red, textAlign: "center", marginBottom: 10 },
+    button: { backgroundColor: t.green, borderRadius: 10, paddingVertical: 14, paddingHorizontal: 24 },
+    buttonText: { color: t.bg, fontSize: 16, fontWeight: "bold" },
 });

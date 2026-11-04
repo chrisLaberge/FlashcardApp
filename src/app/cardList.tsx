@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useState, useMemo } from "react";
 import {
     Alert,
     FlatList,
@@ -13,8 +13,12 @@ import {
 import { getCardsPage } from "../database/database";
 import { Card } from "../models/Card";
 import { exportDatabase } from "../utils/exportDatabase";
+import { useTheme } from "../theme/ThemeProvider";
+import type { Palette } from "../theme/themes";
 
 export default function CardsScreen() {
+    const t = useTheme();
+    const styles = useMemo(() => makeStyles(t), [t]);
 
     const [cards, setCards] = useState<Card[]>([]);
     const [search, setSearch] = useState("");
@@ -111,7 +115,7 @@ export default function CardsScreen() {
                 <TextInput
                     style={styles.searchInput}
                     placeholder="Search cards..."
-                    placeholderTextColor="#a89984"
+                    placeholderTextColor={t.muted}
                     value={search}
                     onChangeText={setSearch}
                 />
@@ -182,6 +186,8 @@ function ActionButton({
     onPress: () => void;
     disabled?: boolean;
 }) {
+    const t = useTheme();
+    const styles = useMemo(() => makeStyles(t), [t]);
     return (
         <Pressable
             disabled={disabled}
@@ -197,26 +203,28 @@ function ActionButton({
     );
 }
 
-const COLORS = {
-    background: "#282828",
-    surface: "#3c3836",
-    border: "#504945",
-    text: "#ebdbb2",
-    muted: "#a89984",
-    accent: "#d79921",
-    link: "#83a598",
-};
+const makeCOLORS = (t: Palette) => ({
+    background: t.bg,
+    surface: t.surface,
+    border: t.surfaceHigh,
+    text: t.text,
+    muted: t.muted,
+    accent: t.gold,
+    link: t.blue,
+});
 
-const styles = StyleSheet.create({
+const makeStyles = (t: Palette) => {
+    const COLORS = makeCOLORS(t);
+    return StyleSheet.create({
 
     container: {
         flex: 1,
-        backgroundColor: "#282828",
+        backgroundColor: t.bg,
         padding: 20,
     },
 
     title: {
-        color: "#ebdbb2",
+        color: t.text,
         fontSize: 32,
         fontWeight: "bold",
         marginBottom: 20,
@@ -232,9 +240,9 @@ const styles = StyleSheet.create({
     },
 
     card: {
-        backgroundColor: "#3c3836",
+        backgroundColor: t.surface,
         borderWidth: 1,
-        borderColor: "#504945",
+        borderColor: t.surfaceHigh,
         borderRadius: 12,
         padding: 18,
         flexDirection: "row",
@@ -251,25 +259,25 @@ const styles = StyleSheet.create({
     },
 
     front: {
-        color: "#ebdbb2",
+        color: t.text,
         fontSize: 19,
         fontWeight: "bold",
         marginBottom: 5,
     },
 
     back: {
-        color: "#a89984",
+        color: t.muted,
         fontSize: 16,
     },
 
     arrow: {
-        color: "#d79921",
+        color: t.gold,
         fontSize: 30,
         marginLeft: 15,
     },
 
     emptyText: {
-        color: "#a89984",
+        color: t.muted,
         fontSize: 16,
         textAlign: "center",
         marginTop: 40,
@@ -277,13 +285,13 @@ const styles = StyleSheet.create({
 
     searchInput: {
         flex: 1,
-        color: "#ebdbb2",
+        color: t.text,
         padding: 14,
         fontSize: 16,
     },
 
     searchCount: {
-        color: "#83a598",
+        color: t.blue,
         fontSize: 16,
         fontWeight: "bold",
         marginRight: 14,
@@ -292,14 +300,14 @@ const styles = StyleSheet.create({
     searchContainer: {
         flexDirection: "row",
         alignItems: "center",
-        backgroundColor: "#3c3836",
+        backgroundColor: t.surface,
         borderWidth: 1,
-        borderColor: "#504945",
+        borderColor: t.surfaceHigh,
         borderRadius: 12,
         marginBottom: 20,
     },
     example: {
-        color: "#b8bb26",
+        color: t.green,
         fontSize: 16,
         marginTop: 5,
     },
@@ -328,4 +336,5 @@ const styles = StyleSheet.create({
         justifyContent: "flex-end",
         gap: 10,
     },
-});
+    });
+};

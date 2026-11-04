@@ -3,7 +3,7 @@ import { getSpeechTrail } from "../services/tts";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import * as Speech from "expo-speech";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef, useState, useMemo } from "react";
 import { Alert, Linking, Modal, Platform, Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import CardStack from "../components/CardStack";
@@ -32,6 +32,8 @@ import {
   refreshQueuedCards,
   ReviewQueue,
 } from "../models/ReviewQueue";
+import { useTheme } from "../theme/ThemeProvider";
+import type { Palette } from "../theme/themes";
 
 const source = { getDueCardIds, getCardsByIds };
 
@@ -45,6 +47,9 @@ type HistoryEntry = {
 };
 
 export default function LearnScreen() {
+  const t = useTheme();
+  const COLORS = useMemo(() => makeCOLORS(t), [t]);
+  const styles = useMemo(() => makeStyles(t), [t]);
   const insets = useSafeAreaInsets();
   const { settings, loaded: settingsLoaded, update: updateSettings } = useLearnSettings();
 
@@ -484,6 +489,9 @@ function SettingRow({
   value: boolean;
   onChange: (value: boolean) => void;
 }) {
+  const t = useTheme();
+  const COLORS = useMemo(() => makeCOLORS(t), [t]);
+  const styles = useMemo(() => makeStyles(t), [t]);
   return (
     <View style={styles.settingRow}>
       <View style={styles.settingText}>
@@ -509,6 +517,8 @@ function ActionButton({
   onPress: () => void;
   disabled?: boolean;
 }) {
+  const t = useTheme();
+  const styles = useMemo(() => makeStyles(t), [t]);
   return (
     <Pressable
       disabled={disabled}
@@ -542,17 +552,19 @@ function formatStudyTime(milliseconds: number): string {
   return `${seconds}s`;
 }
 
-const COLORS = {
-  background: "#282828",
-  surface: "#3c3836",
-  border: "#504945",
-  text: "#ebdbb2",
-  muted: "#a89984",
-  accent: "#d79921",
-  link: "#83a598",
-};
+const makeCOLORS = (t: Palette) => ({
+  background: t.bg,
+  surface: t.surface,
+  border: t.surfaceHigh,
+  text: t.text,
+  muted: t.muted,
+  accent: t.gold,
+  link: t.blue,
+});
 
-const styles = StyleSheet.create({
+const makeStyles = (t: Palette) => {
+    const COLORS = makeCOLORS(t);
+    return StyleSheet.create({
   header: {
     height: 36,
     marginHorizontal: 20,
@@ -792,4 +804,5 @@ const styles = StyleSheet.create({
     fontSize: 13,
     textAlign: "center",
   },
-});
+    });
+};

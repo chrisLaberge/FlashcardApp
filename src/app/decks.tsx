@@ -1,15 +1,19 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useState, useMemo } from "react";
 import { ActivityIndicator, Alert, FlatList, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { getLanguage } from "../constants/languages";
 import { deleteDeck, getDecks } from "../database/database";
 import { backfillLocalImages } from "../services/localImages";
 import { pickAndRestoreBackup } from "../utils/restoreBackup";
+import { useTheme } from "../theme/ThemeProvider";
+import type { Palette } from "../theme/themes";
 
 type Deck = { id: number; name: string; language: string; card_count: number };
 
 export default function DecksScreen() {
+    const t = useTheme();
+    const s = useMemo(() => makeS(t), [t]);
     const [decks, setDecks] = useState<Deck[]>([]);
     const [selectedId, setSelectedId] = useState<number | null>(null);
     const [deckToDelete, setDeckToDelete] = useState<Deck | null>(null);
@@ -86,7 +90,7 @@ export default function DecksScreen() {
                     accessibilityRole="button"
                 >
                     {restoring ? (
-                        <ActivityIndicator color="#83a598" />
+                        <ActivityIndicator color={t.blue} />
                     ) : (
                         <>
                             <Text style={s.restoreTitle}>Restore from backup</Text>
@@ -181,18 +185,18 @@ export default function DecksScreen() {
     );
 }
 
-const s = StyleSheet.create({
-    container: { flex: 1, backgroundColor: "#282828", padding: 20, paddingTop: 60 },
+const makeS = (t: Palette) => StyleSheet.create({
+    container: { flex: 1, backgroundColor: t.bg, padding: 20, paddingTop: 60 },
 
     title: {
-        color: "#ebdbb2",
+        color: t.text,
         fontSize: 22,
         fontWeight: "600",
         textAlign: "center",
         letterSpacing: 0.5,
     },
     hint: {
-        color: "#7c6f64",
+        color: t.subtle,
         fontSize: 13,
         textAlign: "center",
         marginTop: 6,
@@ -202,31 +206,31 @@ const s = StyleSheet.create({
     card: {
         flexDirection: "row",
         alignItems: "center",
-        backgroundColor: "#3c3836",
+        backgroundColor: t.surface,
         borderRadius: 14,
         padding: 18,
         marginBottom: 12,
     },
-    cardSelected: { backgroundColor: "#d79921" },
+    cardSelected: { backgroundColor: t.gold },
     flag: { fontSize: 32, marginRight: 14 },
-    name: { color: "#ebdbb2", fontSize: 19, fontWeight: "bold" },
-    language: { color: "#a89984", fontSize: 14, marginTop: 3 },
+    name: { color: t.text, fontSize: 19, fontWeight: "bold" },
+    language: { color: t.muted, fontSize: 14, marginTop: 3 },
     countBox: { alignItems: "center", marginLeft: 12 },
-    count: { color: "#83a598", fontSize: 28, fontWeight: "bold" },
-    countLabel: { color: "#a89984", fontSize: 12 },
-    onAccent: { color: "#282828" },
+    count: { color: t.blue, fontSize: 28, fontWeight: "bold" },
+    countLabel: { color: t.muted, fontSize: 12 },
+    onAccent: { color: t.bg },
 
     restoreBox: {
         borderWidth: 1,
-        borderColor: "#504945",
+        borderColor: t.surfaceHigh,
         borderStyle: "dashed",
         borderRadius: 14,
         padding: 18,
         marginBottom: 16,
         alignItems: "center",
     },
-    restoreTitle: { color: "#83a598", fontSize: 16, fontWeight: "600" },
-    restoreText: { color: "#a89984", fontSize: 13, marginTop: 4, textAlign: "center" },
+    restoreTitle: { color: t.blue, fontSize: 16, fontWeight: "600" },
+    restoreText: { color: t.muted, fontSize: 13, marginTop: 4, textAlign: "center" },
 
     fab: {
         position: "absolute",
@@ -235,11 +239,11 @@ const s = StyleSheet.create({
         width: 60,
         height: 60,
         borderRadius: 30,
-        backgroundColor: "#b8bb26",
+        backgroundColor: t.green,
         alignItems: "center",
         justifyContent: "center",
     },
-    fabText: { color: "#282828", fontSize: 32, lineHeight: 34, fontWeight: "bold" },
+    fabText: { color: t.bg, fontSize: 32, lineHeight: 34, fontWeight: "bold" },
 
     // Delete dialog
     backdrop: {
@@ -252,22 +256,22 @@ const s = StyleSheet.create({
     dialog: {
         width: "100%",
         maxWidth: 340,
-        backgroundColor: "#3c3836",
+        backgroundColor: t.surface,
         borderWidth: 1,
-        borderColor: "#504945",
+        borderColor: t.surfaceHigh,
         borderRadius: 18,
         padding: 24,
         alignItems: "center",
     },
     dialogFlag: { fontSize: 40, marginBottom: 10 },
-    dialogTitle: { color: "#ebdbb2", fontSize: 20, fontWeight: "bold", marginBottom: 10 },
-    dialogBody: { color: "#a89984", fontSize: 15, lineHeight: 22, textAlign: "center" },
-    dialogDeck: { color: "#ebdbb2", fontWeight: "bold" },
+    dialogTitle: { color: t.text, fontSize: 20, fontWeight: "bold", marginBottom: 10 },
+    dialogBody: { color: t.muted, fontSize: 15, lineHeight: 22, textAlign: "center" },
+    dialogDeck: { color: t.text, fontWeight: "bold" },
     dialogButtons: { flexDirection: "row", gap: 10, marginTop: 24 },
     btn: { flex: 1, paddingVertical: 13, borderRadius: 10, alignItems: "center" },
-    cancelBtn: { backgroundColor: "#504945" },
-    cancelText: { color: "#ebdbb2", fontSize: 16, fontWeight: "600" },
-    deleteBtn: { backgroundColor: "#282828", borderWidth: 1, borderColor: "#fb4934" },
-    deleteText: { color: "#fb4934", fontSize: 16, fontWeight: "bold" },
+    cancelBtn: { backgroundColor: t.surfaceHigh },
+    cancelText: { color: t.text, fontSize: 16, fontWeight: "600" },
+    deleteBtn: { backgroundColor: t.bg, borderWidth: 1, borderColor: t.red },
+    deleteText: { color: t.red, fontSize: 16, fontWeight: "bold" },
     pressed: { opacity: 0.7 },
 });

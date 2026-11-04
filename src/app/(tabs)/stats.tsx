@@ -1,9 +1,11 @@
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useState, useMemo } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { getReviewLog } from "../../database/database";
 import { levelProgress, milestones, nextMilestones, totalXp, type Milestone } from "../../models/Progression";
 import { dailyStats, localDay, shiftDay, streaks, totals, type LoggedReview } from "../../models/Stats";
+import { useTheme } from "../../theme/ThemeProvider";
+import type { Palette } from "../../theme/themes";
 
 type Summary = {
     xp: number;
@@ -47,6 +49,8 @@ function formatTime(ms: number): string {
 }
 
 export default function StatsScreen() {
+    const t = useTheme();
+    const s = useMemo(() => makeS(t), [t]);
     const [summary, setSummary] = useState<Summary | null>(null);
 
     useFocusEffect(
@@ -143,6 +147,8 @@ export default function StatsScreen() {
 }
 
 function Tile({ label, value, note }: { label: string; value: string; note: string }) {
+    const t = useTheme();
+    const s = useMemo(() => makeS(t), [t]);
     return (
         <View style={s.tile}>
             <Text style={s.muted}>{label}</Text>
@@ -152,31 +158,31 @@ function Tile({ label, value, note }: { label: string; value: string; note: stri
     );
 }
 
-const s = StyleSheet.create({
-    container: { flex: 1, backgroundColor: "#282828" },
+const makeS = (t: Palette) => StyleSheet.create({
+    container: { flex: 1, backgroundColor: t.bg },
     content: { padding: 20, paddingBottom: 60, gap: 14 },
-    card: { backgroundColor: "#3c3836", borderRadius: 14, padding: 16, gap: 10 },
-    levelLabel: { color: "#fabd2f", fontSize: 26, fontWeight: "bold" },
-    heading: { color: "#ebdbb2", fontSize: 17, fontWeight: "600" },
-    muted: { color: "#a89984", fontSize: 13 },
-    track: { height: 10, borderRadius: 5, backgroundColor: "#504945", overflow: "hidden" },
-    fill: { height: "100%", backgroundColor: "#b8bb26" },
+    card: { backgroundColor: t.surface, borderRadius: 14, padding: 16, gap: 10 },
+    levelLabel: { color: t.yellow, fontSize: 26, fontWeight: "bold" },
+    heading: { color: t.text, fontSize: 17, fontWeight: "600" },
+    muted: { color: t.muted, fontSize: 13 },
+    track: { height: 10, borderRadius: 5, backgroundColor: t.surfaceHigh, overflow: "hidden" },
+    fill: { height: "100%", backgroundColor: t.green },
     grid: { flexDirection: "row", flexWrap: "wrap", gap: 14 },
-    tile: { flexGrow: 1, flexBasis: "45%", backgroundColor: "#3c3836", borderRadius: 14, padding: 14 },
-    tileValue: { color: "#ebdbb2", fontSize: 24, fontWeight: "bold", marginTop: 2 },
-    tileNote: { color: "#7c6f64", fontSize: 12, marginTop: 2 },
+    tile: { flexGrow: 1, flexBasis: "45%", backgroundColor: t.surface, borderRadius: 14, padding: 14 },
+    tileValue: { color: t.text, fontSize: 24, fontWeight: "bold", marginTop: 2 },
+    tileNote: { color: t.subtle, fontSize: 12, marginTop: 2 },
     chart: { flexDirection: "row", gap: 6, height: 120 },
     barCol: { flex: 1, alignItems: "center" },
-    barSlot: { flex: 1, width: "70%", justifyContent: "flex-end", backgroundColor: "#32302f", borderRadius: 4, overflow: "hidden" },
-    barFill: { width: "100%", backgroundColor: "#83a598" },
-    barCount: { color: "#ebdbb2", fontSize: 11, marginTop: 4 },
-    barDay: { color: "#7c6f64", fontSize: 11 },
+    barSlot: { flex: 1, width: "70%", justifyContent: "flex-end", backgroundColor: t.bgSoft, borderRadius: 4, overflow: "hidden" },
+    barFill: { width: "100%", backgroundColor: t.blue },
+    barCount: { color: t.text, fontSize: 11, marginTop: 4 },
+    barDay: { color: t.subtle, fontSize: 11 },
     goal: { gap: 6 },
     goalRow: { flexDirection: "row", justifyContent: "space-between" },
-    goalTitle: { color: "#ebdbb2", fontSize: 14 },
+    goalTitle: { color: t.text, fontSize: 14 },
     badges: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
     links: { flexDirection: "row", gap: 14 },
-    linkButton: { flex: 1, backgroundColor: "#504945", borderRadius: 12, paddingVertical: 14, alignItems: "center" },
-    linkText: { color: "#ebdbb2", fontSize: 15, fontWeight: "600" },
-    badge: { color: "#ebdbb2", backgroundColor: "#504945", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, fontSize: 13 },
+    linkButton: { flex: 1, backgroundColor: t.surfaceHigh, borderRadius: 12, paddingVertical: 14, alignItems: "center" },
+    linkText: { color: t.text, fontSize: 15, fontWeight: "600" },
+    badge: { color: t.text, backgroundColor: t.surfaceHigh, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, fontSize: 13 },
 });

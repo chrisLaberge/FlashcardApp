@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
     FlatList,
     KeyboardAvoidingView,
@@ -13,8 +13,12 @@ import {
 } from "react-native";
 import { languages } from "../constants/languages";
 import { addDeck } from "../database/database";
+import { useTheme } from "../theme/ThemeProvider";
+import type { Palette } from "../theme/themes";
 
 export default function CreateDeckScreen() {
+    const t = useTheme();
+    const styles = useMemo(() => makeStyles(t), [t]);
     const [name, setName] = useState("");
     const [language, setLanguage] = useState(languages[1]);
     const [modalVisible, setModalVisible] = useState(false);
@@ -55,7 +59,7 @@ export default function CreateDeckScreen() {
                 <TextInput
                     style={styles.input}
                     placeholder="Beginner Chinese"
-                    placeholderTextColor="#7c6f64"
+                    placeholderTextColor={t.subtle}
                     value={name}
                     onChangeText={setName}
                 />
@@ -136,7 +140,7 @@ export default function CreateDeckScreen() {
                         <TextInput
                             style={styles.searchInput}
                             placeholder="Search in English or native language..."
-                            placeholderTextColor="#7c6f64"
+                            placeholderTextColor={t.subtle}
                             value={search}
                             onChangeText={setSearch}
                             autoFocus
@@ -189,45 +193,45 @@ export default function CreateDeckScreen() {
     );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t: Palette) => StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: "#282828",
+        backgroundColor: t.bg,
         padding: 22,
         paddingTop: 55,
     },
 
     smallTitle: {
-        color: "#d79921",
+        color: t.gold,
         fontSize: 13,
         fontWeight: "bold",
         letterSpacing: 2,
     },
 
     title: {
-        color: "#ebdbb2",
+        color: t.text,
         fontSize: 34,
         fontWeight: "bold",
         marginTop: 8,
     },
 
     subtitle: {
-        color: "#a89984",
+        color: t.muted,
         fontSize: 15,
         marginTop: 5,
         marginBottom: 30,
     },
 
     card: {
-        backgroundColor: "#3c3836",
+        backgroundColor: t.surface,
         borderRadius: 14,
         borderWidth: 1,
-        borderColor: "#504945",
+        borderColor: t.surfaceHigh,
         padding: 20,
     },
 
     label: {
-        color: "#d79921",
+        color: t.gold,
         fontSize: 12,
         fontWeight: "bold",
         letterSpacing: 1,
@@ -236,20 +240,20 @@ const styles = StyleSheet.create({
     },
 
     input: {
-        backgroundColor: "#282828",
+        backgroundColor: t.bg,
         borderRadius: 9,
         borderWidth: 1,
-        borderColor: "#504945",
-        color: "#ebdbb2",
+        borderColor: t.surfaceHigh,
+        color: t.text,
         padding: 15,
         fontSize: 16,
         marginBottom: 22,
     },
 
     languageButton: {
-        backgroundColor: "#282828",
+        backgroundColor: t.bg,
         borderWidth: 1,
-        borderColor: "#504945",
+        borderColor: t.surfaceHigh,
         borderRadius: 10,
         padding: 14,
         flexDirection: "row",
@@ -268,19 +272,19 @@ const styles = StyleSheet.create({
     },
 
     languageName: {
-        color: "#ebdbb2",
+        color: t.text,
         fontSize: 16,
         fontWeight: "bold",
     },
 
     nativeName: {
-        color: "#a89984",
+        color: t.muted,
         fontSize: 14,
         marginTop: 2,
     },
 
     arrow: {
-        color: "#a89984",
+        color: t.muted,
         fontSize: 28,
     },
 
@@ -289,7 +293,7 @@ const styles = StyleSheet.create({
     },
 
     createButton: {
-        backgroundColor: "#d79921",
+        backgroundColor: t.gold,
         padding: 17,
         borderRadius: 10,
         alignItems: "center",
@@ -297,13 +301,13 @@ const styles = StyleSheet.create({
     },
 
     createText: {
-        color: "#282828",
+        color: t.bg,
         fontSize: 17,
         fontWeight: "bold",
     },
 
     cancelText: {
-        color: "#a89984",
+        color: t.muted,
         textAlign: "center",
         padding: 15,
         fontSize: 16,
@@ -316,11 +320,11 @@ const styles = StyleSheet.create({
     },
 
     modal: {
-        backgroundColor: "#282828",
+        backgroundColor: t.bg,
         borderTopLeftRadius: 20,
         borderTopRightRadius: 20,
         borderWidth: 1,
-        borderColor: "#504945",
+        borderColor: t.surfaceHigh,
         height: "88%",
         paddingTop: 20,
     },
@@ -334,13 +338,13 @@ const styles = StyleSheet.create({
     },
 
     modalTitle: {
-        color: "#ebdbb2",
+        color: t.text,
         fontSize: 23,
         fontWeight: "bold",
     },
 
     modalSubtitle: {
-        color: "#a89984",
+        color: t.muted,
         fontSize: 13,
         marginTop: 3,
     },
@@ -349,23 +353,23 @@ const styles = StyleSheet.create({
         width: 38,
         height: 38,
         borderRadius: 19,
-        backgroundColor: "#3c3836",
+        backgroundColor: t.surface,
         alignItems: "center",
         justifyContent: "center",
     },
 
     closeText: {
-        color: "#ebdbb2",
+        color: t.text,
         fontSize: 27,
         lineHeight: 29,
     },
 
     searchInput: {
-        backgroundColor: "#3c3836",
+        backgroundColor: t.surface,
         borderWidth: 1,
-        borderColor: "#504945",
+        borderColor: t.surfaceHigh,
         borderRadius: 10,
-        color: "#ebdbb2",
+        color: t.text,
         padding: 14,
         marginHorizontal: 20,
         marginBottom: 10,
@@ -386,7 +390,7 @@ const styles = StyleSheet.create({
     },
 
     selectedOption: {
-        backgroundColor: "#3c3836",
+        backgroundColor: t.surface,
     },
 
     optionFlag: {
@@ -401,19 +405,19 @@ const styles = StyleSheet.create({
     },
 
     optionName: {
-        color: "#ebdbb2",
+        color: t.text,
         fontSize: 16,
         fontWeight: "bold",
     },
 
     optionNative: {
-        color: "#a89984",
+        color: t.muted,
         fontSize: 14,
         marginTop: 2,
     },
 
     check: {
-        color: "#b8bb26",
+        color: t.green,
         fontSize: 20,
         fontWeight: "bold",
         marginRight: 8,
