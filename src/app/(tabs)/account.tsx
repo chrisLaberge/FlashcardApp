@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { deleteAccount } from "../../services/account";
 import { useUser } from "../../hooks/useUser";
-import { deleteAccount, resetPassword, signInWithEmail, signInWithGoogle, signOut, signUpWithEmail } from "../../services/auth";
+import { resetPassword, signInWithEmail, signInWithGoogle, signOut, signUpWithEmail } from "../../services/auth";
 import { authErrorMessage, isPlausibleEmail } from "../../utils/authErrors";
 
 export default function AccountScreen() {
