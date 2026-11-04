@@ -1,9 +1,11 @@
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { useUser } from "../hooks/useUser";
-import { ApiError, getGlobalLeaderboard, getLeaderboard, type GlobalBoard, type LeaderboardEntry, type Period } from "../services/social";
+import { hideUser, loadHidden } from "../services/hiddenUsers";
+import { ApiError, getGlobalLeaderboard, getLeaderboard, reportUser, type GlobalBoard, type GlobalRow, type LeaderboardEntry, type Period } from "../services/social";
 import { syncStats } from "../services/syncStats";
+import { withoutHidden } from "../utils/hiddenUsers";
 
 export default function LeaderboardScreen() {
     const user = useUser();
@@ -13,6 +15,28 @@ export default function LeaderboardScreen() {
     const [global, setGlobal] = useState<GlobalBoard | null>(null);
     const [error, setError] = useState("");
     const [needsProfile, setNeedsProfile] = useState(false);
+    const [hidden, setHidden] = useState<string[]>([]);
+
+    useFocusEffect(useCallback(() => { void loadHidden().then(setHidden); }, []));
+
+    const report = (person: GlobalRow, reason: "cheating" | "offensive") => {
+        reportUser(person.uid, reason)
+            .then(async () => {
+                setHidden(await hideUser(person.uid));
+                Alert.alert("Thanks", `${person.username} was reported and hidden for you. Enough reports take someone off the board for everyone.`);
+            })
+            .catch((e) => Alert.alert("Could not report", e instanceof Error ? e.message : String(e)));
+    };
+
+    const openMenu = (person: GlobalRow) => {
+        if (person.isMe) return;
+        Alert.alert(person.username, undefined, [
+            { text: "Hide from my board", onPress: () => void hideUser(person.uid).then(setHidden) },
+            { text: "Report: cheating", onPress: () => report(person, "cheating") },
+            { text: "Report: offensive name", onPress: () => report(person, "offensive") },
+            { text: "Cancel", style: "cancel" },
+        ]);
+    };
 
     const load = useCallback(async (which: Period, where: "friends" | "global") => {
         setError("");
@@ -73,7 +97,7 @@ export default function LeaderboardScreen() {
                     <ActivityIndicator color="#83a598" style={{ marginTop: 40 }} />
                 ) : (
                     <FlatList
-                        data={global.entries}
+                        data={withoutHidden(global.entries, hidden)}
                         keyExtractor={(e) => e.uid}
                         contentContainerStyle={{ gap: 8, paddingBottom: 60 }}
                         ListEmptyComponent={<Text style={s.muted}>No one has earned XP {period === "week" ? "this week" : "yet"}. Be the first!</Text>}
@@ -98,6 +122,11 @@ export default function LeaderboardScreen() {
                                     <Text style={s.muted}>Level {item.level} · {item.currentStreak} 🔥</Text>
                                 </View>
                                 <Text style={s.xp}>{item.xp.toLocaleString("en-US")} XP</Text>
+                                {item.isMe ? null : (
+                                    <Pressable onPress={() => openMenu(item)} hitSlop={10} accessibilityLabel={`Report or hide ${item.username}`}>
+                                        <Text style={s.more}>⋯</Text>
+                                    </Pressable>
+                                )}
                             </View>
                         )}
                     />
@@ -150,6 +179,7 @@ const s = StyleSheet.create({
     name: { color: "#ebdbb2", fontSize: 16, fontWeight: "600" },
     muted: { color: "#a89984", fontSize: 13, textAlign: "center" },
     xp: { color: "#b8bb26", fontSize: 16, fontWeight: "bold" },
+    more: { color: "#a89984", fontSize: 22, paddingHorizontal: 4 },
     link: { color: "#83a598", textAlign: "center", fontSize: 14, paddingVertical: 10 },
     error: { color: "#fb4934", textAlign: "center", marginBottom: 10 },
     button: { backgroundColor: "#b8bb26", borderRadius: 10, paddingVertical: 14, paddingHorizontal: 24 },

@@ -79,5 +79,8 @@ export const getLeaderboard = async (period: Period) =>
     (await request<{ period: Period; entries: LeaderboardEntry[] }>("GET", `/leaderboard?period=${period}`)).entries;
 
 export const getGlobalLeaderboard = (period: Period) => request<GlobalBoard & { period: Period }>("GET", `/leaderboard/global?period=${period}`);
+export type ReportReason = "cheating" | "offensive" | "other";
+export const reportUser = (uid: string, reason: ReportReason) => request<void>("POST", "/report", { uid, reason });
+
 export const setShowGlobal = async (showGlobal: boolean) =>
     (await request<{ profile: Profile }>("PUT", "/me/settings", { showGlobal })).profile;
