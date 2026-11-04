@@ -29,6 +29,7 @@ export default function AchievementToast() {
     const [slide] = useState(() => new Animated.Value(0));
     const current = queue[0];
     const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+    const leaving = useRef(false);
 
     useEffect(() => onAchievementsUnlocked((event) => setQueue((q) => [...q, ...messagesFor(event)])), []);
     useEffect(
@@ -37,12 +38,15 @@ export default function AchievementToast() {
     );
 
     const dismiss = () => {
+        if (leaving.current) return;
+        leaving.current = true;
         if (timer.current) clearTimeout(timer.current);
         Animated.timing(slide, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => setQueue((q) => q.slice(1)));
     };
 
     useEffect(() => {
         if (!current) return;
+        leaving.current = false;
         Animated.timing(slide, { toValue: 1, duration: 250, useNativeDriver: true }).start();
         timer.current = setTimeout(dismiss, SHOW_MS);
         return () => {

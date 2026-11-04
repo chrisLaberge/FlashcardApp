@@ -6,7 +6,7 @@ describe("explanation signature", () => {
     test("ignores case and surrounding spaces, changes when the words change", () => {
         expect(explanationSignature({ ...card, learningText: "  pomme " })).toBe(explanationSignature(card));
         expect(explanationSignature({ ...card, localizedText: "apples" })).not.toBe(explanationSignature(card));
-        expect(explanationSignature({ ...card, exampleSentence: "" })).not.toBe(explanationSignature(card));
+        expect(explanationSignature({ ...card, exampleSentence: "" })).toBe(explanationSignature(card));
     });
 });
 

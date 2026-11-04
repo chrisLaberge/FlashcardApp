@@ -24,9 +24,9 @@ export default function LeaderboardScreen() {
             // Upload first so your own row is up to date; a failed upload should not hide the board.
             await syncStats().catch(() => null);
             if (where === "global") {
-                setGlobal(await getGlobalLeaderboard("all"));
+                setGlobal(await getGlobalLeaderboard());
             } else {
-                setEntries(await getLeaderboard("all"));
+                setEntries(await getLeaderboard());
             }
             setNeedsProfile(false);
         } catch (e) {

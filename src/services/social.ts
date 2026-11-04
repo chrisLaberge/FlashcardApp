@@ -19,7 +19,6 @@ export type Profile = {
 
 export type Person = { uid: string; username: string; avatar: string | null; level: number; totalXp: number; currentStreak: number };
 export type Friends = { friends: Person[]; incoming: Person[]; outgoing: Person[] };
-export type Period = "week" | "all";
 export type LeaderboardEntry = Person & { rank: number; xp: number; isMe: boolean };
 
 export type GlobalRow = { rank: number; uid: string; username: string; avatar: string | null; level: number; xp: number; currentStreak: number; isMe: boolean };
@@ -78,10 +77,9 @@ export const acceptRequest = (uid: string) => request<void>("POST", `/friends/re
 export const removeRequest = (uid: string) => request<void>("DELETE", `/friends/requests/${encodeURIComponent(uid)}`);
 export const removeFriend = (uid: string) => request<void>("DELETE", `/friends/${encodeURIComponent(uid)}`);
 
-export const getLeaderboard = async (period: Period) =>
-    (await request<{ period: Period; entries: LeaderboardEntry[] }>("GET", `/leaderboard?period=${period}`)).entries;
+export const getLeaderboard = async () => (await request<{ entries: LeaderboardEntry[] }>("GET", "/leaderboard")).entries;
 
-export const getGlobalLeaderboard = (period: Period) => request<GlobalBoard & { period: Period }>("GET", `/leaderboard/global?period=${period}`);
+export const getGlobalLeaderboard = () => request<GlobalBoard>("GET", "/leaderboard/global");
 export const setAvatar = async (avatar: string) =>
     (await request<{ profile: Profile }>("PUT", "/me/settings", { avatar })).profile;
 export const setShowGlobal = async (showGlobal: boolean) =>
