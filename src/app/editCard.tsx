@@ -1,4 +1,5 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import PixabayCredit from "../components/PixabayCredit";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
@@ -876,6 +877,8 @@ export default function EditCardScreen() {
                                 )}
                             </Pressable>
                         </View>
+
+                        <PixabayCredit />
 
                         <ScrollView
                             contentContainerStyle={styles.imageGrid}

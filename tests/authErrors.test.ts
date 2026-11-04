@@ -8,6 +8,7 @@ describe("authErrorMessage", () => {
         ["auth/email-already-in-use", "An account with this email already exists. Try signing in instead."],
         ["auth/network-request-failed", "No connection. Check your internet and try again."],
         ["auth/too-many-requests", "Too many attempts. Wait a few minutes and try again."],
+        ["auth/requires-recent-login", "For your security, sign out, sign in again, and then delete the account."],
     ])("%s", (code, message) => {
         expect(authErrorMessage({ code })).toBe(message);
     });

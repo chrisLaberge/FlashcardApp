@@ -1,4 +1,5 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import PixabayCredit from "../components/PixabayCredit";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useRef, useState, type ComponentRef } from "react";
@@ -827,6 +828,8 @@ export default function AddCardScreen() {
                                 )}
                             </Pressable>
                         </View>
+
+                        <PixabayCredit />
 
                         {/* Results */}
 
