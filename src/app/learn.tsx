@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { getSpeechTrail } from "../services/tts";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import * as Speech from "expo-speech";
@@ -444,6 +445,16 @@ export default function LearnScreen() {
               onChange={(listeningCards) => updateSettings({ listeningCards })}
             />
 
+            {remoteVoice ? (
+              <View style={styles.trailBox}>
+                <Text style={styles.trailTitle}>Server voice, last events</Text>
+                {(settingsOpen ? getSpeechTrail() : []).map((line, i) => (
+                  <Text key={i} style={styles.trailLine}>{line}</Text>
+                ))}
+                {settingsOpen && getSpeechTrail().length === 0 ? <Text style={styles.trailLine}>nothing yet</Text> : null}
+              </View>
+            ) : null}
+
             <Pressable
               onPress={() => setSettingsOpen(false)}
               accessibilityRole="button"
@@ -594,6 +605,9 @@ const styles = StyleSheet.create({
     padding: 20,
   },
 
+  trailBox: { marginTop: 8, gap: 2 },
+  trailTitle: { color: COLORS.muted, fontSize: 12, fontWeight: "600" },
+  trailLine: { color: COLORS.muted, fontSize: 11 },
   settingsTitle: {
     color: COLORS.text,
     fontSize: 20,

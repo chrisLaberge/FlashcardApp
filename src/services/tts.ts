@@ -15,6 +15,23 @@ import { API_URL } from "./imageApi";
 
 const REQUEST_TIMEOUT_MS = 20_000;
 
+/**
+ * A short trail of what happened to the server voice (download, load, play, errors), shown in the
+ * learn settings so a problem can be diagnosed on the phone without a computer.
+ */
+const trail: string[] = [];
+
+function note(message: string): void {
+    const now = new Date();
+    const clock = [now.getHours(), now.getMinutes(), now.getSeconds()].map((n) => String(n).padStart(2, "0")).join(":");
+    trail.push(`${clock} ${message}`);
+    if (trail.length > 8) trail.shift();
+}
+
+export function getSpeechTrail(): string[] {
+    return [...trail];
+}
+
 function cacheDirectory(): Directory {
     return new Directory(Paths.document, "tts");
 }
@@ -46,7 +63,10 @@ export function ensureSpeechFile(voice: string, text: string): Promise<string | 
     if (!clean) return Promise.resolve(null);
 
     const cached = findCached(voice, clean);
-    if (cached) return Promise.resolve(cached.uri);
+    if (cached) {
+        note(`on phone: ${cached.name} (${cached.size} bytes)`);
+        return Promise.resolve(cached.uri);
+    }
 
     const key = ttsCacheName(voice, clean);
     let request = inFlight.get(key);
@@ -70,6 +90,7 @@ export function ensureSpeechFile(voice: string, text: string): Promise<string | 
                 if (!response.ok) throw new Error(`Speech request failed (${response.status})`);
 
                 const bytes = new Uint8Array(await response.arrayBuffer());
+                note(`downloaded ${bytes.length} bytes (${response.headers.get("content-type") ?? "no type"})`);
                 if (bytes.length === 0) throw new Error("Speech request returned no audio");
 
                 const directory = cacheDirectory();
@@ -80,6 +101,7 @@ export function ensureSpeechFile(voice: string, text: string): Promise<string | 
                 return file.uri;
             } catch (error) {
                 console.warn("Could not get speech audio:", error);
+                note(`download failed: ${error instanceof Error ? error.message : String(error)}`);
                 return null;
             } finally {
                 inFlight.delete(key);
@@ -126,8 +148,19 @@ export async function speakRemote(voice: string, text: string): Promise<boolean>
             audioModeSet = true;
         }
         const next = createAudioPlayer({ uri });
+        let sawLoaded = false;
+        let sawPlaying = false;
         next.addListener("playbackStatusUpdate", (status) => {
+            if (status.isLoaded && !sawLoaded) {
+                sawLoaded = true;
+                note(`loaded, ${status.duration.toFixed(1)} s`);
+            }
+            if (status.playing && !sawPlaying) {
+                sawPlaying = true;
+                note("playing");
+            }
             if (status.didJustFinish) {
+                note("finished");
                 try {
                     next.remove();
                 } catch {
@@ -138,9 +171,11 @@ export async function speakRemote(voice: string, text: string): Promise<boolean>
         });
         player = next;
         next.play();
+        note("play() called");
         return true;
     } catch (error) {
         console.warn("Could not play speech audio:", error);
+        note(`play failed: ${error instanceof Error ? error.message : String(error)}`);
         return false;
     }
 }
