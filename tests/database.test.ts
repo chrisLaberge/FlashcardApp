@@ -249,6 +249,23 @@ describe("due cards and counts", () => {
         expect(await dueIds(db, deckId)).toEqual([2, 1, 4]);
     });
 
+    test("each deck reports how many of its cards are due", async () => {
+        const db = startApp();
+        const a = await db.addDeck("A", "zh");
+        const b = await db.addDeck("B", "ja");
+        const empty = await db.addDeck("Empty", "fr");
+        const raw = rawDb();
+        seedCard(raw, a, 1, { review_count: 3, next_review_at: T0 - DAY });
+        seedCard(raw, a, 2, { review_count: 3, next_review_at: T0 + DAY }); // not due
+        seedCard(raw, a, 3, { review_count: 0, next_review_at: null }); // never reviewed: due
+        seedCard(raw, b, 4, { review_count: 3, next_review_at: T0 + DAY });
+        const decks = await db.getDecks();
+        const by = (id: number) => decks.find((d) => d.id === id)!;
+        expect([by(a).card_count, by(a).due_count]).toEqual([3, 2]);
+        expect([by(b).card_count, by(b).due_count]).toEqual([1, 0]);
+        expect([by(empty).card_count, by(empty).due_count]).toEqual([0, 0]);
+    });
+
     test("only the requested deck's cards are returned", async () => {
         const db = startApp();
         const a = await db.addDeck("A", "zh");
@@ -475,5 +492,24 @@ describe("saved word lookups", () => {
         expect(await db.getWordLookup("key-2")).toBeNull();
         expect(await db.getWordLookup("key-3")).toEqual(entry);
         expect(await db.getWordLookup("key-502")).toEqual(entry);
+    });
+});
+
+describe("words added", () => {
+    test("lists the words still in the app, newest first, with their deck", async () => {
+        const db = startApp();
+        const deck = await db.addDeck("Russian", "ru");
+        await db.addCard("собака", "dog", "", "", deck);
+        advanceTime(1000);
+        const second = await db.addCard("кошка", "cat", "", "", deck);
+        advanceTime(1000);
+        const third = await db.addCard("дом", "house", "", "", deck);
+        const words = await db.getAddedWords();
+        expect(words.map((w) => w.learningText)).toEqual(["дом", "кошка", "собака"]);
+        expect(words[0]).toMatchObject({ localizedText: "house", deckName: "Russian" });
+
+        await db.deleteCard(second);
+        expect((await db.getAddedWords()).map((w) => w.id)).toEqual([third, words[2].id]);
+        expect(await db.getAddedWords(1)).toHaveLength(1);
     });
 });
