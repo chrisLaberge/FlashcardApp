@@ -2,7 +2,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import PixabayCredit from "../components/PixabayCredit";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useRef, useState, type ComponentRef } from "react";
+import { useCallback, useEffect, useRef, useState, type ComponentRef, useMemo } from "react";
 import {
     ActivityIndicator,
     Image,
@@ -36,6 +36,8 @@ import { keepLocalCopy } from "@/services/localImages";
 import { translateText } from "@/services/translationApi";
 import { getRomanization } from "@/utils/romanization";
 import { getLanguage } from "../constants/languages";
+import { useTheme } from "../theme/ThemeProvider";
+import type { Palette } from "../theme/themes";
 
 type TranslationDirection =
     | "learningToLocalized"
@@ -51,18 +53,18 @@ type ExistingCard = {
 type DuplicateChoice = "existing" | "new" | null;
 
 // Gruvbox palette
-const COLORS = {
-    bg0: "#282828",
-    bg1: "#3c3836",
-    bg2: "#504945",
-    bg3: "#665c54",
-    fg: "#ebdbb2",
-    gray: "#a89984",
-    yellow: "#fabd2f",
-    yellowDark: "#d79921",
-    aqua: "#8ec07c",
-    red: "#fb4934",
-};
+const makeCOLORS = (t: Palette) => ({
+    bg0: t.bg,
+    bg1: t.surface,
+    bg2: t.surfaceHigh,
+    bg3: t.surfaceTop,
+    fg: t.text,
+    gray: t.muted,
+    yellow: t.yellow,
+    yellowDark: t.gold,
+    aqua: t.aqua,
+    red: t.red,
+});
 
 function normalize(text: string): string {
     return text.trim().toLocaleLowerCase();
@@ -91,6 +93,9 @@ function ChoiceCard({
     dimmed: boolean;
     onPress: () => void;
 }) {
+    const t = useTheme();
+    const COLORS = useMemo(() => makeCOLORS(t), [t]);
+    const styles = useMemo(() => makeStyles(t), [t]);
     const accent = tone === "existing" ? COLORS.aqua : COLORS.yellow;
 
     return (
@@ -124,6 +129,9 @@ function ChoiceCard({
 }
 
 export default function AddCardScreen() {
+    const t = useTheme();
+    const COLORS = useMemo(() => makeCOLORS(t), [t]);
+    const styles = useMemo(() => makeStyles(t), [t]);
     const { deckId } = useLocalSearchParams<{ deckId?: string }>();
 
     const [learningLanguageCode, setLearningLanguageCode] = useState("en");
@@ -1056,7 +1064,9 @@ export default function AddCardScreen() {
     );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t: Palette) => {
+    const COLORS = makeCOLORS(t);
+    return StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: COLORS.bg0,
@@ -1500,4 +1510,5 @@ const styles = StyleSheet.create({
     errorText: {
         color: COLORS.red,
     },
-});
+    });
+};

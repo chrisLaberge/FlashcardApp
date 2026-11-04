@@ -43,7 +43,7 @@ describe("startup and schema", () => {
             .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
             .all()
             .map((r) => (r as { name: string }).name);
-        expect(tables).toEqual(["card_progress", "cards", "decks", "images", "review_log"]);
+        expect(tables).toEqual(["card_add_log", "card_progress", "cards", "decks", "images", "review_log"]);
     });
 
     test("upgrades a pre-FSRS database without losing progress", async () => {
@@ -358,6 +358,41 @@ describe("persistence across an app restart", () => {
             await db.getDecks();
             const rows = rawDb().prepare("SELECT COUNT(*) AS n FROM card_progress").get() as { n: number };
             expect(rows.n).toBe(1);
+        } finally {
+            stopApp();
+            tmp.cleanup();
+        }
+    });
+});
+
+describe("cards added log", () => {
+    test("adding a card records when it was added, and deleting the card keeps that record", async () => {
+        const { db, ids } = await newDeckWithCards(2);
+        expect((await db.getCardsAdded()).addedAt).toEqual([T0, T0]);
+        await db.deleteCard(ids[0]);
+        const after = await db.getCardsAdded();
+        expect(after.addedAt).toEqual([T0, T0]); // still counts: achievements never go backwards
+        expect(after.undated).toBe(0);
+    });
+
+    test("cards from before dates were recorded are counted but have no date", async () => {
+        const tmp = makeTempDir();
+        try {
+            const file = `${tmp.dir}/old.db`;
+            const old = new DatabaseSync(file);
+            old.exec(`
+                CREATE TABLE decks (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, language TEXT NOT NULL);
+                CREATE TABLE cards (id INTEGER PRIMARY KEY AUTOINCREMENT, deck_id INTEGER NOT NULL, learning_text TEXT NOT NULL,
+                    localized_text TEXT NOT NULL, example_sentence TEXT, romanization TEXT, image_id INTEGER);
+                INSERT INTO decks (name, language) VALUES ('Old', 'zh');
+                INSERT INTO cards (deck_id, learning_text, localized_text) VALUES (1, 'a', 'A'), (1, 'b', 'B');
+            `);
+            old.close();
+
+            const db = startApp(file);
+            expect(await db.getCardsAdded()).toEqual({ addedAt: [], undated: 2 });
+            await db.addCard("c", "C", "", "", 1);
+            expect(await db.getCardsAdded()).toEqual({ addedAt: [T0], undated: 2 });
         } finally {
             stopApp();
             tmp.cleanup();

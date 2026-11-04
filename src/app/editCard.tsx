@@ -2,7 +2,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import PixabayCredit from "../components/PixabayCredit";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import KeyboardInsetView from "@/components/KeyboardInsetView";
 import {
     ActivityIndicator,
@@ -41,6 +41,8 @@ import {
 import { getRomanization } from "../utils/romanization";
 
 import { CardProgress } from "../models/CardProgress";
+import { useTheme } from "../theme/ThemeProvider";
+import type { Palette } from "../theme/themes";
 
 type TranslationDirection = "learningToLocalized" | "localizedToLearning" | null;
 
@@ -53,20 +55,20 @@ type ExistingCard = {
 type DuplicateChoice = "existing" | "current" | null;
 
 // Gruvbox palette
-const COLORS = {
-    bg0: "#282828",
-    bg1: "#3c3836",
-    bg2: "#504945",
-    bg3: "#665c54",
-    fg: "#ebdbb2",
-    gray: "#a89984",
-    yellow: "#fabd2f",
-    yellowDark: "#d79921",
-    aqua: "#8ec07c",
-    red: "#cc241d",
-    redBright: "#fb4934",
-    blue: "#5992b1",
-};
+const makeCOLORS = (t: Palette) => ({
+    bg0: t.bg,
+    bg1: t.surface,
+    bg2: t.surfaceHigh,
+    bg3: t.surfaceTop,
+    fg: t.text,
+    gray: t.muted,
+    yellow: t.yellow,
+    yellowDark: t.gold,
+    aqua: t.aqua,
+    red: t.redDark,
+    redBright: t.red,
+    blue: t.blue,
+});
 
 function normalize(text: string): string {
     return text.trim().toLocaleLowerCase();
@@ -95,6 +97,9 @@ function ChoiceCard({
     dimmed: boolean;
     onPress: () => void;
 }) {
+    const t = useTheme();
+    const COLORS = useMemo(() => makeCOLORS(t), [t]);
+    const styles = useMemo(() => makeStyles(t), [t]);
     const accent = tone === "existing" ? COLORS.aqua : COLORS.yellow;
 
     return (
@@ -128,6 +133,9 @@ function ChoiceCard({
 }
 
 export default function EditCardScreen() {
+    const t = useTheme();
+    const COLORS = useMemo(() => makeCOLORS(t), [t]);
+    const styles = useMemo(() => makeStyles(t), [t]);
     const { id } = useLocalSearchParams<{ id: string }>();
     const cardId = Number(id);
 
@@ -1105,7 +1113,9 @@ function formatTimeRemaining(nextReviewAt?: number): string {
     return `${days} day${days === 1 ? "" : "s"}`;
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t: Palette) => {
+    const COLORS = makeCOLORS(t);
+    return StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: COLORS.bg0,
@@ -1682,4 +1692,5 @@ const styles = StyleSheet.create({
     errorText: {
         color: COLORS.redBright,
     },
-});
+    });
+};

@@ -118,6 +118,23 @@ describe("restoreFromBackup", () => {
         await expect(db.restoreFromBackup(asSource(notABackup))).rejects.toBeInstanceOf(db.RestoreError);
     });
 
+    test("the dates cards were added come back with a restore", async () => {
+        const dir = makeTempDir();
+        try {
+            const file = `${dir.dir}/backup.db`;
+            const made = await makeBackup(file);
+            const raw = new DatabaseSync(file);
+            const db = startApp();
+            await db.restoreFromBackup(asSource(raw));
+            raw.close();
+            expect(await db.getCardsAdded()).toEqual({ addedAt: [T0, T0], undated: 0 });
+            expect(made.a).toBeDefined();
+        } finally {
+            stopApp();
+            dir.cleanup();
+        }
+    });
+
     test("a backup from before FSRS, levels, images and the review log is accepted", async () => {
         const old = new DatabaseSync(":memory:");
         old.exec(`

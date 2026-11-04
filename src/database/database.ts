@@ -84,6 +84,14 @@ async function openAndPrepareDatabase(): Promise<SQLite.SQLiteDatabase> {
                 duration_ms INTEGER,
                 due_at INTEGER
             );
+            -- When each card was added (for the "cards added" calendar and achievements). Like review_log it
+            -- survives deleting the card, and has no foreign key. Cards added before this existed have no row.
+            CREATE TABLE IF NOT EXISTS card_add_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                card_id INTEGER NOT NULL,
+                added_at INTEGER NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_card_add_log_time ON card_add_log(added_at);
             CREATE INDEX IF NOT EXISTS idx_review_log_time ON review_log(reviewed_at);
             CREATE INDEX IF NOT EXISTS idx_review_log_card ON review_log(card_id);
             CREATE INDEX IF NOT EXISTS idx_cards_deck ON cards(deck_id);
@@ -172,6 +180,7 @@ export async function addCard(learningText: string, localizedText: string, examp
         VALUES (?, ?, ?, ?, ?)
     `, learningText, localizedText, exampleSentence, romanization, deckId);
     await database.runAsync("INSERT OR IGNORE INTO card_progress (card_id) VALUES (?)", result.lastInsertRowId);
+    await database.runAsync("INSERT INTO card_add_log (card_id, added_at) VALUES (?, ?)", result.lastInsertRowId, Date.now());
     return result.lastInsertRowId;
 }
 
@@ -391,6 +400,22 @@ export async function getReviewLog(sinceMs = 0, deckId?: number): Promise<Review
     }));
 }
 
+export type CardsAdded = {
+    /** When each card was added, oldest first. */
+    addedAt: number[];
+    /** Cards that exist but were added before dates were recorded: counted in totals, not on the calendar. */
+    undated: number;
+};
+
+export async function getCardsAdded(): Promise<CardsAdded> {
+    const database = await getDatabase();
+    const rows = await database.getAllAsync<{ added_at: number }>("SELECT added_at FROM card_add_log ORDER BY added_at, id");
+    const undated = await database.getFirstAsync<{ n: number }>(
+        "SELECT COUNT(*) AS n FROM cards WHERE id NOT IN (SELECT card_id FROM card_add_log)",
+    );
+    return { addedAt: rows.map((row) => row.added_at), undated: undated?.n ?? 0 };
+}
+
 async function applyReview(cardId: number, direction: "left" | "right", info: ReviewInfo): Promise<number | undefined> {
     const progress = await getCardProgress(cardId);
     if (!progress) return undefined;
@@ -566,7 +591,7 @@ export type RestoreResult = {
 
 export class RestoreError extends Error {}
 
-const RESTORE_TABLES = ["decks", "images", "cards", "card_progress", "review_log"] as const;
+const RESTORE_TABLES = ["decks", "images", "cards", "card_progress", "review_log", "card_add_log"] as const;
 
 async function columnNames(db: RestoreSource, table: string): Promise<string[]> {
     const rows = await db.getAllAsync<{ name: string }>(`PRAGMA table_info(${table})`);

@@ -2,7 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as DocumentPicker from "expo-document-picker";
 import { router } from "expo-router";
 import Papa from "papaparse";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import {
     ActivityIndicator,
     Animated,
@@ -22,21 +22,23 @@ import {
 } from "../database/database";
 import { REVIEW_INTERVALS } from "../models/SpacedRepetition";
 import { getRomanization } from "../utils/romanization";
+import { useTheme } from "../theme/ThemeProvider";
+import type { Palette } from "../theme/themes";
 
 /* ---------- Gruvbox dark palette ---------- */
-const c = {
-    bg: "#282828",
-    bg1: "#3c3836",
-    bg2: "#504945",
-    bg3: "#665c54",
-    fg: "#ebdbb2",
-    gray: "#a89984",
-    yellow: "#fabd2f",
-    green: "#b8bb26",
-    red: "#fb4934",
-    orange: "#fe8019",
-    aqua: "#8ec07c",
-};
+const makeC = (t: Palette) => ({
+    bg: t.bg,
+    bg1: t.surface,
+    bg2: t.surfaceHigh,
+    bg3: t.surfaceTop,
+    fg: t.text,
+    gray: t.muted,
+    yellow: t.yellow,
+    green: t.green,
+    red: t.red,
+    orange: t.orange,
+    aqua: t.aqua,
+});
 
 type CsvCard = {
     learningText: string;
@@ -98,6 +100,8 @@ function StatRow({
     value: number;
     last?: boolean;
 }) {
+    const t = useTheme();
+    const styles = useMemo(() => makeStyles(t), [t]);
     return (
         <View style={[styles.statRow, !last && styles.statDivider]}>
             <Text style={styles.statLabel}>{label}</Text>
@@ -127,6 +131,9 @@ function ChoiceCard({
     dimmed: boolean;
     onPress: () => void;
 }) {
+    const t = useTheme();
+    const c = useMemo(() => makeC(t), [t]);
+    const styles = useMemo(() => makeStyles(t), [t]);
     const accent = tone === "existing" ? c.aqua : c.yellow;
 
     return (
@@ -159,6 +166,9 @@ function ChoiceCard({
 }
 
 export default function ImportScreen() {
+    const t = useTheme();
+    const c = useMemo(() => makeC(t), [t]);
+    const styles = useMemo(() => makeStyles(t), [t]);
     const [cards, setCards] = useState<CsvCard[]>([]);
     const [plans, setPlans] = useState<ImportPlan[]>([]);
     const [stage, setStage] = useState<
@@ -1020,7 +1030,9 @@ export default function ImportScreen() {
     );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t: Palette) => {
+    const c = makeC(t);
+    return StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: c.bg,
@@ -1297,4 +1309,5 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: "bold",
     },
-});
+    });
+};

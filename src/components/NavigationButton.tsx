@@ -1,5 +1,8 @@
 import { router } from "expo-router";
 import { Pressable, StyleSheet, Text } from "react-native";
+import { useMemo } from "react";
+import { useTheme } from "../theme/ThemeProvider";
+import type { Palette } from "../theme/themes";
 
 export default function NavigationButton({
     deckId,
@@ -8,6 +11,8 @@ export default function NavigationButton({
     deckId?: string;
     variant?: "floating" | "pill";
 }) {
+    const t = useTheme();
+    const styles = useMemo(() => makeStyles(t), [t]);
     const isPill = variant === "pill";
 
     return (
@@ -33,10 +38,10 @@ export default function NavigationButton({
     );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t: Palette) => StyleSheet.create({
     // Original floating style (unchanged)
     button: {
-        backgroundColor: "#d79921",
+        backgroundColor: t.gold,
         paddingVertical: 14,
         paddingHorizontal: 20,
         borderRadius: 10,
@@ -46,7 +51,7 @@ const styles = StyleSheet.create({
     },
 
     text: {
-        color: "#282828",
+        color: t.bg,
         fontSize: 16,
         fontWeight: "bold",
     },
@@ -57,11 +62,11 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         borderRadius: 999,
         borderWidth: 1,
-        borderColor: "#d79921",
+        borderColor: t.gold,
     },
 
     pillText: {
-        color: "#d79921",
+        color: t.gold,
         fontSize: 14,
         fontWeight: "500",
     },

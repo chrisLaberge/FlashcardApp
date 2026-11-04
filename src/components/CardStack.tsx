@@ -23,6 +23,8 @@ import { Card } from "../models/Card";
 import { prefetchSpeech, speakRemote, stopRemoteSpeech } from "@/services/tts";
 import { answerSideFor, pickPromptSide, type PromptSide } from "../models/StudyMode";
 import { fitText } from "../utils/textFit";
+import { useTheme } from "../theme/ThemeProvider";
+import type { Palette } from "../theme/themes";
 
 /* -------------------------------------------------------------------------- */
 /*                              Constants & types                             */
@@ -52,14 +54,14 @@ const LEARNING_WIDTH = {
 const LOCALIZED_WIDTH = TEXT_AREA_WIDTH;
 const TEXT_SIZE = { large: 36, small: 18 };
 
-const COLORS = {
-    cardBackground: "#ebdbb2",
-    cardBorder: "#d5c4a1",
-    text: "#282828",
-    hint: "#7c6f64",
-    danger: "#cc241d",
-    success: "#136d18",
-};
+const makeCOLORS = (t: Palette) => ({
+    cardBackground: t.paper,
+    cardBorder: t.paperBorder,
+    text: t.paperText,
+    hint: t.subtle,
+    danger: t.redDark,
+    success: t.success,
+});
 
 type Direction = "left" | "right";
 
@@ -388,6 +390,9 @@ interface SpeakButtonProps {
  * learning row can stay symmetric around the word.
  */
 function SpeakButton({ onPress, small, style, decorative }: SpeakButtonProps) {
+    const t = useTheme();
+    const COLORS = useMemo(() => makeCOLORS(t), [t]);
+    const styles = useMemo(() => makeStyles(t), [t]);
     const size = small ? styles.speakSmall : styles.speakLarge;
 
     if (!onPress && decorative) {
@@ -426,6 +431,9 @@ function SpeakButton({ onPress, small, style, decorative }: SpeakButtonProps) {
 
 /** The front of a listening card: no text at all, just the sound (tap to hear it again). */
 function AudioPrompt({ onPress }: { onPress?: () => void }) {
+    const t = useTheme();
+    const COLORS = useMemo(() => makeCOLORS(t), [t]);
+    const styles = useMemo(() => makeStyles(t), [t]);
     return (
         <View style={styles.term}>
             <Pressable
@@ -464,6 +472,8 @@ function Term({
     previewSpeaker,
     showRomanization = true,
 }: TermProps) {
+    const t = useTheme();
+    const styles = useMemo(() => makeStyles(t), [t]);
     const small = size === "small";
     const textStyle = small ? styles.textSmall : styles.textLarge;
 
@@ -575,6 +585,8 @@ export default function CardStack({
     onSwipe,
     onDelete,
 }: CardStackProps) {
+    const t = useTheme();
+    const styles = useMemo(() => makeStyles(t), [t]);
     const sides = usePromptSides(listening);
 
     const handleSwipe = (direction: Direction, prompt: PromptSide) => {
@@ -636,6 +648,9 @@ function ActiveCards({
     onSwipe,
     onDelete,
 }: ActiveCardsProps) {
+    const t = useTheme();
+    const COLORS = useMemo(() => makeCOLORS(t), [t]);
+    const styles = useMemo(() => makeStyles(t), [t]);
     // The prompt side is frozen for the lifetime of this card (the component is re-keyed per card).
     // The next card's side is remembered per card by usePromptSides, so it is stable even if the next card changes.
     const [promptSide] = useState(initialPromptSide);
@@ -876,7 +891,9 @@ function ActiveCards({
 /*                                   Styles                                   */
 /* -------------------------------------------------------------------------- */
 
-const styles = StyleSheet.create({
+const makeStyles = (t: Palette) => {
+    const COLORS = makeCOLORS(t);
+    return StyleSheet.create({
     container: {
         flex: 1,
         width: "100%",
@@ -1130,7 +1147,7 @@ const styles = StyleSheet.create({
         paddingVertical: 12,
         fontSize: 18,
         color: COLORS.text,
-        backgroundColor: "#fbf1c7",
+        backgroundColor: t.paper,
     },
 
     checkButton: {
@@ -1167,4 +1184,5 @@ const styles = StyleSheet.create({
         fontSize: 17,
         fontWeight: "bold",
     },
-});
+    });
+};

@@ -1,15 +1,19 @@
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useState, useMemo } from "react";
 import { ActivityIndicator, Alert, Pressable, ScrollView, Share, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { useUser } from "../hooks/useUser";
 import {
     acceptRequest, deleteMyData, getFriends, getProfile, removeFriend, removeRequest, requestFriend, saveUsername, setShowGlobal,
     type Friends, type Person, type Profile,
 } from "../services/social";
+import { useTheme } from "../theme/ThemeProvider";
+import type { Palette } from "../theme/themes";
 
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
 export default function FriendsScreen() {
+    const t = useTheme();
+    const s = useMemo(() => makeS(t), [t]);
     const user = useUser();
     const [loading, setLoading] = useState(true);
     const [profile, setProfile] = useState<Profile | null>(null);
@@ -49,7 +53,7 @@ export default function FriendsScreen() {
         }
     };
 
-    if (user === undefined) return <View style={[s.container, s.center]}><ActivityIndicator color="#83a598" /></View>;
+    if (user === undefined) return <View style={[s.container, s.center]}><ActivityIndicator color={t.blue} /></View>;
 
     if (!user) {
         return (
@@ -63,7 +67,7 @@ export default function FriendsScreen() {
         );
     }
 
-    if (loading) return <View style={[s.container, s.center]}><ActivityIndicator color="#83a598" /></View>;
+    if (loading) return <View style={[s.container, s.center]}><ActivityIndicator color={t.blue} /></View>;
 
     if (!profile || editingName) {
         return (
@@ -75,7 +79,7 @@ export default function FriendsScreen() {
                     value={username}
                     onChangeText={setUsername}
                     placeholder="username"
-                    placeholderTextColor="#7c6f64"
+                    placeholderTextColor={t.subtle}
                     autoCapitalize="none"
                     autoCorrect={false}
                     maxLength={20}
@@ -86,7 +90,7 @@ export default function FriendsScreen() {
                     disabled={busy}
                     onPress={() => run(() => saveUsername(username), () => { setEditingName(false); setUsername(""); })}
                 >
-                    {busy ? <ActivityIndicator color="#282828" /> : <Text style={s.primaryText}>Save</Text>}
+                    {busy ? <ActivityIndicator color={t.bg} /> : <Text style={s.primaryText}>Save</Text>}
                 </Pressable>
                 {profile ? (
                     <Pressable onPress={() => { setEditingName(false); setNotice(""); }}><Text style={s.link}>Cancel</Text></Pressable>
@@ -136,7 +140,7 @@ export default function FriendsScreen() {
                     value={profile.showGlobal}
                     disabled={busy}
                     onValueChange={(value) => run(() => setShowGlobal(value))}
-                    trackColor={{ true: "#b8bb26", false: "#504945" }}
+                    trackColor={{ true: t.green, false: t.surfaceHigh }}
                 />
             </View>
 
@@ -147,7 +151,7 @@ export default function FriendsScreen() {
                     value={code}
                     onChangeText={setCode}
                     placeholder="Their friend code"
-                    placeholderTextColor="#7c6f64"
+                    placeholderTextColor={t.subtle}
                     autoCapitalize="characters"
                     autoCorrect={false}
                 />
@@ -211,28 +215,28 @@ export default function FriendsScreen() {
     );
 }
 
-const s = StyleSheet.create({
-    container: { flex: 1, backgroundColor: "#282828", padding: 20 },
+const makeS = (t: Palette) => StyleSheet.create({
+    container: { flex: 1, backgroundColor: t.bg, padding: 20 },
     content: { gap: 14, paddingBottom: 60 },
     switchCard: { flexDirection: "row", alignItems: "center", gap: 12 },
     center: { alignItems: "center", justifyContent: "center", gap: 14 },
-    card: { backgroundColor: "#3c3836", borderRadius: 14, padding: 16, gap: 10 },
-    heading: { color: "#ebdbb2", fontSize: 18, fontWeight: "600" },
-    muted: { color: "#a89984", fontSize: 13 },
-    hint: { color: "#7c6f64", fontSize: 12, textAlign: "center" },
-    code: { color: "#fabd2f", fontSize: 32, fontWeight: "bold", letterSpacing: 4 },
-    input: { backgroundColor: "#282828", color: "#ebdbb2", borderRadius: 10, padding: 14, fontSize: 16, alignSelf: "stretch" },
+    card: { backgroundColor: t.surface, borderRadius: 14, padding: 16, gap: 10 },
+    heading: { color: t.text, fontSize: 18, fontWeight: "600" },
+    muted: { color: t.muted, fontSize: 13 },
+    hint: { color: t.subtle, fontSize: 12, textAlign: "center" },
+    code: { color: t.yellow, fontSize: 32, fontWeight: "bold", letterSpacing: 4 },
+    input: { backgroundColor: t.bg, color: t.text, borderRadius: 10, padding: 14, fontSize: 16, alignSelf: "stretch" },
     button: { borderRadius: 10, paddingVertical: 14, alignItems: "center", alignSelf: "stretch" },
     smallButton: { borderRadius: 10, paddingVertical: 10, paddingHorizontal: 16, alignItems: "center" },
-    primary: { backgroundColor: "#b8bb26" },
-    primaryText: { color: "#282828", fontSize: 15, fontWeight: "bold" },
-    secondary: { backgroundColor: "#504945" },
-    secondaryText: { color: "#ebdbb2", fontSize: 15, fontWeight: "600" },
+    primary: { backgroundColor: t.green },
+    primaryText: { color: t.bg, fontSize: 15, fontWeight: "bold" },
+    secondary: { backgroundColor: t.surfaceHigh },
+    secondaryText: { color: t.text, fontSize: 15, fontWeight: "600" },
     row: { flexDirection: "row", gap: 10, alignItems: "center" },
     personRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 6, gap: 10 },
-    name: { color: "#ebdbb2", fontSize: 16, fontWeight: "600", flexShrink: 1 },
-    link: { color: "#83a598", textAlign: "center", fontSize: 14, paddingVertical: 4 },
-    danger: { color: "#fb4934", textAlign: "center", fontSize: 13, paddingVertical: 8 },
-    error: { color: "#fb4934", fontSize: 14, textAlign: "center" },
-    ok: { color: "#b8bb26", fontSize: 14, textAlign: "center" },
+    name: { color: t.text, fontSize: 16, fontWeight: "600", flexShrink: 1 },
+    link: { color: t.blue, textAlign: "center", fontSize: 14, paddingVertical: 4 },
+    danger: { color: t.red, textAlign: "center", fontSize: 13, paddingVertical: 8 },
+    error: { color: t.red, fontSize: 14, textAlign: "center" },
+    ok: { color: t.green, fontSize: 14, textAlign: "center" },
 });
