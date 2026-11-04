@@ -26,6 +26,7 @@ import {
 import { imageDisplayUrl, keepLocalCopy } from "@/services/localImages";
 import { translateText } from "@/services/translationApi";
 import { getLanguage } from "../constants/languages";
+import ExampleButton from "../components/ExampleButton";
 import {
     addImage,
     deleteCard,
@@ -633,6 +634,15 @@ export default function EditCardScreen() {
                         multiline
                     />
 
+                    {!exampleSentence.trim() && (
+                        <ExampleButton
+                            learningText={learningText}
+                            localizedText={localizedText}
+                            languageName={getLanguage(learningLanguageCode)?.name ?? ""} cardId={cardId}
+                            onExample={setExampleSentence}
+                        />
+                    )}
+
                     {renderWatermark("Example")}
                 </View>
 
@@ -1147,7 +1157,7 @@ const makeStyles = (t: Palette) => {
 
     exampleInput: {
         minHeight: 55,
-        paddingRight: 15,
+        paddingRight: 56,
         fontSize: 16,
     },
 

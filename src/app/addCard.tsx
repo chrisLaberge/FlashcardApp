@@ -37,6 +37,7 @@ import { keepLocalCopy } from "@/services/localImages";
 import { translateText } from "@/services/translationApi";
 import { getRomanization } from "@/utils/romanization";
 import { getLanguage } from "../constants/languages";
+import ExampleButton from "../components/ExampleButton";
 import { useTheme } from "../theme/ThemeProvider";
 import type { Palette } from "../theme/themes";
 
@@ -745,6 +746,15 @@ export default function AddCardScreen() {
                             multiline
                         />
 
+                        {!exampleSentence.trim() && (
+                            <ExampleButton
+                                learningText={learningText}
+                                localizedText={localizedText}
+                                languageName={getLanguage(learningLanguageCode)?.name ?? ""}
+                                onExample={setExampleSentence}
+                            />
+                        )}
+
                         {renderWatermark("Example")}
                     </View>
 
@@ -1105,7 +1115,7 @@ const makeStyles = (t: Palette) => {
 
     exampleInput: {
         minHeight: 55,
-        paddingRight: 15,
+        paddingRight: 56,
         fontSize: 16,
     },
 
