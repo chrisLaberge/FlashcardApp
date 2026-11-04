@@ -6,7 +6,7 @@ import { loadGoalSettings, reviewedToday } from "../services/dailyGoal";
 import { useTheme } from "../theme/ThemeProvider";
 import type { Palette } from "../theme/themes";
 
-/** A slim line at the top of the Study screen: today's progress towards the daily goal. Hidden when the goal is off. */
+/** A small chip: today's progress towards the daily goal, with a thin bar under it. Hidden when the goal is off. */
 export default function DailyGoalCard() {
     const t = useTheme();
     const s = useMemo(() => makeS(t), [t]);
@@ -28,18 +28,18 @@ export default function DailyGoalCard() {
 
     const reached = state.done >= state.goal;
     return (
-        <View style={s.row} accessibilityLabel={`Daily goal: ${state.done} of ${state.goal} cards`}>
+        <View style={s.chip} accessibilityLabel={`Daily goal: ${state.done} of ${state.goal} cards`}>
+            <Text style={s.count}>{reached ? "🎉" : "🎯"} {state.done}/{state.goal}</Text>
             <View style={s.track}>
                 <View style={[s.fill, { width: `${Math.round(goalFraction(state.done, state.goal) * 100)}%`, backgroundColor: reached ? t.yellow : t.green }]} />
             </View>
-            <Text style={s.count}>{reached ? "🎉 " : ""}{state.done}/{state.goal}</Text>
         </View>
     );
 }
 
 const makeS = (t: Palette) => StyleSheet.create({
-    row: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 },
-    track: { flex: 1, height: 4, borderRadius: 2, backgroundColor: t.surfaceHigh, overflow: "hidden" },
-    fill: { height: 4, borderRadius: 2 },
-    count: { color: t.muted, fontSize: 12 },
+    chip: { backgroundColor: t.surface, borderWidth: 1, borderColor: t.surfaceHigh, borderRadius: 8, paddingHorizontal: 10, paddingTop: 5, paddingBottom: 6, gap: 3 },
+    count: { color: t.text, fontSize: 12, fontWeight: "600" },
+    track: { height: 3, borderRadius: 2, backgroundColor: t.surfaceHigh, overflow: "hidden" },
+    fill: { height: 3, borderRadius: 2 },
 });

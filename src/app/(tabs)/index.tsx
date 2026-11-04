@@ -115,15 +115,14 @@ export default function HomeScreen() {
 
     return (
         <View style={styles.container}>
-            <DailyGoalCard />
-
+            <View style={styles.topRow}>
             <Animated.View
                 style={{
+                    flexShrink: 1,
                     backgroundColor: t.surface,
                     borderWidth: deckSelected ? 1 : 2,
                     borderColor: deckSelected ? t.surfaceHigh : t.yellow,
                     borderRadius: 8,
-                    marginBottom: 16,
                     opacity: deckSelected
                         ? 1
                         : pulse.interpolate({
@@ -139,13 +138,16 @@ export default function HomeScreen() {
                     ]}
                     onPress={() => router.push("/decks")}
                 >
+                    <Text style={styles.flag}>{selectedDeckFlag}</Text>
                     <Text style={styles.deckName} numberOfLines={1}>
                         {selectedDeckName}
                     </Text>
-                    <Text style={styles.flag}>{selectedDeckFlag}</Text>
                     <Text style={styles.arrow}>▼</Text>
                 </Pressable>
             </Animated.View>
+
+            <DailyGoalCard />
+            </View>
 
             <Pressable
                 style={({ pressed }) => [
@@ -202,15 +204,17 @@ const makeStyles = (t: Palette) => StyleSheet.create({
     container: { flex: 1, backgroundColor: t.bg, padding: 20, paddingTop: 56 },
     pressed: { opacity: 0.7 },
 
+    // The deck and the daily goal sit side by side as two small chips.
+    topRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 18 },
     deckButton: {
         flexDirection: "row",
         alignItems: "center",
-        paddingVertical: 9,
-        paddingHorizontal: 12,
+        paddingVertical: 6,
+        paddingHorizontal: 10,
     },
-    deckName: { flex: 1, color: t.text, fontSize: 15, fontWeight: "600" },
-    flag: { fontSize: 20, marginLeft: 8 },
-    arrow: { color: t.muted, fontSize: 10, marginLeft: 8 },
+    deckName: { flexShrink: 1, color: t.text, fontSize: 13, fontWeight: "600", marginLeft: 6 },
+    flag: { fontSize: 16 },
+    arrow: { color: t.muted, fontSize: 9, marginLeft: 6 },
 
     startButton: {
         backgroundColor: t.gold,

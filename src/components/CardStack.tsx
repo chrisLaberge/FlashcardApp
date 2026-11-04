@@ -1,6 +1,7 @@
 import { getCardImage } from "@/database/database";
 import { downloadImageLocally, imageDisplayUrl, localImageUri } from "@/services/localImages";
 import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
 import * as Speech from "expo-speech";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -19,6 +20,8 @@ import {
     ViewStyle,
 } from "react-native";
 import ExplainSheet from "./ExplainSheet";
+import LookupSheet from "./LookupSheet";
+import TappableText from "./TappableText";
 import KeyboardInsetView from "./KeyboardInsetView";
 import { Card } from "../models/Card";
 import { prefetchSpeech, speakRemote, stopRemoteSpeech } from "@/services/tts";
@@ -461,6 +464,8 @@ interface TermProps {
     /** Show the speaker even without `onSpeak` (the next card). */
     previewSpeaker?: boolean;
     showRomanization?: boolean;
+    /** When set, the words of the learning text can be tapped (held: the whole text). */
+    onLookup?: (text: string, context: string) => void;
 }
 
 /** One language of a card: learning text (+ romanization + speaker) or image + localized text. */
@@ -472,6 +477,7 @@ function Term({
     onSpeak,
     previewSpeaker,
     showRomanization = true,
+    onLookup,
 }: TermProps) {
     const t = useTheme();
     const styles = useMemo(() => makeStyles(t), [t]);
@@ -496,14 +502,26 @@ function Term({
                         style={styles.speakGapStart}
                     />
 
-                    <Text
-                        style={[textStyle, styles.learningText, { fontSize: fit.fontSize }]}
-                        numberOfLines={fit.numberOfLines}
-                        adjustsFontSizeToFit
-                        minimumFontScale={0.6}
-                    >
-                        {card.learningText}
-                    </Text>
+                    {onLookup ? (
+                        <TappableText
+                            text={card.learningText}
+                            onWord={(word) => onLookup(word, card.learningText)}
+                            onSentence={(whole) => onLookup(whole, whole)}
+                            style={[textStyle, styles.learningText, { fontSize: fit.fontSize }]}
+                            numberOfLines={fit.numberOfLines}
+                            adjustsFontSizeToFit
+                            minimumFontScale={0.6}
+                        />
+                    ) : (
+                        <Text
+                            style={[textStyle, styles.learningText, { fontSize: fit.fontSize }]}
+                            numberOfLines={fit.numberOfLines}
+                            adjustsFontSizeToFit
+                            minimumFontScale={0.6}
+                        >
+                            {card.learningText}
+                        </Text>
+                    )}
 
                     {/* Invisible twin of the speaker: keeps the word exactly centered */}
                     <SpeakButton small={small} style={styles.speakGapEnd} />
@@ -561,6 +579,8 @@ interface CardStackProps {
     remoteVoice?: string;
     /** Shown to the explanation model, e.g. "French". Empty: the explain button is hidden. */
     languageName?: string;
+    /** The deck being studied: new cards made from a tapped word go into it. */
+    deckId?: string;
     /** False when the phone has no voice for the language: nothing is spoken rather than a wrong voice. */
     speechAvailable?: boolean;
     cardKey: number;
@@ -582,6 +602,7 @@ export default function CardStack({
     ttsVoice,
     remoteVoice,
     languageName = "",
+    deckId,
     speechAvailable = true,
     autoSpeak = true,
     showRomanization = true,
@@ -610,6 +631,7 @@ export default function CardStack({
                 ttsVoice={ttsVoice}
                 remoteVoice={remoteVoice}
                 languageName={languageName}
+                deckId={deckId}
                 speechAvailable={speechAvailable}
                 autoSpeak={autoSpeak}
                 showRomanization={showRomanization}
@@ -633,6 +655,7 @@ interface ActiveCardsProps {
     ttsVoice?: string;
     remoteVoice?: string;
     languageName: string;
+    deckId?: string;
     speechAvailable: boolean;
     autoSpeak: boolean;
     showRomanization: boolean;
@@ -649,6 +672,7 @@ function ActiveCards({
     ttsVoice,
     remoteVoice,
     languageName,
+    deckId,
     speechAvailable,
     autoSpeak,
     showRomanization,
@@ -662,6 +686,9 @@ function ActiveCards({
     // The next card's side is remembered per card by usePromptSides, so it is stable even if the next card changes.
     const [promptSide] = useState(initialPromptSide);
     const [explaining, setExplaining] = useState(false);
+    // The word or sentence being looked up, and the sentence it was tapped in.
+    const [lookup, setLookup] = useState<{ text: string; context: string } | null>(null);
+    const openLookup = languageName ? (text: string, context: string) => setLookup({ text, context }) : undefined;
     const answerSide = answerSideFor(promptSide);
     // On a listening card the word is only revealed on the back, as the small second line.
     const revealedSide = promptSide === "audio" ? "learning" : promptSide;
@@ -821,6 +848,7 @@ function ActiveCards({
                         image={currentImage}
                         onSpeak={speakLearning}
                         showRomanization={showRomanization}
+                        onLookup={openLookup}
                     />
 
                     {!!typed.trim() && (
@@ -843,13 +871,23 @@ function ActiveCards({
                             size="small"
                             onSpeak={speakLearning}
                             showRomanization={showRomanization}
+                            onLookup={openLookup}
                         />
                     </View>
 
                     {!!exampleText && (
                         <View style={styles.exampleRow}>
                             <SpeakButton small onPress={() => speak(exampleText)} />
-                            <Text style={styles.exampleText}>{exampleText}</Text>
+                            {openLookup ? (
+                                <TappableText
+                                    text={exampleText}
+                                    onWord={(word) => openLookup(word, exampleText)}
+                                    onSentence={(whole) => openLookup(whole, whole)}
+                                    style={styles.exampleText}
+                                />
+                            ) : (
+                                <Text style={styles.exampleText}>{exampleText}</Text>
+                            )}
                         </View>
                     )}
 
@@ -873,6 +911,24 @@ function ActiveCards({
                     onClose={() => setExplaining(false)}
                     card={currentCard}
                     languageName={languageName}
+                />
+            )}
+
+            {!!languageName && lookup && (
+                <LookupSheet
+                    key={`${lookup.text}\u0001${lookup.context}`}
+                    text={lookup.text}
+                    context={lookup.context}
+                    languageName={languageName}
+                    onClose={() => setLookup(null)}
+                    onAdd={(entry) => {
+                        const example = lookup.context !== lookup.text ? lookup.context : "";
+                        setLookup(null);
+                        router.push({
+                            pathname: "/addCard",
+                            params: { ...(deckId ? { deckId } : {}), text: entry.word, meaning: entry.translation, example },
+                        });
+                    }}
                 />
             )}
 
