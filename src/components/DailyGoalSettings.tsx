@@ -34,8 +34,14 @@ export default function DailyGoalSettings() {
 
     return (
         <View style={s.wrap}>
-            <Text style={s.heading}>Daily goal</Text>
             <View style={s.card}>
+                <View style={s.row}>
+                    <Text style={s.label}>Daily goal</Text>
+                    <Switch value={settings.enabled} onValueChange={(enabled) => update({ enabled })} trackColor={{ true: t.green, false: t.surfaceHigh }} />
+                </View>
+
+                {settings.enabled ? (
+                <>
                 <View style={s.row}>
                     <Text style={s.label}>Cards per day</Text>
                     <View style={s.stepper}>
@@ -59,6 +65,8 @@ export default function DailyGoalSettings() {
                             <Pressable style={s.step} onPress={() => shiftTime(30)} accessibilityLabel="Later"><Text style={s.stepText}>+</Text></Pressable>
                         </View>
                     </View>
+                ) : null}
+                </>
                 ) : null}
             </View>
         </View>

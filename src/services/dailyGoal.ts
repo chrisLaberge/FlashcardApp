@@ -50,7 +50,7 @@ export async function refreshReminders(): Promise<void> {
     try {
         await Notifications.cancelAllScheduledNotificationsAsync();
         const settings = await loadGoalSettings();
-        if (!settings.reminder) return;
+        if (!settings.enabled || !settings.reminder) return;
         if (!(await Notifications.getPermissionsAsync()).granted) return;
 
         if (Platform.OS === "android") {
@@ -70,7 +70,8 @@ export async function refreshReminders(): Promise<void> {
             });
         }
     } catch (error) {
-        console.warn("Could not schedule reminders:", error);
+        // Expo Go cannot create notification channels; real builds can. Reminders just stay off there.
+        console.log("Could not schedule reminders:", error);
     }
 }
 
