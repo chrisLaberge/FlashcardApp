@@ -1,4 +1,3 @@
-import { GoogleSignin, statusCodes } from "@react-native-google-signin/google-signin";
 import {
     createUserWithEmailAndPassword,
     GoogleAuthProvider,
@@ -9,12 +8,33 @@ import {
 } from "firebase/auth";
 import { auth, GOOGLE_WEB_CLIENT_ID } from "./firebase";
 
+type GoogleModule = typeof import("@react-native-google-signin/google-signin");
+
+let googleModule: GoogleModule | null | undefined;
 let googleConfigured = false;
 
-function configureGoogle() {
-    if (googleConfigured) return;
-    GoogleSignin.configure({ webClientId: GOOGLE_WEB_CLIENT_ID });
-    googleConfigured = true;
+/**
+ * Google sign-in is a native module. Builds made before it was added (and Expo Go) do not contain
+ * it, and importing it there crashes at start-up, so it is loaded only when first needed.
+ * Returns null when this build does not have it.
+ */
+async function loadGoogle(): Promise<GoogleModule | null> {
+    if (googleModule !== undefined) return googleModule;
+    try {
+        googleModule = await import("@react-native-google-signin/google-signin");
+    } catch {
+        googleModule = null;
+    }
+    return googleModule;
+}
+
+async function configuredGoogle(): Promise<GoogleModule | null> {
+    const google = await loadGoogle();
+    if (google && !googleConfigured) {
+        google.GoogleSignin.configure({ webClientId: GOOGLE_WEB_CLIENT_ID });
+        googleConfigured = true;
+    }
+    return google;
 }
 
 export async function signUpWithEmail(email: string, password: string) {
@@ -31,7 +51,11 @@ export async function resetPassword(email: string) {
 
 /** Returns false when the user closed the Google dialog. */
 export async function signInWithGoogle(): Promise<boolean> {
-    configureGoogle();
+    const google = await configuredGoogle();
+    if (!google) {
+        throw new Error("Google sign-in isn't available in this version of the app. Use email, or install the latest build.");
+    }
+    const { GoogleSignin, statusCodes } = google;
     await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
     try {
         const response = await GoogleSignin.signIn();
@@ -49,8 +73,7 @@ export async function signInWithGoogle(): Promise<boolean> {
 export async function signOut() {
     await firebaseSignOut(auth);
     try {
-        configureGoogle();
-        await GoogleSignin.signOut();
+        await (await configuredGoogle())?.GoogleSignin.signOut();
     } catch {
         // Not signed in with Google; nothing to do.
     }
