@@ -20,14 +20,13 @@ const SHADES = ["", "40", "80", "BF", "FF"] as const; // alpha steps appended to
 export default function ActivityCalendar({ reviewDays, addedDays, today }: Props) {
     const t = useTheme();
     const s = useMemo(() => makeS(t), [t]);
-    const [mode, setMode] = useState<"reviews" | "added">("reviews");
     const [cursor, setCursor] = useState(() => ({ year: Number(today.slice(0, 4)), month: Number(today.slice(5, 7)) - 1 }));
     const [selected, setSelected] = useState<string>(today);
 
     const grid = useMemo(() => monthGrid(cursor.year, cursor.month), [cursor]);
     const shown = selected;
-    const color = mode === "reviews" ? t.green : t.blue;
-    const countOf = (day: string) => (mode === "reviews" ? (reviewDays.get(day)?.reviews ?? 0) : (addedDays.get(day) ?? 0));
+    const color = t.green;
+    const countOf = (day: string) => reviewDays.get(day)?.reviews ?? 0;
 
     const monthDays = grid.weeks.flat().flatMap((cell) => (cell ? [cell.day] : []));
     const max = Math.max(0, ...monthDays.map(countOf));
@@ -40,14 +39,6 @@ export default function ActivityCalendar({ reviewDays, addedDays, today }: Props
 
     return (
         <View style={s.card}>
-            <View style={s.toggle}>
-                {(["reviews", "added"] as const).map((m) => (
-                    <Pressable key={m} style={[s.tab, mode === m && s.tabOn]} onPress={() => setMode(m)}>
-                        <Text style={[s.tabText, mode === m && s.tabTextOn]}>{m === "reviews" ? "Reviews" : "Cards added"}</Text>
-                    </Pressable>
-                ))}
-            </View>
-
             <View style={s.header}>
                 <Pressable onPress={() => move(-1)} hitSlop={12} accessibilityLabel="Previous month">
                     <Text style={s.arrow}>‹</Text>
@@ -80,6 +71,7 @@ export default function ActivityCalendar({ reviewDays, addedDays, today }: Props
                                     ]}
                                 >
                                     <Text style={[s.date, level >= 3 && { color: t.bg }]}>{cell.date}</Text>
+                                    {(addedDays.get(cell.day) ?? 0) > 0 && <View style={[s.dot, { backgroundColor: t.blue, borderColor: t.surface }]} />}
                                 </View>
                             </Pressable>
                         );
@@ -97,17 +89,16 @@ export default function ActivityCalendar({ reviewDays, addedDays, today }: Props
                     <Text style={s.countLabel}>Cards added</Text>
                 </View>
             </View>
+            <View style={s.legend}>
+                <View style={[s.legendDot, { backgroundColor: t.green }]} /><Text style={s.legendText}>reviewed</Text>
+                <View style={[s.legendDot, { backgroundColor: t.blue }]} /><Text style={s.legendText}>cards added</Text>
+            </View>
         </View>
     );
 }
 
 const makeS = (t: Palette) => StyleSheet.create({
     card: { backgroundColor: t.surface, borderRadius: 14, padding: 16, gap: 6 },
-    toggle: { flexDirection: "row", backgroundColor: t.bg, borderRadius: 10, padding: 3, marginBottom: 6 },
-    tab: { flex: 1, paddingVertical: 8, borderRadius: 8, alignItems: "center" },
-    tabOn: { backgroundColor: t.surfaceHigh },
-    tabText: { color: t.muted, fontWeight: "600", fontSize: 13 },
-    tabTextOn: { color: t.text },
     header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 4 },
     title: { color: t.text, fontSize: 16, fontWeight: "600" },
     arrow: { color: t.text, fontSize: 28, paddingHorizontal: 12, lineHeight: 30 },
@@ -116,7 +107,11 @@ const makeS = (t: Palette) => StyleSheet.create({
     weekday: { flex: 1, textAlign: "center", color: t.muted, fontSize: 12, paddingBottom: 2 },
     cellSlot: { flex: 1, aspectRatio: 1, padding: 2 },
     cell: { flex: 1, borderRadius: 6, alignItems: "center", justifyContent: "center" },
+    dot: { position: "absolute", top: 2, right: 2, width: 8, height: 8, borderRadius: 4, borderWidth: 1 },
     date: { color: t.text, fontSize: 12 },
+    legend: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 8 },
+    legendDot: { width: 8, height: 8, borderRadius: 4 },
+    legendText: { color: t.muted, fontSize: 12, marginRight: 8 },
     counts: { flexDirection: "row", marginTop: 10, gap: 10 },
     count: { flex: 1, backgroundColor: t.bg, borderRadius: 10, paddingVertical: 10, alignItems: "center" },
     countValue: { color: t.text, fontSize: 22, fontWeight: "bold" },

@@ -1,6 +1,6 @@
-import { clampGoal, DEFAULT_GOAL_SETTINGS, formatTime, goalFraction, parseGoalSettings, reminderTimes } from "../src/models/DailyGoal";
+import { clampGoal, DEFAULT_GOAL_SETTINGS, formatTime, goalFraction, parseGoalSettings, reminderTimes, shouldCelebrate } from "../src/models/DailyGoal";
 
-const on = { goal: 20, reminder: true, hour: 19, minute: 30 };
+const on = { enabled: true, goal: 20, reminder: true, hour: 19, minute: 30 };
 const at = (d: number, h: number, m = 0) => new Date(2026, 10, d, h, m);
 
 describe("daily goal settings", () => {
@@ -12,8 +12,13 @@ describe("daily goal settings", () => {
     test("keeps good values and fixes bad ones one by one", () => {
         expect(parseGoalSettings(JSON.stringify(on))).toEqual(on);
         expect(parseGoalSettings(JSON.stringify({ goal: 5000, reminder: "yes", hour: 25, minute: -1 }))).toEqual({
-            goal: 200, reminder: false, hour: 19, minute: 0,
+            enabled: true, goal: 200, reminder: false, hour: 19, minute: 0,
         });
+    });
+
+    test("it is on unless switched off, and older saved settings (without the switch) stay on", () => {
+        expect(parseGoalSettings(JSON.stringify({ ...on, enabled: false })).enabled).toBe(false);
+        expect(parseGoalSettings(JSON.stringify({ goal: 30, reminder: true, hour: 8, minute: 0 })).enabled).toBe(true);
     });
 
     test("the goal stays between 5 and 200", () => {
@@ -39,6 +44,10 @@ describe("daily goal settings", () => {
 describe("reminderTimes", () => {
     test("nothing when reminders are off", () => {
         expect(reminderTimes(at(4, 9), { ...on, reminder: false }, 0)).toEqual([]);
+    });
+
+    test("no reminders while the goal is switched off, even if reminders were on", () => {
+        expect(reminderTimes(at(4, 9), { ...on, enabled: false }, 0)).toEqual([]);
     });
 
     test("the next 7 evenings, starting today when the time is still ahead", () => {
@@ -67,5 +76,18 @@ describe("reminderTimes", () => {
     test("month ends roll over", () => {
         const times = reminderTimes(new Date(2026, 10, 29, 9), on, 0);
         expect(times[2]).toEqual(new Date(2026, 11, 1, 19, 30));
+    });
+});
+
+describe("shouldCelebrate", () => {
+    const goal = { ...on, goal: 20 };
+    test("when the goal is reached and not yet celebrated today", () => {
+        expect(shouldCelebrate(goal, 20, null, "2026-11-04")).toBe(true);
+        expect(shouldCelebrate(goal, 35, "2026-11-03", "2026-11-04")).toBe(true);
+    });
+    test("not before the goal, not twice in a day, not when switched off", () => {
+        expect(shouldCelebrate(goal, 19, null, "2026-11-04")).toBe(false);
+        expect(shouldCelebrate(goal, 25, "2026-11-04", "2026-11-04")).toBe(false);
+        expect(shouldCelebrate({ ...goal, enabled: false }, 25, null, "2026-11-04")).toBe(false);
     });
 });

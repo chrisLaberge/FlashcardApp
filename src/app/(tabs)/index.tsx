@@ -115,6 +115,8 @@ export default function HomeScreen() {
 
     return (
         <View style={styles.container}>
+            <DailyGoalCard />
+
             <Animated.View
                 style={{
                     backgroundColor: t.surface,
@@ -168,8 +170,6 @@ export default function HomeScreen() {
                 <Text style={styles.secondaryText}>My Cards</Text>
             </Pressable>
 
-            <DailyGoalCard />
-
             <View style={styles.statsBox}>
                 <View style={styles.bar}>
                     <View style={{ flex: dueCount, backgroundColor: t.green }} />
@@ -199,7 +199,7 @@ export default function HomeScreen() {
 }
 
 const makeStyles = (t: Palette) => StyleSheet.create({
-    container: { flex: 1, backgroundColor: t.bg, padding: 20, paddingTop: 70 },
+    container: { flex: 1, backgroundColor: t.bg, padding: 20, paddingTop: 56 },
     pressed: { opacity: 0.7 },
 
     deckButton: {

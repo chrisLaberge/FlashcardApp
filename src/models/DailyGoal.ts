@@ -5,6 +5,8 @@ export const GOAL_MAX = 200;
 export const GOAL_STEP = 5;
 
 export type GoalSettings = {
+    /** The whole daily goal (bar and reminders) can be switched off. */
+    enabled: boolean;
     /** Cards to review each day. */
     goal: number;
     reminder: boolean;
@@ -13,7 +15,7 @@ export type GoalSettings = {
     minute: number;
 };
 
-export const DEFAULT_GOAL_SETTINGS: GoalSettings = { goal: 20, reminder: false, hour: 19, minute: 0 };
+export const DEFAULT_GOAL_SETTINGS: GoalSettings = { enabled: true, goal: 20, reminder: false, hour: 19, minute: 0 };
 
 export const clampGoal = (value: number): number => {
     if (!Number.isFinite(value)) return DEFAULT_GOAL_SETTINGS.goal;
@@ -28,6 +30,7 @@ export function parseGoalSettings(raw: string | null): GoalSettings {
         const whole = (v: unknown, min: number, max: number, fallback: number) =>
             typeof v === "number" && Number.isInteger(v) && v >= min && v <= max ? v : fallback;
         return {
+            enabled: data.enabled !== false,
             goal: typeof data.goal === "number" ? clampGoal(data.goal) : DEFAULT_GOAL_SETTINGS.goal,
             reminder: data.reminder === true,
             hour: whole(data.hour, 0, 23, DEFAULT_GOAL_SETTINGS.hour),
@@ -48,7 +51,7 @@ export const goalFraction = (reviewedToday: number, goal: number): number =>
  * done their cards is not nagged.
  */
 export function reminderTimes(now: Date, settings: GoalSettings, reviewedToday: number, days = 7): Date[] {
-    if (!settings.reminder) return [];
+    if (!settings.enabled || !settings.reminder) return [];
     const times: Date[] = [];
     for (let i = 0; i < days; i++) {
         const at = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i, settings.hour, settings.minute, 0, 0);
@@ -63,4 +66,9 @@ export function formatTime(hour: number, minute: number): string {
     const suffix = hour >= 12 ? "PM" : "AM";
     const h = hour % 12 === 0 ? 12 : hour % 12;
     return `${h}:${String(minute).padStart(2, "0")} ${suffix}`;
+}
+
+/** True the first time today's reviews reach the goal (once per day, and never while the goal is off). */
+export function shouldCelebrate(settings: GoalSettings, reviewedToday: number, lastCelebratedDay: string | null, today: string): boolean {
+    return settings.enabled && reviewedToday >= settings.goal && lastCelebratedDay !== today;
 }
