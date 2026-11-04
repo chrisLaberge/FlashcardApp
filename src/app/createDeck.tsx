@@ -1,18 +1,17 @@
 import { router } from "expo-router";
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import {
     FlatList,
-    KeyboardAvoidingView,
     Modal,
-    Platform,
     Pressable,
     StyleSheet,
     Text,
     TextInput,
     View,
 } from "react-native";
+import KeyboardInsetView from "../components/KeyboardInsetView";
 import { languages } from "../constants/languages";
-import { addDeck } from "../database/database";
+import { addDeck, getDecks } from "../database/database";
 import { useTheme } from "../theme/ThemeProvider";
 import type { Palette } from "../theme/themes";
 
@@ -23,6 +22,16 @@ export default function CreateDeckScreen() {
     const [language, setLanguage] = useState(languages[1]);
     const [modalVisible, setModalVisible] = useState(false);
     const [search, setSearch] = useState("");
+    const [deckCount, setDeckCount] = useState(0);
+
+    useEffect(() => {
+        let alive = true;
+        getDecks().then((decks) => { if (alive) setDeckCount(decks.length); }).catch(() => undefined);
+        return () => { alive = false; };
+    }, []);
+
+    // Left empty, the deck is named after its place in the list: Deck 1, Deck 2...
+    const defaultName = `Deck ${deckCount + 1}`;
 
     const filteredLanguages = languages.filter((item) => {
         const query = search.toLowerCase();
@@ -34,17 +43,12 @@ export default function CreateDeckScreen() {
     });
 
     const createDeck = async () => {
-        if (!name.trim()) return;
-
-        await addDeck(name.trim(), language.code);
+        await addDeck(name.trim() || defaultName, language.code);
         router.back();
     };
 
     return (
-        <KeyboardAvoidingView
-            style={styles.container}
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
-        >
+        <KeyboardInsetView style={styles.container}>
             <Text style={styles.smallTitle}>NEW DECK</Text>
 
             <Text style={styles.title}>Create a Deck</Text>
@@ -58,7 +62,7 @@ export default function CreateDeckScreen() {
 
                 <TextInput
                     style={styles.input}
-                    placeholder="Beginner Chinese"
+                    placeholder={defaultName}
                     placeholderTextColor={t.subtle}
                     value={name}
                     onChangeText={setName}
@@ -111,9 +115,10 @@ export default function CreateDeckScreen() {
                 visible={modalVisible}
                 animationType="slide"
                 transparent
+                statusBarTranslucent
                 onRequestClose={() => setModalVisible(false)}
             >
-                <View style={styles.modalBackground}>
+                <KeyboardInsetView style={styles.modalBackground}>
                     <View style={styles.modal}>
                         <View style={styles.modalHeader}>
                             <View>
@@ -187,9 +192,9 @@ export default function CreateDeckScreen() {
                             )}
                         />
                     </View>
-                </View>
+                </KeyboardInsetView>
             </Modal>
-        </KeyboardAvoidingView>
+        </KeyboardInsetView>
     );
 }
 

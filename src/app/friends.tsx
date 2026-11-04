@@ -2,6 +2,7 @@ import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState, useMemo } from "react";
 import { ActivityIndicator, Alert, Pressable, ScrollView, Share, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import Avatar from "../components/Avatar";
+import KeyboardInsetView from "../components/KeyboardInsetView";
 import { AVATARS } from "../constants/avatars";
 import { useUser } from "../hooks/useUser";
 import {
@@ -73,7 +74,7 @@ export default function FriendsScreen() {
 
     if (!profile || editingName) {
         return (
-            <View style={[s.container, s.center]}>
+            <KeyboardInsetView style={[s.container, s.center]}>
                 <Text style={s.heading}>{profile ? "Change username" : "Pick a username"}</Text>
                 <Text style={s.muted}>Every username is unique. It is shown to your friends and, unless you turn it off, on the global leaderboard with your level and XP. 3 to 20 letters, numbers or underscores. Your email is never shown.</Text>
                 <TextInput
@@ -97,7 +98,7 @@ export default function FriendsScreen() {
                 {profile ? (
                     <Pressable onPress={() => { setEditingName(false); setNotice(""); }}><Text style={s.link}>Cancel</Text></Pressable>
                 ) : null}
-            </View>
+            </KeyboardInsetView>
         );
     }
 
@@ -121,6 +122,7 @@ export default function FriendsScreen() {
         );
 
     return (
+        <KeyboardInsetView style={{ flex: 1 }}>
         <ScrollView style={s.container} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
             <View style={s.card}>
                 <View style={{ alignItems: "center" }}>
@@ -234,6 +236,7 @@ export default function FriendsScreen() {
             <Pressable onPress={() => router.push("/leaderboard")}><Text style={s.link}>Open the leaderboard</Text></Pressable>
             <Pressable onPress={confirmDelete}><Text style={s.danger}>Delete my online data</Text></Pressable>
         </ScrollView>
+        </KeyboardInsetView>
     );
 }
 

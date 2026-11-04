@@ -203,14 +203,17 @@ export async function getCardsPage(deckId: number, limit: number, offset: number
     });
 }
 
-export async function addCard(learningText: string, localizedText: string, exampleSentence: string, romanization: string, deckId: number) {
+/** `logAdd: false` keeps cards that came ready-made (starter decks) out of the "words added" history. */
+export async function addCard(learningText: string, localizedText: string, exampleSentence: string, romanization: string, deckId: number, options: { logAdd?: boolean } = {}) {
     const database = await getDatabase();
     const result = await database.runAsync(`
         INSERT INTO cards (learning_text, localized_text, example_sentence, romanization, deck_id)
         VALUES (?, ?, ?, ?, ?)
     `, learningText, localizedText, exampleSentence, romanization, deckId);
     await database.runAsync("INSERT OR IGNORE INTO card_progress (card_id) VALUES (?)", result.lastInsertRowId);
-    await database.runAsync("INSERT INTO card_add_log (card_id, added_at) VALUES (?, ?)", result.lastInsertRowId, Date.now());
+    if (options.logAdd !== false) {
+        await database.runAsync("INSERT INTO card_add_log (card_id, added_at) VALUES (?, ?)", result.lastInsertRowId, Date.now());
+    }
     return result.lastInsertRowId;
 }
 
