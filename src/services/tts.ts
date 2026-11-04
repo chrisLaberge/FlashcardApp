@@ -117,19 +117,32 @@ export function prefetchSpeech(voice: string, text: string): void {
     void ensureSpeechFile(voice, text);
 }
 
+/**
+ * One player for the whole app, reused for every word. Creating and releasing a native player
+ * for each card made the voice stop working after a few cards (until the app was reloaded).
+ */
 let player: AudioPlayer | null = null;
-let audioModeSet = false;
 let playToken = 0;
+
+function sharedPlayer(): AudioPlayer {
+    if (!player) {
+        const created = createAudioPlayer(null);
+        created.addListener("playbackStatusUpdate", (status) => {
+            if (status.didJustFinish) note("finished");
+        });
+        player = created;
+    }
+    return player;
+}
 
 /** Stops anything this service is playing. */
 export function stopRemoteSpeech(): void {
     playToken++; // a request that is still being fetched must not start playing afterwards
-    if (player) {
-        try {
-            player.remove();
-        } catch {
-            // already released
-        }
+    if (!player) return;
+    try {
+        player.pause();
+    } catch {
+        // player is gone; a new one is created on the next word
         player = null;
     }
 }
@@ -143,45 +156,29 @@ export async function speakRemote(voice: string, text: string): Promise<boolean>
     if (!uri || token !== playToken) return false; // failed, or something else started meanwhile
 
     try {
-        if (!audioModeSet) {
-            // On Android, `false` makes the library refuse to start playback while the ringer is on
-            // silent or vibrate (it never even reports "playing"). The phone's own voices play
-            // regardless of the ringer, and this audio was asked for, so allow it.
-            // "mixWithOthers" also skips Android's audio focus request: when the system refuses focus
-            // (another app holds it, a call, ...) expo-audio silently does not play at all, which
-            // looks exactly like "loaded, play() called, never playing".
-            await setAudioModeAsync({ playsInSilentMode: true, interruptionMode: "mixWithOthers" });
-            audioModeSet = true;
-        }
-        const next = createAudioPlayer({ uri });
-        let sawLoaded = false;
-        let sawPlaying = false;
-        next.addListener("playbackStatusUpdate", (status) => {
-            if (status.isLoaded && !sawLoaded) {
-                sawLoaded = true;
-                note(`loaded, ${status.duration.toFixed(1)} s`);
-            }
-            if (status.playing && !sawPlaying) {
-                sawPlaying = true;
-                note("playing");
-            }
-            if (status.didJustFinish) {
-                note("finished");
-                try {
-                    next.remove();
-                } catch {
-                    // already released
-                }
-                if (player === next) player = null;
-            }
-        });
-        player = next;
-        next.play();
+        // Set before every word, not once: Android can drop the mode after a while.
+        // playsInSilentMode: the library otherwise refuses to start while the ringer is silent.
+        // "mixWithOthers" skips Android's audio focus request, which expo-audio otherwise honours
+        // by silently not playing when focus is refused.
+        await setAudioModeAsync({ playsInSilentMode: true, interruptionMode: "mixWithOthers" });
+        if (token !== playToken) return false;
+
+        const active = sharedPlayer();
+        active.replace({ uri });
+        await active.seekTo(0);
+        active.play();
         note("play() called");
         return true;
     } catch (error) {
         console.warn("Could not play speech audio:", error);
         note(`play failed: ${error instanceof Error ? error.message : String(error)}`);
+        // Throw the player away so the next word starts from a fresh one.
+        try {
+            player?.remove();
+        } catch {
+            // already released
+        }
+        player = null;
         return false;
     }
 }
