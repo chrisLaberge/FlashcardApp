@@ -18,6 +18,7 @@ import {
     View,
     ViewStyle,
 } from "react-native";
+import ExplainSheet from "./ExplainSheet";
 import KeyboardInsetView from "./KeyboardInsetView";
 import { Card } from "../models/Card";
 import { prefetchSpeech, speakRemote, stopRemoteSpeech } from "@/services/tts";
@@ -558,6 +559,8 @@ interface CardStackProps {
     ttsVoice?: string;
     /** Voice id on the server, for languages the phone cannot speak (takes the place of the phone's voice). */
     remoteVoice?: string;
+    /** Shown to the explanation model, e.g. "French". Empty: the explain button is hidden. */
+    languageName?: string;
     /** False when the phone has no voice for the language: nothing is spoken rather than a wrong voice. */
     speechAvailable?: boolean;
     cardKey: number;
@@ -578,6 +581,7 @@ export default function CardStack({
     ttsCode,
     ttsVoice,
     remoteVoice,
+    languageName = "",
     speechAvailable = true,
     autoSpeak = true,
     showRomanization = true,
@@ -605,6 +609,7 @@ export default function CardStack({
                 ttsCode={ttsCode}
                 ttsVoice={ttsVoice}
                 remoteVoice={remoteVoice}
+                languageName={languageName}
                 speechAvailable={speechAvailable}
                 autoSpeak={autoSpeak}
                 showRomanization={showRomanization}
@@ -627,6 +632,7 @@ interface ActiveCardsProps {
     ttsCode?: string;
     ttsVoice?: string;
     remoteVoice?: string;
+    languageName: string;
     speechAvailable: boolean;
     autoSpeak: boolean;
     showRomanization: boolean;
@@ -642,6 +648,7 @@ function ActiveCards({
     ttsCode,
     ttsVoice,
     remoteVoice,
+    languageName,
     speechAvailable,
     autoSpeak,
     showRomanization,
@@ -654,6 +661,7 @@ function ActiveCards({
     // The prompt side is frozen for the lifetime of this card (the component is re-keyed per card).
     // The next card's side is remembered per card by usePromptSides, so it is stable even if the next card changes.
     const [promptSide] = useState(initialPromptSide);
+    const [explaining, setExplaining] = useState(false);
     const answerSide = answerSideFor(promptSide);
     // On a listening card the word is only revealed on the back, as the small second line.
     const revealedSide = promptSide === "audio" ? "learning" : promptSide;
@@ -844,8 +852,29 @@ function ActiveCards({
                             <Text style={styles.exampleText}>{exampleText}</Text>
                         </View>
                     )}
+
+                    {!!languageName && (
+                        <Pressable
+                            onPress={() => setExplaining(true)}
+                            hitSlop={10}
+                            accessibilityRole="button"
+                            accessibilityLabel="Explain this word"
+                            style={styles.infoButton}
+                        >
+                            <Ionicons name="information-circle-outline" size={26} color={COLORS.text} />
+                        </Pressable>
+                    )}
                 </Animated.View>
             </Animated.View>
+
+            {!!languageName && explaining && (
+                <ExplainSheet
+                    visible={explaining}
+                    onClose={() => setExplaining(false)}
+                    card={currentCard}
+                    languageName={languageName}
+                />
+            )}
 
             {/* Answer input: slides above the keyboard */}
             <Modal
@@ -1096,6 +1125,8 @@ const makeStyles = (t: Palette) => {
     },
 
     /* "Type answer" button (front of card) */
+
+    infoButton: { position: "absolute", top: 14, right: 14 },
 
     typeButton: {
         position: "absolute",
