@@ -1,0 +1,108 @@
+import { Ionicons } from "@expo/vector-icons";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import type { Lookup } from "../models/Lookup";
+import { lookupText } from "../services/lookup";
+import { useTheme } from "../theme/ThemeProvider";
+import type { Palette } from "../theme/themes";
+
+type Props = {
+    onClose: () => void;
+    /** The tapped word, or the whole sentence after a long press. */
+    text: string;
+    /** The sentence the word was tapped in. */
+    context: string;
+    languageName: string;
+    /** Start a new card from this entry. */
+    onAdd: (lookup: Lookup) => void;
+};
+
+type State = { status: "loading" } | { status: "error"; message: string } | { status: "done"; lookup: Lookup };
+
+/** A sheet with the meaning of one tapped word or sentence, and a button to make it a card. Mount it fresh for each tap. */
+export default function LookupSheet({ onClose, text, context, languageName, onAdd }: Props) {
+    const t = useTheme();
+    const s = useMemo(() => makeS(t), [t]);
+    const [state, setState] = useState<State>({ status: "loading" });
+
+    const run = useCallback(() => {
+        let active = true;
+        lookupText(text, context, languageName)
+            .then((lookup) => active && setState({ status: "done", lookup }))
+            .catch((e) => active && setState({ status: "error", message: e instanceof Error ? e.message : String(e) }));
+        return () => {
+            active = false;
+        };
+    }, [text, context, languageName]);
+
+    useEffect(() => run(), [run]);
+
+    return (
+        <Modal visible transparent animationType="slide" statusBarTranslucent onRequestClose={onClose}>
+            <Pressable style={s.backdrop} onPress={onClose} accessibilityLabel="Close" />
+            <View style={s.sheet}>
+                <View style={s.header}>
+                    <View style={{ flex: 1 }}>
+                        <Text style={s.word}>{state.status === "done" ? state.lookup.word : text}</Text>
+                        {state.status === "done" && state.lookup.romanization ? <Text style={s.muted}>{state.lookup.romanization}</Text> : null}
+                        {state.status === "done" ? <Text style={s.translation}>{state.lookup.translation}</Text> : null}
+                    </View>
+                    <Pressable onPress={onClose} hitSlop={12} accessibilityLabel="Close"><Text style={s.close}>✕</Text></Pressable>
+                </View>
+
+                <ScrollView contentContainerStyle={s.content}>
+                    {state.status === "loading" && <ActivityIndicator color={t.blue} style={{ marginVertical: 24 }} />}
+
+                    {state.status === "error" && (
+                        <View style={s.center}>
+                            <Text style={s.error}>{state.message}</Text>
+                            <Pressable
+                                style={s.retry}
+                                onPress={() => {
+                                    setState({ status: "loading" });
+                                    run();
+                                }}
+                            >
+                                <Text style={s.retryText}>Try again</Text>
+                            </Pressable>
+                        </View>
+                    )}
+
+                    {state.status === "done" && (
+                        <>
+                            <Text style={s.body}>{state.lookup.definition}</Text>
+                            {state.lookup.grammar.map((g, i) => <Text key={i} style={s.body}>• {g}</Text>)}
+                            <Text style={s.note}>Written by an AI, so double-check anything important.</Text>
+                        </>
+                    )}
+                </ScrollView>
+
+                {state.status === "done" && (
+                    <Pressable style={s.add} onPress={() => onAdd(state.lookup)} accessibilityLabel="Add as a card">
+                        <Ionicons name="add" size={22} color={t.bg} />
+                        <Text style={s.addText}>Add as a card</Text>
+                    </Pressable>
+                )}
+            </View>
+        </Modal>
+    );
+}
+
+const makeS = (t: Palette) => StyleSheet.create({
+    backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)" },
+    sheet: { maxHeight: "70%", backgroundColor: t.bg, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 18, borderTopWidth: 1, borderColor: t.surfaceHigh },
+    header: { flexDirection: "row", alignItems: "flex-start", gap: 12, marginBottom: 8 },
+    word: { color: t.text, fontSize: 26, fontWeight: "bold" },
+    translation: { color: t.yellow, fontSize: 17, fontWeight: "600", marginTop: 2 },
+    close: { color: t.muted, fontSize: 20, padding: 4 },
+    content: { paddingBottom: 12, gap: 8 },
+    body: { color: t.text, fontSize: 15, lineHeight: 22 },
+    muted: { color: t.muted, fontSize: 14 },
+    center: { alignItems: "center", gap: 12, paddingVertical: 16 },
+    error: { color: t.red, textAlign: "center" },
+    retry: { backgroundColor: t.green, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 20 },
+    retryText: { color: t.bg, fontWeight: "bold" },
+    note: { color: t.muted, fontSize: 12, textAlign: "center", marginTop: 8 },
+    add: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: t.green, borderRadius: 12, paddingVertical: 12, marginTop: 6 },
+    addText: { color: t.bg, fontSize: 16, fontWeight: "bold" },
+});

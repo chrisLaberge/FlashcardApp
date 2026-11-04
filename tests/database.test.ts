@@ -43,7 +43,7 @@ describe("startup and schema", () => {
             .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
             .all()
             .map((r) => (r as { name: string }).name);
-        expect(tables).toEqual(["achievement_unlocks", "card_add_log", "card_explanations", "card_progress", "cards", "decks", "images", "review_log"]);
+        expect(tables).toEqual(["achievement_unlocks", "card_add_log", "card_explanations", "card_progress", "cards", "decks", "images", "review_log", "word_lookups"]);
     });
 
     test("upgrades a pre-FSRS database without losing progress", async () => {
@@ -450,5 +450,30 @@ describe("saved card explanations", () => {
         await db.deleteCard(ids[0]);
         const left = rawDb().prepare("SELECT COUNT(*) AS n FROM card_explanations").get() as { n: number };
         expect(left.n).toBe(0);
+    });
+});
+
+describe("saved word lookups", () => {
+    const entry = { word: "pomme", translation: "apple", definition: "A noun.", grammar: ["Feminine."] };
+
+    test("saved once and found again; a lookup outlives card deletion", async () => {
+        const db = startApp();
+        expect(await db.getWordLookup("k1")).toBeNull();
+        await db.saveWordLookup("k1", entry);
+        expect(await db.getWordLookup("k1")).toEqual(entry);
+        await db.saveWordLookup("k1", { ...entry, translation: "fruit" });
+        expect((await db.getWordLookup("k1"))?.translation).toBe("fruit");
+    });
+
+    test("only the newest 500 are kept", async () => {
+        const db = startApp();
+        for (let i = 0; i < 503; i++) {
+            advanceTime(1);
+            await db.saveWordLookup(`key-${i}`, entry);
+        }
+        expect(await db.getWordLookup("key-0")).toBeNull();
+        expect(await db.getWordLookup("key-2")).toBeNull();
+        expect(await db.getWordLookup("key-3")).toEqual(entry);
+        expect(await db.getWordLookup("key-502")).toEqual(entry);
     });
 });

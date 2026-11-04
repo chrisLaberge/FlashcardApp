@@ -9,6 +9,7 @@ import {
 import * as SQLite from "expo-sqlite";
 import { Card } from "../models/Card";
 import { parseStoredExplanation, type Explanation } from "../models/Explanation";
+import { parseStoredLookup, type Lookup } from "../models/Lookup";
 import { clampLevel, MASTERED_START_LEVEL, nextLevel } from "../models/StudyMode";
 
 let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
@@ -107,6 +108,12 @@ async function openAndPrepareDatabase(): Promise<SQLite.SQLiteDatabase> {
                 data TEXT NOT NULL,
                 created_at INTEGER NOT NULL,
                 FOREIGN KEY(card_id) REFERENCES cards(id) ON DELETE CASCADE
+            );
+            -- Dictionary entries for words tapped while reviewing, kept so the same tap is never asked twice.
+            CREATE TABLE IF NOT EXISTS word_lookups (
+                key TEXT PRIMARY KEY,
+                data TEXT NOT NULL,
+                created_at INTEGER NOT NULL
             );
             CREATE INDEX IF NOT EXISTS idx_card_add_log_time ON card_add_log(added_at);
             CREATE INDEX IF NOT EXISTS idx_review_log_time ON review_log(reviewed_at);
@@ -436,6 +443,27 @@ export async function saveCardExplanation(cardId: number, signature: string, exp
     await database.runAsync(
         "INSERT OR REPLACE INTO card_explanations (card_id, signature, data, created_at) VALUES (?, ?, ?, ?)",
         cardId, signature, JSON.stringify(explanation), Date.now(),
+    );
+}
+
+export async function getWordLookup(key: string): Promise<Lookup | null> {
+    const database = await getDatabase();
+    const row = await database.getFirstAsync<{ data: string }>("SELECT data FROM word_lookups WHERE key = ?", key);
+    return row ? parseStoredLookup(row.data) : null;
+}
+
+const MAX_SAVED_LOOKUPS = 500;
+
+/** Keeps the entry; the oldest ones go once there are more than MAX_SAVED_LOOKUPS. */
+export async function saveWordLookup(key: string, lookup: Lookup): Promise<void> {
+    const database = await getDatabase();
+    await database.runAsync(
+        "INSERT OR REPLACE INTO word_lookups (key, data, created_at) VALUES (?, ?, ?)",
+        key, JSON.stringify(lookup), Date.now(),
+    );
+    await database.runAsync(
+        "DELETE FROM word_lookups WHERE key NOT IN (SELECT key FROM word_lookups ORDER BY created_at DESC LIMIT ?)",
+        MAX_SAVED_LOOKUPS,
     );
 }
 

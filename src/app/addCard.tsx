@@ -134,7 +134,7 @@ export default function AddCardScreen() {
     const t = useTheme();
     const COLORS = useMemo(() => makeCOLORS(t), [t]);
     const styles = useMemo(() => makeStyles(t), [t]);
-    const { deckId } = useLocalSearchParams<{ deckId?: string }>();
+    const { deckId, text: presetText, meaning: presetMeaning, example: presetExample } = useLocalSearchParams<{ deckId?: string; text?: string; meaning?: string; example?: string }>();
 
     const [learningLanguageCode, setLearningLanguageCode] = useState("en");
     const [learningLanguageFlag, setLearningLanguageFlag] = useState("🌐");
@@ -143,9 +143,10 @@ export default function AddCardScreen() {
     const localizedLanguageCode = "en";
     const localizedLanguageFlag = "🇬🇧";
 
-    const [learningText, setLearningText] = useState("");
-    const [localizedText, setLocalizedText] = useState("");
-    const [exampleSentence, setExampleSentence] = useState("");
+    // A word tapped while reviewing arrives here already filled in (the meaning and sentence can be edited).
+    const [learningText, setLearningText] = useState(typeof presetText === "string" ? presetText : "");
+    const [localizedText, setLocalizedText] = useState(typeof presetMeaning === "string" ? presetMeaning : "");
+    const [exampleSentence, setExampleSentence] = useState(typeof presetExample === "string" ? presetExample : "");
 
     const [translating, setTranslating] =
         useState<TranslationDirection>(null);
