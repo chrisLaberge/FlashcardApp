@@ -8,7 +8,7 @@
 - Privacy policy draft: `hosting/public/privacy/index.html`, published with Firebase Hosting (see below).
 
 ## You need to do
-1. Fill `[YOUR CONTACT EMAIL]` (twice) in `hosting/public/privacy/index.html`, then publish it (Cloud Shell, from the repo folder):
+1. Publish the privacy policy (contact email is already filled in) (Cloud Shell, from the repo folder):
    ```
    cd hosting
    npx firebase-tools login --no-localhost
