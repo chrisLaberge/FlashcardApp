@@ -3,7 +3,8 @@ import * as Notifications from "expo-notifications";
 import { AndroidImportance } from "expo-notifications";
 import { Platform } from "react-native";
 import { getReviewLog } from "../database/database";
-import { DEFAULT_GOAL_SETTINGS, parseGoalSettings, reminderTimes, type GoalSettings } from "../models/DailyGoal";
+import { DEFAULT_GOAL_SETTINGS, parseGoalSettings, reminderTimes, shouldCelebrate, type GoalSettings } from "../models/DailyGoal";
+import { localDay } from "../models/Stats";
 
 const KEY = "daily-goal";
 const CHANNEL = "study-reminders";
@@ -83,5 +84,49 @@ export function scheduleReminderRefresh(delayMs = 3000): void {
     timer = setTimeout(() => {
         timer = undefined;
         void refreshReminders();
+    }, delayMs);
+}
+
+/* ------------------------- "goal reached" banner ------------------------- */
+
+const CELEBRATED_KEY = "daily-goal-celebrated";
+type GoalListener = (event: { goal: number }) => void;
+const goalListeners = new Set<GoalListener>();
+
+/** Calls `listener` when today's goal is reached. Returns the way to stop listening. */
+export function onGoalReached(listener: GoalListener): () => void {
+    goalListeners.add(listener);
+    return () => {
+        goalListeners.delete(listener);
+    };
+}
+
+let celebrating = false;
+
+/** Tells the listeners (once per day) if today's reviews have reached the goal. */
+export async function checkGoalReached(): Promise<void> {
+    if (celebrating) return;
+    celebrating = true;
+    try {
+        const settings = await loadGoalSettings();
+        if (!settings.enabled) return;
+        const today = localDay(Date.now());
+        const last = await AsyncStorage.getItem(CELEBRATED_KEY).catch(() => null);
+        if (!shouldCelebrate(settings, await reviewedToday(), last, today)) return;
+        await AsyncStorage.setItem(CELEBRATED_KEY, today).catch(() => undefined);
+        goalListeners.forEach((listener) => listener({ goal: settings.goal }));
+    } finally {
+        celebrating = false;
+    }
+}
+
+let goalTimer: ReturnType<typeof setTimeout> | undefined;
+
+/** Checks shortly after the last answer. */
+export function scheduleGoalCheck(delayMs = 900): void {
+    if (goalTimer) clearTimeout(goalTimer);
+    goalTimer = setTimeout(() => {
+        goalTimer = undefined;
+        void checkGoalReached();
     }, delayMs);
 }

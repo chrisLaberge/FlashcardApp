@@ -1,4 +1,4 @@
-import { clampGoal, DEFAULT_GOAL_SETTINGS, formatTime, goalFraction, parseGoalSettings, reminderTimes } from "../src/models/DailyGoal";
+import { clampGoal, DEFAULT_GOAL_SETTINGS, formatTime, goalFraction, parseGoalSettings, reminderTimes, shouldCelebrate } from "../src/models/DailyGoal";
 
 const on = { enabled: true, goal: 20, reminder: true, hour: 19, minute: 30 };
 const at = (d: number, h: number, m = 0) => new Date(2026, 10, d, h, m);
@@ -76,5 +76,18 @@ describe("reminderTimes", () => {
     test("month ends roll over", () => {
         const times = reminderTimes(new Date(2026, 10, 29, 9), on, 0);
         expect(times[2]).toEqual(new Date(2026, 11, 1, 19, 30));
+    });
+});
+
+describe("shouldCelebrate", () => {
+    const goal = { ...on, goal: 20 };
+    test("when the goal is reached and not yet celebrated today", () => {
+        expect(shouldCelebrate(goal, 20, null, "2026-11-04")).toBe(true);
+        expect(shouldCelebrate(goal, 35, "2026-11-03", "2026-11-04")).toBe(true);
+    });
+    test("not before the goal, not twice in a day, not when switched off", () => {
+        expect(shouldCelebrate(goal, 19, null, "2026-11-04")).toBe(false);
+        expect(shouldCelebrate(goal, 25, "2026-11-04", "2026-11-04")).toBe(false);
+        expect(shouldCelebrate({ ...goal, enabled: false }, 25, null, "2026-11-04")).toBe(false);
     });
 });

@@ -67,3 +67,8 @@ export function formatTime(hour: number, minute: number): string {
     const h = hour % 12 === 0 ? 12 : hour % 12;
     return `${h}:${String(minute).padStart(2, "0")} ${suffix}`;
 }
+
+/** True the first time today's reviews reach the goal (once per day, and never while the goal is off). */
+export function shouldCelebrate(settings: GoalSettings, reviewedToday: number, lastCelebratedDay: string | null, today: string): boolean {
+    return settings.enabled && reviewedToday >= settings.goal && lastCelebratedDay !== today;
+}
