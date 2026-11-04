@@ -20,6 +20,7 @@ import {
     getDecks,
     updateCardProgress,
 } from "../database/database";
+import { scheduleAchievementCheck } from "../services/achievementUnlocks";
 import { REVIEW_INTERVALS } from "../models/SpacedRepetition";
 import { getRomanization } from "../utils/romanization";
 import { useTheme } from "../theme/ThemeProvider";
@@ -623,6 +624,7 @@ export default function ImportScreen() {
                     selectedDeck.language
                 );
 
+                scheduleAchievementCheck();
                 const cardId = await addCard(
                     learningText,
                     definition,

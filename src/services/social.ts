@@ -13,14 +13,16 @@ export type Profile = {
     longestStreak: number;
     /** Shown on the global leaderboard. */
     showGlobal: boolean;
+    /** The chosen profile picture, or null until one is picked. */
+    avatar: string | null;
 };
 
-export type Person = { uid: string; username: string; level: number; totalXp: number; currentStreak: number };
+export type Person = { uid: string; username: string; avatar: string | null; level: number; totalXp: number; currentStreak: number };
 export type Friends = { friends: Person[]; incoming: Person[]; outgoing: Person[] };
 export type Period = "week" | "all";
 export type LeaderboardEntry = Person & { rank: number; xp: number; isMe: boolean };
 
-export type GlobalRow = { rank: number; uid: string; username: string; level: number; xp: number; currentStreak: number; isMe: boolean };
+export type GlobalRow = { rank: number; uid: string; username: string; avatar: string | null; level: number; xp: number; currentStreak: number; isMe: boolean };
 export type GlobalBoard = {
     entries: GlobalRow[];
     /** Your own standing, even when you are outside the top list. `rank` is null with no XP or when hidden. */
@@ -65,7 +67,8 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 
 export const getProfile = async () => (await request<{ profile: Profile | null }>("GET", "/me")).profile;
 export const saveUsername = async (username: string) => (await request<{ profile: Profile }>("POST", "/me", { username })).profile;
-export const uploadDays = async (days: UploadDay[]) => (await request<{ profile: Profile }>("PUT", "/me/days", { days })).profile;
+export const uploadDays = async (days: UploadDay[], bonusXp = 0) =>
+    (await request<{ profile: Profile }>("PUT", "/me/days", { days, bonusXp })).profile;
 export const deleteMyData = () => request<void>("DELETE", "/me");
 
 export const getFriends = () => request<Friends>("GET", "/friends");
@@ -79,5 +82,7 @@ export const getLeaderboard = async (period: Period) =>
     (await request<{ period: Period; entries: LeaderboardEntry[] }>("GET", `/leaderboard?period=${period}`)).entries;
 
 export const getGlobalLeaderboard = (period: Period) => request<GlobalBoard & { period: Period }>("GET", `/leaderboard/global?period=${period}`);
+export const setAvatar = async (avatar: string) =>
+    (await request<{ profile: Profile }>("PUT", "/me/settings", { avatar })).profile;
 export const setShowGlobal = async (showGlobal: boolean) =>
     (await request<{ profile: Profile }>("PUT", "/me/settings", { showGlobal })).profile;

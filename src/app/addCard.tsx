@@ -25,6 +25,7 @@ import {
     getDecks,
     setCardImage,
 } from "../database/database";
+import { scheduleAchievementCheck } from "../services/achievementUnlocks";
 
 import {
     ImageSearchResult,
@@ -412,6 +413,7 @@ export default function AddCardScreen() {
             if (imageId !== null) {
                 await setCardImage(cardId, imageId);
             }
+            scheduleAchievementCheck();
 
             setLearningText("");
             setLocalizedText("");
