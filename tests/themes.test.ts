@@ -39,3 +39,24 @@ describe("themes", () => {
         });
     });
 });
+
+// Hues from red-orange through yellow-brown (10 to 70 degrees). Pure reds and pinks sit outside it.
+function isWarm(hex: string): boolean {
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const light = (max + min) / 2;
+    const chroma = max - min;
+    if (chroma === 0) return false;
+    const sat = chroma / (1 - Math.abs(2 * light - 1));
+    let hue = max === r ? ((g - b) / chroma) % 6 : max === g ? (b - r) / chroma + 2 : (r - g) / chroma + 4;
+    hue = (hue * 60 + 360) % 360;
+    return sat > 0.15 && hue >= 10 && hue <= 70 && light > 0.1 && light < 0.97;
+}
+
+describe("cool themes", () => {
+    test.each(["ocean", "amethyst", "forest", "rose", "sky"] as const)("%s has no brown, orange or yellow", (id) => {
+        const warm = Object.entries(themeById(id).colors).filter(([, value]) => isWarm(value));
+        expect(warm).toEqual([]);
+    });
+});
