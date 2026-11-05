@@ -512,4 +512,13 @@ describe("words added", () => {
         expect((await db.getAddedWords()).map((w) => w.id)).toEqual([third, words[2].id]);
         expect(await db.getAddedWords(1)).toHaveLength(1);
     });
+
+    test("cards from a premade deck stay out of the history but are still studyable", async () => {
+        const db = startApp();
+        const deck = await db.addDeck("Spanish basics", "es");
+        const premade = await db.addCard("Hola", "Hello", "", "", deck, { logAdd: false });
+        await db.addCard("gato", "cat", "", "", deck);
+        expect((await db.getAddedWords()).map((w) => w.learningText)).toEqual(["gato"]);
+        expect(await dueIds(db, deck)).toContain(premade);
+    });
 });

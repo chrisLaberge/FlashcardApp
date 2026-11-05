@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import KeyboardInsetView from "@/components/KeyboardInsetView";
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { deleteAccount } from "../../services/account";
 import { useUser } from "../../hooks/useUser";
 import { resetPassword, signInWithEmail, signInWithGoogle, signOut, signUpWithEmail } from "../../services/auth";
@@ -84,7 +85,7 @@ export default function AccountScreen() {
     }
 
     return (
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <KeyboardInsetView style={{ flex: 1 }}>
             <ScrollView style={s.scroll} contentContainerStyle={s.scrollContent} keyboardShouldPersistTaps="handled">
                 <Text style={s.title}>{mode === "signIn" ? "Sign in" : "Create account"}</Text>
                 <Text style={s.muted}>The app works without an account. Sign in for friends and the leaderboard.</Text>
@@ -134,7 +135,7 @@ export default function AccountScreen() {
                 <DailyGoalSettings />
                 <ThemePicker />
             </ScrollView>
-        </KeyboardAvoidingView>
+        </KeyboardInsetView>
     );
 }
 

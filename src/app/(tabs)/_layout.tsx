@@ -4,6 +4,7 @@ import { useTheme } from "../../theme/ThemeProvider";
 
 const ICONS = {
     index: "book",
+    library: "library",
     stats: "stats-chart",
     account: "person-circle",
 } as const;
@@ -25,6 +26,7 @@ export default function TabsLayout() {
             })}
         >
             <Tabs.Screen name="index" options={{ title: "Study" }} />
+            <Tabs.Screen name="library" options={{ title: "Library" }} />
             <Tabs.Screen name="stats" options={{ title: "Progress" }} />
             <Tabs.Screen name="account" options={{ title: "Account" }} />
         </Tabs>
