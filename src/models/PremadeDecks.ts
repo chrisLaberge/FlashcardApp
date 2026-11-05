@@ -51,3 +51,5 @@ export const premadeDecks: PremadeDeck[] = Object.entries(TRANSLATIONS).map(([la
     description: "Greetings, polite words, questions and the numbers 1 to 3.",
     cards: words.map((learning, i) => ({ learning, meaning: BASICS[i] })),
 }));
+
+export const premadeDecksFor = (language: string): PremadeDeck[] => premadeDecks.filter((d) => d.language === language);

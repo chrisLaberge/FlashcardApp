@@ -82,15 +82,6 @@ export default function DecksScreen() {
             <Text style={s.title}>My decks</Text>
             <Text style={s.hint}>Tap to select · hold to delete</Text>
 
-            <Pressable
-                style={({ pressed }) => [s.premadeButton, pressed && s.pressed]}
-                onPress={() => router.push("/premadeDecks")}
-                accessibilityRole="button"
-            >
-                <Text style={s.premadeText}>📚 Premade decks</Text>
-                <Text style={s.premadeArrow}>›</Text>
-            </Pressable>
-
             {decks.length === 0 && (
                 <Pressable
                     style={({ pressed }) => [s.restoreBox, pressed && s.pressed]}
@@ -260,19 +251,6 @@ const makeS = (t: Palette) => StyleSheet.create({
         justifyContent: "center",
     },
     fabText: { color: t.bg, fontSize: 32, lineHeight: 34, fontWeight: "bold" },
-
-    premadeButton: {
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "space-between",
-        backgroundColor: t.surface,
-        borderRadius: 12,
-        paddingVertical: 12,
-        paddingHorizontal: 16,
-        marginBottom: 14,
-    },
-    premadeText: { color: t.text, fontSize: 15, fontWeight: "600" },
-    premadeArrow: { color: t.muted, fontSize: 22 },
 
     // Delete dialog
     backdrop: {
