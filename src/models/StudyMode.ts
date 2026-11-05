@@ -24,16 +24,17 @@ type Mix = { learning: number; localized: number; audio: number };
 
 /**
  * Probability of each kind of prompt at every level. Each row sums to 1.
- * Levels 0 and 1 are recognition only (the first two right answers); after that recall takes
- * over gradually, and listening appears from level 4.
+ * Level 0 (a card's first showing) is recognition only; from the first right answer recall
+ * ("apple" -> pomme) is a real share of reviews and takes over by level 3. Listening appears
+ * from level 4.
  */
 const MIX: readonly Mix[] = [
     { learning: 1.0, localized: 0.0, audio: 0.0 }, // 0
-    { learning: 1.0, localized: 0.0, audio: 0.0 }, // 1
-    { learning: 0.7, localized: 0.3, audio: 0.0 }, // 2
-    { learning: 0.5, localized: 0.5, audio: 0.0 }, // 3
-    { learning: 0.35, localized: 0.55, audio: 0.1 }, // 4
-    { learning: 0.25, localized: 0.6, audio: 0.15 }, // 5
+    { learning: 0.6, localized: 0.4, audio: 0.0 }, // 1
+    { learning: 0.4, localized: 0.6, audio: 0.0 }, // 2
+    { learning: 0.35, localized: 0.65, audio: 0.0 }, // 3
+    { learning: 0.25, localized: 0.65, audio: 0.1 }, // 4
+    { learning: 0.2, localized: 0.65, audio: 0.15 }, // 5
     { learning: 0.15, localized: 0.65, audio: 0.2 }, // 6
     { learning: 0.1, localized: 0.65, audio: 0.25 }, // 7
     { learning: 0.05, localized: 0.65, audio: 0.3 }, // 8
