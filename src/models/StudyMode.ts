@@ -6,7 +6,7 @@
  * mixes in recall, and mature cards also get listening-only reviews.
  *
  * The level is stored separately from the FSRS schedule: FSRS decides WHEN a card is due, the
- * level decides HOW it is shown. A right swipe moves a card up a level, a left swipe down one.
+ * level decides HOW it is shown. A right swipe moves a card up a level, a left swipe halves it.
  */
 
 /** What the front of the card shows. */
@@ -45,9 +45,13 @@ export function clampLevel(level: number | undefined): number {
     return Math.min(MAX_LEVEL, Math.max(0, Math.trunc(level)));
 }
 
-/** Right swipe: one level up. Left swipe: one level down. */
+/**
+ * Right swipe: one level up. Left swipe: the level is halved (rounded down), so a forgotten card
+ * falls back towards the easy direction instead of staying on a hard prompt it just failed.
+ */
 export function nextLevel(level: number | undefined, direction: "left" | "right"): number {
-    return clampLevel(clampLevel(level) + (direction === "right" ? 1 : -1));
+    const current = clampLevel(level);
+    return direction === "right" ? clampLevel(current + 1) : Math.floor(current / 2);
 }
 
 export function initialLevel(mastered: boolean): number {
