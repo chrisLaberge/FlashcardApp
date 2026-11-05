@@ -21,10 +21,10 @@ describe("prompt mix", () => {
         }
     });
 
-    test("the first two levels are recognition only (the learning word, never the meaning or sound)", () => {
-        for (const level of [0, 1]) {
-            expect(promptMix(level, true)).toEqual({ learning: 1, localized: 0, audio: 0 });
-        }
+    test("level 0 (the first showing) is recognition only; recall is mixed in from level 1", () => {
+        expect(promptMix(0, true)).toEqual({ learning: 1, localized: 0, audio: 0 });
+        expect(promptMix(1, true).localized).toBeGreaterThanOrEqual(0.3);
+        expect(promptMix(3, true).localized).toBeGreaterThan(promptMix(3, true).learning);
     });
 
     test("recall (meaning first) only grows with the level, recognition only shrinks", () => {
@@ -61,10 +61,10 @@ describe("prompt mix", () => {
 
 describe("pickPromptSide", () => {
     test("follows the probabilities (deterministic rolls)", () => {
-        // level 4: learning .35, localized .55, audio .10
+        // level 4: learning .25, localized .65, audio .10
         expect(pickPromptSide(4, true, () => 0.0)).toBe("learning");
-        expect(pickPromptSide(4, true, () => 0.34)).toBe("learning");
-        expect(pickPromptSide(4, true, () => 0.36)).toBe("localized");
+        expect(pickPromptSide(4, true, () => 0.24)).toBe("learning");
+        expect(pickPromptSide(4, true, () => 0.26)).toBe("localized");
         expect(pickPromptSide(4, true, () => 0.89)).toBe("localized");
         expect(pickPromptSide(4, true, () => 0.91)).toBe("audio");
         expect(pickPromptSide(4, true, () => 0.999)).toBe("audio");

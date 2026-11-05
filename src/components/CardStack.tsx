@@ -1218,6 +1218,9 @@ const makeStyles = (t: Palette) => {
         gap: 4,
         borderWidth: 1,
         borderColor: t.surfaceTop,
+        // The card is raised (elevation + zIndex); without this Android draws the card over the bar.
+        zIndex: 20,
+        elevation: 20,
     },
     pickText: { color: t.text, fontSize: 17, fontWeight: "700" },
     pickHint: { color: t.muted, fontSize: 12 },
