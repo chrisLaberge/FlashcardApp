@@ -1,16 +1,14 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, FlatList, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { FlatList, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { getLanguage } from "../../constants/languages";
-import { getDecks } from "../../database/database";
-import { premadeDecks, premadeDecksFor, type PremadeDeck } from "../../models/PremadeDecks";
+import { getCards, getDecks } from "../../database/database";
+import { cardKey, premadeDecks, premadeDecksFor, presentIndexes } from "../../models/PremadeDecks";
 import { readings, readingsFor } from "../../models/Readings";
-import { installPremadeDeck } from "../../services/premadeDecks";
 import { useTheme } from "../../theme/ThemeProvider";
 import type { Palette } from "../../theme/themes";
 
-type Owned = { name: string; language: string };
 
 // Languages that have something in the library, in the order they were written.
 const libraryLanguages = [...new Set([...premadeDecks.map((d) => d.language), ...readings.map((r) => r.language)])];
@@ -18,16 +16,22 @@ const libraryLanguages = [...new Set([...premadeDecks.map((d) => d.language), ..
 export default function LibraryScreen() {
     const t = useTheme();
     const s = useMemo(() => makeS(t), [t]);
-    const [owned, setOwned] = useState<Owned[]>([]);
+    // Words you already have, per language (across all your decks of that language).
+    const [owned, setOwned] = useState<Map<string, Set<string>>>(new Map());
     const [picking, setPicking] = useState(false);
     const [deckLanguage, setDeckLanguage] = useState<string | null>(null);
     const [chosen, setChosen] = useState<string | null>(null);
     const [tab, setTab] = useState<"decks" | "reading">("decks");
-    const [busyId, setBusyId] = useState<string | null>(null);
 
     const load = useCallback(async () => {
         const [decks, lastDeckId] = await Promise.all([getDecks(), AsyncStorage.getItem("lastDeckId")]);
-        setOwned(decks.map((d) => ({ name: d.name, language: d.language })));
+        const words = new Map<string, Set<string>>();
+        for (const d of decks) {
+            const set = words.get(d.language) ?? new Set<string>();
+            for (const c of await getCards(d.id)) set.add(cardKey(c.learningText));
+            words.set(d.language, set);
+        }
+        setOwned(words);
         setDeckLanguage(decks.find((d) => d.id === Number(lastDeckId))?.language ?? null);
     }, []);
 
@@ -38,19 +42,6 @@ export default function LibraryScreen() {
     const lang = getLanguage(language);
     const decks = premadeDecksFor(language);
     const texts = readingsFor(language);
-
-    const add = async (deck: PremadeDeck) => {
-        if (busyId) return;
-        setBusyId(deck.id);
-        try {
-            await installPremadeDeck(deck);
-            await load();
-        } catch (error) {
-            Alert.alert("Could not add the deck", error instanceof Error ? error.message : String(error));
-        } finally {
-            setBusyId(null);
-        }
-    };
 
     return (
         <View style={s.container}>
@@ -88,26 +79,25 @@ export default function LibraryScreen() {
                     data={decks}
                     keyExtractor={(d) => d.id}
                     contentContainerStyle={s.list}
-                    ListHeaderComponent={<Text style={s.hint}>Add a deck and it becomes your own. Change or delete its cards any time.</Text>}
+                    ListHeaderComponent={<Text style={s.hint}>Open a deck to add all its cards or pick just the ones you want. Added cards are yours to change or delete.</Text>}
                     ListEmptyComponent={<Text style={s.empty}>No premade decks for {lang?.name ?? "this language"} yet.</Text>}
                     renderItem={({ item }) => {
-                        const done = owned.some((d) => d.name === item.name && d.language === item.language);
+                        const have = presentIndexes(item.cards, owned.get(item.language) ?? new Set()).size;
+                        const all = have === item.cards.length;
                         return (
-                            <View style={s.card}>
+                            <Pressable
+                                style={({ pressed }) => [s.card, pressed && s.pressed]}
+                                onPress={() => router.push({ pathname: "/premade", params: { id: item.id } })}
+                                accessibilityRole="button"
+                            >
                                 <Text style={s.flag}>{lang?.flag ?? "🌐"}</Text>
                                 <View style={{ flex: 1 }}>
                                     <Text style={s.name}>{item.name}</Text>
                                     <Text style={s.meta}>{item.cards.length} cards · {item.description}</Text>
+                                    <Text style={[s.meta, all && s.metaDone]}>{all ? "All cards in your decks ✓" : have > 0 ? `${have} of ${item.cards.length} already in your decks` : "None in your decks yet"}</Text>
                                 </View>
-                                <Pressable
-                                    style={({ pressed }) => [s.button, done && s.buttonDone, pressed && s.pressed]}
-                                    onPress={() => add(item)}
-                                    disabled={done || busyId !== null}
-                                    accessibilityRole="button"
-                                >
-                                    {busyId === item.id ? <ActivityIndicator color={t.bg} /> : <Text style={[s.buttonText, done && s.buttonTextDone]}>{done ? "Added ✓" : "Add"}</Text>}
-                                </Pressable>
-                            </View>
+                                <Text style={s.arrow}>›</Text>
+                            </Pressable>
                         );
                     }}
                 />
@@ -160,11 +150,8 @@ const makeS = (t: Palette) => StyleSheet.create({
     card: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: t.surface, borderRadius: 14, padding: 14, marginBottom: 10 },
     flag: { fontSize: 30 },
     name: { color: t.text, fontSize: 16, fontWeight: "600" },
+    metaDone: { color: t.green, fontWeight: "600" },
     meta: { color: t.muted, fontSize: 12, marginTop: 2 },
     arrow: { color: t.muted, fontSize: 24 },
-    button: { backgroundColor: t.green, paddingVertical: 9, paddingHorizontal: 16, borderRadius: 10, minWidth: 74, alignItems: "center" },
-    buttonDone: { backgroundColor: t.surfaceHigh },
-    buttonText: { color: t.bg, fontSize: 14, fontWeight: "bold" },
-    buttonTextDone: { color: t.text },
     pressed: { opacity: 0.7 },
 });
