@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, FlatList, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, FlatList, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { getLanguage } from "../../constants/languages";
 import { getDecks } from "../../database/database";
 import { premadeDecks, premadeDecksFor, type PremadeDeck } from "../../models/PremadeDecks";
@@ -19,6 +19,7 @@ export default function LibraryScreen() {
     const t = useTheme();
     const s = useMemo(() => makeS(t), [t]);
     const [owned, setOwned] = useState<Owned[]>([]);
+    const [picking, setPicking] = useState(false);
     const [deckLanguage, setDeckLanguage] = useState<string | null>(null);
     const [chosen, setChosen] = useState<string | null>(null);
     const [tab, setTab] = useState<"decks" | "reading">("decks");
@@ -53,14 +54,26 @@ export default function LibraryScreen() {
 
     return (
         <View style={s.container}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.chipScroll} contentContainerStyle={s.chips}>
-                {libraryLanguages.map((code) => (
-                    <Pressable key={code} style={[s.chip, code === language && s.chipOn]} onPress={() => setChosen(code)} accessibilityRole="button">
-                        <Text style={s.chipFlag}>{getLanguage(code)?.flag ?? "🌐"}</Text>
-                        <Text style={[s.chipText, code === language && s.chipTextOn]}>{getLanguage(code)?.name.split(" ")[0] ?? code}</Text>
-                    </Pressable>
-                ))}
-            </ScrollView>
+            <View style={s.dropWrap}>
+                <Pressable style={({ pressed }) => [s.deckButton, pressed && { opacity: 0.7 }]} onPress={() => setPicking(true)} accessibilityRole="button" accessibilityLabel="Choose a language">
+                    <Text style={s.dropFlag}>{lang?.flag ?? "🌐"}</Text>
+                    <Text style={s.deckName} numberOfLines={1}>{lang?.name ?? language}</Text>
+                    <Text style={s.dropArrow}>▼</Text>
+                </Pressable>
+            </View>
+
+            <Modal visible={picking} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setPicking(false)}>
+                <Pressable style={s.backdrop} onPress={() => setPicking(false)}>
+                    <View style={s.menu}>
+                        {libraryLanguages.map((code) => (
+                            <Pressable key={code} style={[s.menuRow, code === language && s.menuRowOn]} onPress={() => { setChosen(code); setPicking(false); }} accessibilityRole="button">
+                                <Text style={s.dropFlag}>{getLanguage(code)?.flag ?? "🌐"}</Text>
+                                <Text style={s.menuText}>{getLanguage(code)?.name ?? code}</Text>
+                            </Pressable>
+                        ))}
+                    </View>
+                </Pressable>
+            </Modal>
 
             <View style={s.toggle}>
                 {(["decks", "reading"] as const).map((w) => (
@@ -126,13 +139,16 @@ export default function LibraryScreen() {
 
 const makeS = (t: Palette) => StyleSheet.create({
     container: { flex: 1, backgroundColor: t.bg, paddingHorizontal: 16, paddingTop: 12 },
-    chipScroll: { flexGrow: 0 },
-    chips: { gap: 8, paddingVertical: 4 },
-    chip: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: t.surface, borderRadius: 20, paddingVertical: 7, paddingHorizontal: 12 },
-    chipOn: { backgroundColor: t.yellow },
-    chipFlag: { fontSize: 16 },
-    chipText: { color: t.text, fontSize: 14, fontWeight: "600" },
-    chipTextOn: { color: t.bg },
+    dropWrap: { flexDirection: "row" },
+    deckButton: { flexDirection: "row", alignItems: "center", paddingVertical: 6, paddingHorizontal: 10, backgroundColor: t.surface, borderWidth: 1, borderColor: t.surfaceHigh, borderRadius: 8 },
+    deckName: { flexShrink: 1, color: t.text, fontSize: 13, fontWeight: "600", marginLeft: 6 },
+    dropFlag: { fontSize: 16 },
+    dropArrow: { color: t.muted, fontSize: 9, marginLeft: 6 },
+    backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", padding: 28 },
+    menu: { backgroundColor: t.surface, borderRadius: 14, borderWidth: 1, borderColor: t.surfaceHigh, paddingVertical: 6 },
+    menuRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 14, paddingHorizontal: 16 },
+    menuRowOn: { backgroundColor: t.surfaceHigh },
+    menuText: { color: t.text, fontSize: 16, fontWeight: "600" },
     toggle: { flexDirection: "row", backgroundColor: t.surface, borderRadius: 12, padding: 4, marginTop: 12, marginBottom: 8 },
     tab: { flex: 1, alignItems: "center", paddingVertical: 8, borderRadius: 9 },
     tabOn: { backgroundColor: t.surfaceHigh },
