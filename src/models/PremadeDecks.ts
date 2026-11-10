@@ -53,3 +53,17 @@ export const premadeDecks: PremadeDeck[] = Object.entries(TRANSLATIONS).map(([la
 }));
 
 export const premadeDecksFor = (language: string): PremadeDeck[] => premadeDecks.filter((d) => d.language === language);
+
+/** How a word is compared when checking whether a deck already has it (case and spacing do not matter). */
+export const cardKey = (text: string): string => text.trim().replace(/\s+/g, " ").toLowerCase();
+
+/** Which of a premade deck's cards (by index) the given words already contain. */
+export function presentIndexes(cards: readonly PremadeCard[], existing: ReadonlySet<string>): Set<number> {
+    const found = new Set<number>();
+    cards.forEach((card, i) => {
+        if (existing.has(cardKey(card.learning))) found.add(i);
+    });
+    return found;
+}
+
+export const getPremadeDeck = (id: string): PremadeDeck | undefined => premadeDecks.find((d) => d.id === id);
