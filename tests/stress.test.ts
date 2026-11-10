@@ -40,7 +40,6 @@ test("a 300,000-word book is analysed in reasonable time, and coverage matches a
 
     const db = startApp();
     const id = await db.addMyText("Big", "ru", "x");
-    const s0 = performance.now();
     await db.saveBookAnalysis(id, russian.version, stats.total, stats.lemmas);
 
     for (const w of ["книга", "кот", "дом"]) await db.setWordKnown("ru", lemmaKey(w), true);
