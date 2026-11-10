@@ -17,7 +17,7 @@ function messagesFor(event: UnlockEvent): Message[] {
     if (event.items.length > MAX_SEPARATE) {
         return [{ id: event.items.map((i) => i.id).join(","), icon: "🏆", title: `${event.items.length} achievements unlocked`, subtitle: "Tap to see them", color: "#ffc933", xp: event.totalXp, to: "/achievements" }];
     }
-    return event.items.map((i: UnlockItem) => ({ id: i.id, icon: i.icon, title: i.title, subtitle: `${i.tierName} unlocked`, color: i.color, xp: i.xp, to: "/achievements" as const }));
+    return event.items.map((i: UnlockItem) => ({ id: i.id, icon: i.icon, title: i.title, subtitle: i.tierName, color: i.color, xp: i.xp, to: "/achievements" as const }));
 }
 
 /** Slides a banner in from the top when an achievement is earned. Tap it to open the achievements. */

@@ -5,7 +5,7 @@ const run = (start: string, length: number) => Array.from({ length }, (_, i) => 
 
 describe("streak freezes", () => {
     test("no history", () => {
-        expect(streakWithFreezes([], "2026-11-04")).toEqual({ current: 0, longest: 0, freezes: 0, frozenDays: [], studiedToday: false });
+        expect(streakWithFreezes([], "2026-11-04")).toEqual({ current: 0, longest: 0, freezes: 0, frozenDays: [], savers: 0, studiedToday: false });
     });
 
     test("a plain streak, and today not being done yet does not break it", () => {

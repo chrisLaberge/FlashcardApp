@@ -28,11 +28,16 @@ export default function AchievementsScreen() {
     return (
         <ScrollView style={s.container} contentContainerStyle={s.content}>
             <Stack.Screen options={{ title: "Achievements" }} />
-            {summary ? <Text style={s.summary}>{summary.earned} of {summary.total} tiers earned</Text> : null}
+            {summary ? <Text style={s.summary}>{summary.earned} / {summary.total}</Text> : null}
             {list?.map((a) => {
                 const color = a.tier > 0 ? TIERS[a.tier - 1].color : t.surfaceTop;
+                // The God tier lights up the whole card in its colour.
+                const god = a.tier === TIERS.length;
                 return (
-                    <View key={a.id} style={s.card}>
+                    <View
+                        key={a.id}
+                        style={[s.card, god && { backgroundColor: `${color}26`, borderWidth: 2, borderColor: color, shadowColor: color, shadowOpacity: 0.9, shadowRadius: 18, shadowOffset: { width: 0, height: 0 }, elevation: 12 }]}
+                    >
                         <View style={s.top}>
                             <View style={[s.medal, { borderColor: color }]}>
                                 <Text style={s.icon}>{a.icon}</Text>
@@ -61,9 +66,7 @@ export default function AchievementsScreen() {
                                     {a.nextGoal} for {TIERS[a.tier].name} ({a.value.toLocaleString("en-US")} / {a.nextTarget.toLocaleString("en-US")})
                                 </Text>
                             </>
-                        ) : (
-                            <Text style={[s.goal, { color }]}>Everything earned. Diamond!</Text>
-                        )}
+                        ) : null}
                     </View>
                 );
             })}

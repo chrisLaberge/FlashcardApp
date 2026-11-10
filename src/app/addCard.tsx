@@ -676,9 +676,10 @@ export default function AddCardScreen() {
                         >
                             <MaterialCommunityIcons
                                 name="close"
-                                size={18}
+                                size={17}
                                 color={COLORS.fg}
                             />
+                            <Text style={styles.changeImageText}>Remove</Text>
                         </Pressable>
                     )}
 
@@ -1198,11 +1199,15 @@ const makeStyles = (t: Palette) => {
 
     removeImageBadge: {
         position: "absolute",
-        top: 10,
-        right: 10,
+        left: 10,
+        bottom: 10,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 5,
         backgroundColor: "rgba(40,40,40,0.85)",
-        borderRadius: 16,
-        padding: 6,
+        paddingHorizontal: 10,
+        paddingVertical: 7,
+        borderRadius: 8,
     },
 
     addedBanner: {

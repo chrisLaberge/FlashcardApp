@@ -1,8 +1,8 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useNavigation } from "expo-router";
 import * as Speech from "expo-speech";
-import { useCallback, useRef, useState, useMemo } from "react";
+import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { Alert, Linking, Modal, Platform, Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import CardStack from "../components/CardStack";
@@ -21,6 +21,8 @@ import {
 } from "../database/database";
 import { scheduleAchievementCheck } from "../services/achievementUnlocks";
 import { scheduleGoalCheck, scheduleReminderRefresh } from "../services/dailyGoal";
+import { announceStudyScreenLeft, currentSession } from "../services/sessionSummary";
+import { formatStudyTime, type StudySession } from "../models/Stats";
 import { useFocusedInterval } from "../hooks/useFocusedInterval";
 import { useLearnSettings } from "../hooks/useLearnSettings";
 import { Card } from "../models/Card";
@@ -54,7 +56,6 @@ export default function LearnScreen() {
   const insets = useSafeAreaInsets();
   const { settings, loaded: settingsLoaded, update: updateSettings } = useLearnSettings();
 
-  const [sessionStart] = useState(Date.now());
   const [queue] = useState(() => new ReviewQueue());
 
   // What is on screen. The queue is the source of truth; `show` copies it into state.
@@ -63,10 +64,29 @@ export default function LearnScreen() {
   const [loadedOnce, setLoadedOnce] = useState(false);
   const [hasDeck, setHasDeck] = useState(true);
 
-  const [reviewedCount, setReviewedCount] = useState(0);
-  const [correctCount, setCorrectCount] = useState(0);
+  // The study session in progress, worked out from the review log so it survives leaving this
+  // screen (and coming back), restarting the app and Undo.
+  const [session, setSession] = useState<StudySession | null>(null);
+  const reviewedCount = session?.reviews ?? 0;
+  const correctCount = session?.correct ?? 0;
+  const refreshSession = useCallback(() => {
+    currentSession()
+      .then(setSession)
+      .catch(() => undefined);
+  }, []);
+  useEffect(refreshSession, [refreshSession]);
+
+
 
   const [selectedDeckId, setSelectedDeckId] = useState<string | undefined>();
+
+  // Closing this screen (back, or the tab bar) shows what you did and what is left. Opening the
+  // edit or add screen on top of it does not remove it, so that stays quiet.
+  const navigation = useNavigation<{ addListener: (event: "beforeRemove", callback: () => void) => () => void }>();
+  useEffect(
+    () => navigation.addListener("beforeRemove", () => announceStudyScreenLeft(selectedDeckId === undefined ? null : Number(selectedDeckId))),
+    [navigation, selectedDeckId],
+  );
   const [ttsCode, setTtsCode] = useState<string | undefined>();
   // Does this phone have a voice for the deck's language? Listening cards need one.
   const [voiceAvailable, setVoiceAvailable] = useState(true);
@@ -128,8 +148,6 @@ export default function LearnScreen() {
         }
       }
       setHistory([]);
-      setReviewedCount(0);
-      setCorrectCount(0);
       setHasDeck(true);
       setLoadedOnce(true);
       show(true);
@@ -215,8 +233,7 @@ export default function LearnScreen() {
       scheduleReminderRefresh();
       scheduleGoalCheck();
       setHistory((h) => [...h, { card, direction, previousProgress }]);
-      setReviewedCount((count) => count + 1);
-      if (direction === "right") setCorrectCount((count) => count + 1);
+      refreshSession();
       show(true);
     }, "Your answer could not be saved. Please try again.");
 
@@ -233,8 +250,7 @@ export default function LearnScreen() {
 
       queue.undo(last.card);
       setHistory((h) => h.slice(0, -1));
-      setReviewedCount((c) => c - 1);
-      if (last.direction === "right") setCorrectCount((c) => c - 1);
+      refreshSession();
       show(true);
     }, "The last answer could not be undone.");
 
@@ -340,7 +356,7 @@ export default function LearnScreen() {
           <View style={styles.statsRow}>
             <View style={styles.statCard}>
               <Text style={styles.statNumber}>
-                {formatStudyTime(Date.now() - sessionStart)}
+                {formatStudyTime(session?.timeMs ?? 0)}
               </Text>
 
               <Text style={styles.statLabel}>Time Spent</Text>
@@ -528,24 +544,6 @@ function ActionButton({
       <Text style={styles.actionText}>{label}</Text>
     </Pressable>
   );
-}
-
-function formatStudyTime(milliseconds: number): string {
-  const totalSeconds = Math.floor(milliseconds / 1000);
-
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-
-  if (hours > 0) {
-    return `${hours}h ${minutes}m ${seconds}s`;
-  }
-
-  if (minutes > 0) {
-    return `${minutes}m ${seconds}s`;
-  }
-
-  return `${seconds}s`;
 }
 
 const makeCOLORS = (t: Palette) => ({

@@ -1,9 +1,11 @@
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
+import SessionSummaryPopup from "../components/SessionSummaryPopup";
 import AchievementToast from "../components/AchievementToast";
 import { scheduleAchievementCheck } from "../services/achievementUnlocks";
 import { refreshReminders } from "../services/dailyGoal";
+import { API_URL } from "../services/imageApi";
 import { backfillLocalImages } from "../services/localImages";
 import { ThemeProvider, useTheme, useThemeControls } from "../theme/ThemeProvider";
 
@@ -29,6 +31,7 @@ function Navigator() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       </Stack>
       <AchievementToast />
+      <SessionSummaryPopup />
     </>
   );
 }
@@ -40,6 +43,8 @@ export default function RootLayout() {
     // Award anything already earned (e.g. right after updating); a no-op once recorded.
     scheduleAchievementCheck(4000);
     void refreshReminders();
+    // Wake the server now so the first word lookup or spoken card is not waiting on a cold start.
+    fetch(`${API_URL}/`).catch(() => undefined);
   }, []);
 
   return (

@@ -5,6 +5,7 @@ import ActivityCalendar from "../../components/ActivityCalendar";
 import { getCardsAdded, getReviewLog, type CardsAdded } from "../../database/database";
 import { achievements, TIERS, tierSummary, type Achievement } from "../../models/Achievements";
 import { getBonusXp } from "../../services/achievementUnlocks";
+import { loadSaverDays } from "../../services/shop";
 import { countByDay } from "../../models/Calendar";
 import { streakWithFreezes } from "../../models/StreakFreeze";
 import { levelProgress, totalXp } from "../../models/Progression";
@@ -27,11 +28,11 @@ type Summary = {
     achievements: Achievement[];
 };
 
-function summarize(log: LoggedReview[], added: CardsAdded, bonusXp: number, nowMs: number): Summary {
+function summarize(log: LoggedReview[], added: CardsAdded, bonusXp: number, nowMs: number, saverDays: string[]): Summary {
     const days = dailyStats(log);
     const sum = totals(log);
     const today = localDay(nowMs);
-    const run = streakWithFreezes(days.filter((d) => d.reviews > 0).map((d) => d.day), today);
+    const run = streakWithFreezes(days.filter((d) => d.reviews > 0).map((d) => d.day), today, saverDays);
     return {
         xp: totalXp(log) + bonusXp, // reviews plus achievement bonuses
         reviews: sum.reviews,
@@ -62,8 +63,8 @@ export default function StatsScreen() {
     useFocusEffect(
         useCallback(() => {
             let active = true;
-            Promise.all([getReviewLog(), getCardsAdded(), getBonusXp()]).then(([log, added, bonusXp]) => {
-                if (active) setSummary(summarize(log, added, bonusXp, Date.now()));
+            Promise.all([getReviewLog(), getCardsAdded(), getBonusXp(), loadSaverDays()]).then(([log, added, bonusXp, savers]) => {
+                if (active) setSummary(summarize(log, added, bonusXp, Date.now(), savers));
             });
             return () => {
                 active = false;

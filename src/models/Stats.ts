@@ -102,3 +102,53 @@ export function totals(reviews: readonly LoggedReview[]): Totals {
         timeMs,
     };
 }
+
+/* --------------------------------- sessions --------------------------------- */
+
+/** A gap this long with no answers ends a study session. */
+export const SESSION_GAP_MS = 30 * 60 * 1000;
+/** One answer never counts for more than this, so a phone left on a card does not inflate the time. */
+export const MAX_ANSWER_MS = 2 * 60 * 1000;
+
+export type StudySession = {
+    reviews: number;
+    correct: number;
+    /** Time actually spent answering (the sum of how long each card was on screen). */
+    timeMs: number;
+    startedAt: number;
+    lastAt: number;
+};
+
+/**
+ * The study session in progress: the latest run of answers with no gap of SESSION_GAP_MS between
+ * them, as long as the last one is that recent. Worked out from the review log, so it survives
+ * leaving the screen, restarting the app and Undo. Null when there is no session right now.
+ */
+export function latestSession(reviews: readonly LoggedReview[], nowMs: number, gapMs = SESSION_GAP_MS): StudySession | null {
+    const sorted = [...reviews].sort((a, b) => a.reviewedAt - b.reviewedAt);
+    const last = sorted[sorted.length - 1];
+    if (!last || nowMs - last.reviewedAt > gapMs) return null;
+
+    let start = sorted.length - 1;
+    while (start > 0 && sorted[start].reviewedAt - sorted[start - 1].reviewedAt <= gapMs) start--;
+
+    const run = sorted.slice(start);
+    return {
+        reviews: run.length,
+        correct: run.filter((r) => r.correct).length,
+        timeMs: run.reduce((sum, r) => sum + Math.min(MAX_ANSWER_MS, Math.max(0, r.durationMs ?? 0)), 0),
+        startedAt: run[0].reviewedAt,
+        lastAt: last.reviewedAt,
+    };
+}
+
+/** "2h 5m", "4m 12s" or "38s". */
+export function formatStudyTime(milliseconds: number): string {
+    const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000));
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    if (hours > 0) return `${hours}h ${minutes}m`;
+    if (minutes > 0) return `${minutes}m ${seconds}s`;
+    return `${seconds}s`;
+}

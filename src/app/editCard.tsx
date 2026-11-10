@@ -36,6 +36,7 @@ import {
     getCardProgress,
     getDecks,
     resetCardProgress,
+    removeCardImage,
     setCardImage,
     updateCard,
 } from "../database/database";
@@ -152,6 +153,8 @@ export default function EditCardScreen() {
     const [saving, setSaving] = useState(false);
 
     const [selectedImage, setSelectedImage] = useState<ImageSearchResult | null>(null);
+    // True once the picture was taken off the card: saving then leaves the card without one.
+    const [imageRemoved, setImageRemoved] = useState(false);
     const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(null);
     const [imageResults, setImageResults] = useState<ImageSearchResult[]>([]);
     const [imageQuery, setImageQuery] = useState("");
@@ -272,6 +275,9 @@ export default function EditCardScreen() {
             if (imageId !== null) {
                 await setCardImage(cardId, imageId);
                 invalidateCardImage(cardId);   // <-- add this line
+            } else if (imageRemoved) {
+                await removeCardImage(cardId);
+                invalidateCardImage(cardId);
             }
 
             setDuplicateCard(null);
@@ -531,7 +537,14 @@ export default function EditCardScreen() {
         setImageModalVisible(true);
     };
 
+    const removeImage = () => {
+        setSelectedImage(null);
+        setCurrentImageUrl(null);
+        setImageRemoved(true);
+    };
+
     const selectImage = (image: ImageSearchResult) => {
+        setImageRemoved(false);
         setSelectedImage(image);
         setCurrentImageUrl(image.downloadUrl);
         setImageModalVisible(false);
@@ -577,6 +590,19 @@ export default function EditCardScreen() {
                     </View>
                 )}
 
+                {currentImageUrl ? (
+                    <Pressable
+                        onPress={removeImage}
+                        hitSlop={8}
+                        accessibilityRole="button"
+                        accessibilityLabel="Remove picture"
+                        style={styles.removeImageBadge}
+                    >
+                        <MaterialCommunityIcons name="close" size={17} color={COLORS.fg} />
+                        <Text style={styles.changeImageText}>Remove</Text>
+                    </Pressable>
+                ) : null}
+
                 <View style={styles.changeImageBadge}>
                     <MaterialCommunityIcons
                         name="image-edit-outline"
@@ -585,7 +611,7 @@ export default function EditCardScreen() {
                     />
 
                     <Text style={styles.changeImageText}>
-                        Change
+                        {currentImageUrl ? "Change" : "Add"}
                     </Text>
                 </View>
             </Pressable>
@@ -1405,6 +1431,19 @@ const makeStyles = (t: Palette) => {
         flex: 1,
         alignItems: "center",
         justifyContent: "center",
+    },
+
+    removeImageBadge: {
+        position: "absolute",
+        left: 10,
+        bottom: 10,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 5,
+        backgroundColor: "rgba(40,40,40,0.85)",
+        paddingHorizontal: 10,
+        paddingVertical: 7,
+        borderRadius: 8,
     },
 
     changeImageBadge: {
