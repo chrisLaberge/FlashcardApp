@@ -193,6 +193,13 @@ async function openAndPrepareDatabase(): Promise<SQLite.SQLiteDatabase> {
         if (!textColumns.some((column) => column.name === "analyzer_version")) {
             await db.execAsync("ALTER TABLE my_texts ADD COLUMN analyzer_version INTEGER");
         }
+        // A PDF keeps its original file on the phone, and the page you stopped at (additive).
+        if (!textColumns.some((column) => column.name === "pdf_path")) {
+            await db.execAsync("ALTER TABLE my_texts ADD COLUMN pdf_path TEXT");
+        }
+        if (!textColumns.some((column) => column.name === "last_page")) {
+            await db.execAsync("ALTER TABLE my_texts ADD COLUMN last_page INTEGER");
+        }
 
         // Images are also kept on the phone (additive).
         const imageColumns = await db.getAllAsync<{ name: string }>("PRAGMA table_info(images)");
@@ -900,35 +907,57 @@ export async function recordShopAction(action: { ledger: readonly Omit<LedgerEnt
     });
 }
 
-export type MyText = { id: number; title: string; language: string; body: string; addedAt: number };
+export type MyText = { id: number; title: string; language: string; body: string; addedAt: number; pdfPath: string | null; lastPage: number | null };
 
-export async function addMyText(title: string, language: string, body: string, atMs = Date.now()): Promise<number> {
+export async function addMyText(title: string, language: string, body: string, atMs = Date.now(), pdfPath: string | null = null): Promise<number> {
     const database = await getDatabase();
-    const result = await database.runAsync("INSERT INTO my_texts (title, language, body, added_at) VALUES (?, ?, ?, ?)", title, language, body, atMs);
+    const result = await database.runAsync("INSERT INTO my_texts (title, language, body, added_at, pdf_path) VALUES (?, ?, ?, ?, ?)", title, language, body, atMs, pdfPath);
     return result.lastInsertRowId;
 }
 
 /** The titles of the added texts for a language, newest first (the body is loaded when one is opened). */
 export async function getMyTexts(language: string): Promise<(Omit<MyText, "body"> & { analyzerVersion: number | null })[]> {
     const database = await getDatabase();
-    const rows = await database.getAllAsync<{ id: number; title: string; language: string; added_at: number; analyzer_version: number | null }>(
-        "SELECT id, title, language, added_at, analyzer_version FROM my_texts WHERE language = ? ORDER BY added_at DESC, id DESC", language,
+    const rows = await database.getAllAsync<{ id: number; title: string; language: string; added_at: number; analyzer_version: number | null; pdf_path: string | null; last_page: number | null }>(
+        "SELECT id, title, language, added_at, analyzer_version, pdf_path, last_page FROM my_texts WHERE language = ? ORDER BY added_at DESC, id DESC", language,
     );
-    return rows.map((r) => ({ id: r.id, title: r.title, language: r.language, addedAt: r.added_at, analyzerVersion: r.analyzer_version }));
+    return rows.map((r) => ({ id: r.id, title: r.title, language: r.language, addedAt: r.added_at, analyzerVersion: r.analyzer_version, pdfPath: r.pdf_path, lastPage: r.last_page }));
 }
 
 export async function getMyText(id: number): Promise<MyText | null> {
     const database = await getDatabase();
-    const row = await database.getFirstAsync<{ id: number; title: string; language: string; body: string; added_at: number }>(
-        "SELECT id, title, language, body, added_at FROM my_texts WHERE id = ?", id,
+    const row = await database.getFirstAsync<{ id: number; title: string; language: string; body: string; added_at: number; pdf_path: string | null; last_page: number | null }>(
+        "SELECT id, title, language, body, added_at, pdf_path, last_page FROM my_texts WHERE id = ?", id,
     );
-    return row ? { id: row.id, title: row.title, language: row.language, body: row.body, addedAt: row.added_at } : null;
+    return row ? { id: row.id, title: row.title, language: row.language, body: row.body, addedAt: row.added_at, pdfPath: row.pdf_path, lastPage: row.last_page } : null;
 }
 
-export async function deleteMyText(id: number): Promise<void> {
+/** Saves the text read out of a PDF (the words are counted separately, by `saveBookAnalysis`). */
+export async function setMyTextBody(id: number, body: string): Promise<void> {
     const database = await getDatabase();
+    await database.runAsync("UPDATE my_texts SET body = ? WHERE id = ?", body, id);
+}
+
+/** Remembers the page you stopped at. */
+export async function setLastPage(id: number, page: number): Promise<void> {
+    const database = await getDatabase();
+    await database.runAsync("UPDATE my_texts SET last_page = ? WHERE id = ?", Math.max(1, Math.floor(page)), id);
+}
+
+/** Deletes a text and its word counts. Returns where its PDF file was kept, so the caller can remove the file too. */
+export async function deleteMyText(id: number): Promise<string | null> {
+    const database = await getDatabase();
+    const row = await database.getFirstAsync<{ pdf_path: string | null }>("SELECT pdf_path FROM my_texts WHERE id = ?", id);
     await database.runAsync("DELETE FROM book_vocab WHERE book_id = ?", id);
     await database.runAsync("DELETE FROM my_texts WHERE id = ?", id);
+    return row?.pdf_path ?? null;
+}
+
+/** Every word of the language you know (known by your cards or by your own choice), as lemma keys. */
+export async function getKnownLemmas(language: string): Promise<Set<string>> {
+    const database = await getDatabase();
+    const rows = await database.getAllAsync<{ lemma: string }>("SELECT lemma FROM known_words WHERE language = ? AND known = 1", language);
+    return new Set(rows.map((r) => r.lemma));
 }
 
 /* ---------------------------- Known words and books ---------------------------- */
