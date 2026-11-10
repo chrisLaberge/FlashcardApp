@@ -13,6 +13,7 @@ function messageFor(status: number | null, detail?: string): string {
     if (status === 413) return "That PDF is too big.";
     if (status === 404) return "The server does not support PDFs yet.";
     if (status === 422) return "No text found. Scanned PDFs do not work.";
+    if (status === 503) return "The server is busy. Try again in a moment.";
     if (status === 429) return "Too many PDFs just now. Try again later.";
     return "Could not read that PDF.";
 }

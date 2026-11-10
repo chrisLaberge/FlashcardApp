@@ -1,6 +1,6 @@
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, FlatList, StyleSheet, Text, View } from "react-native";
 import LookupSheet from "../components/LookupSheet";
 import TappableText from "../components/TappableText";
 import { getLanguage } from "../constants/languages";
@@ -37,17 +37,22 @@ export default function ReadingScreen() {
     return (
         <View style={s.container}>
             <Stack.Screen options={{ title: text.title }} />
-            <ScrollView contentContainerStyle={s.content}>
-                {lines.map((line, i) => (
+            {/* A list draws only the lines on screen, so a whole book stays smooth. */}
+            <FlatList
+                data={lines}
+                keyExtractor={(_, i) => String(i)}
+                contentContainerStyle={s.content}
+                initialNumToRender={12}
+                windowSize={7}
+                renderItem={({ item: line }) => (
                     <TappableText
-                        key={i}
                         text={line}
                         style={s.text}
                         onWord={(index) => setLookup({ text: textOfWords(line, index, index), context: line })}
                         onHold={(index) => setLookup({ text: textOfWords(line, index, index), context: line })}
                     />
-                ))}
-            </ScrollView>
+                )}
+            />
 
             {language && lookup && (
                 <LookupSheet

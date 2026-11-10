@@ -6,12 +6,23 @@ import { knownFromCards } from "../models/Vocabulary";
 
 const hasLetter = /\p{L}/u;
 
+// The database allows one transaction at a time, so vocabulary jobs (a sync, an import's analysis,
+// the library's catch-up) wait for each other instead of overlapping.
+let queue: Promise<unknown> = Promise.resolve();
+function inOrder<T>(job: () => Promise<T>): Promise<T> {
+    const run = queue.then(job, job);
+    queue = run.catch(() => undefined);
+    return run;
+}
+
 /**
  * Brings the words the cards say are known up to date (a word is known when any card for it is
  * learned). Only the card-based rows change; words you marked yourself are left alone. Cheap enough
  * to run whenever the library opens, which keeps coverage right without hooks in every card edit.
  */
-export async function syncKnownWords(language: string, analyzer: Analyzer): Promise<void> {
+export const syncKnownWords = (language: string, analyzer: Analyzer): Promise<void> => inOrder(() => syncNow(language, analyzer));
+
+async function syncNow(language: string, analyzer: Analyzer): Promise<void> {
     const cards = await getCardsForVocabulary(language);
     const known = knownFromCards(cards.map((card) => {
         const words = tokenize(card.text).filter((t) => t.word && hasLetter.test(t.text));
@@ -22,7 +33,9 @@ export async function syncKnownWords(language: string, analyzer: Analyzer): Prom
 }
 
 /** Reads a book once and stores how often each word occurs. Returns the number of words found. */
-export async function analyzeBook(bookId: number, analyzer: Analyzer, onProgress?: (done: number, total: number) => void): Promise<number> {
+export const analyzeBook = (bookId: number, analyzer: Analyzer, onProgress?: (done: number, total: number) => void): Promise<number> => inOrder(() => analyzeNow(bookId, analyzer, onProgress));
+
+async function analyzeNow(bookId: number, analyzer: Analyzer, onProgress?: (done: number, total: number) => void): Promise<number> {
     const book = await getMyText(bookId);
     if (!book || book.language !== analyzer.language) return 0;
     const stats = await analyzeText(book.body, analyzer, onProgress);
@@ -31,8 +44,9 @@ export async function analyzeBook(bookId: number, analyzer: Analyzer, onProgress
 }
 
 /** Analyses every book of the language that has not been analysed with this version of the rules. */
-export async function analyzeNewBooks(language: string, analyzer: Analyzer, onProgress?: (done: number, total: number) => void): Promise<void> {
-    for (const book of await getMyTexts(language)) {
-        if (book.analyzerVersion !== analyzer.version) await analyzeBook(book.id, analyzer, onProgress);
-    }
-}
+export const analyzeNewBooks = (language: string, analyzer: Analyzer, onProgress?: (done: number, total: number) => void): Promise<void> =>
+    inOrder(async () => {
+        for (const book of await getMyTexts(language)) {
+            if (book.analyzerVersion !== analyzer.version) await analyzeNow(book.id, analyzer, onProgress);
+        }
+    });
