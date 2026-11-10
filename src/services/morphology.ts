@@ -3,6 +3,7 @@ import Az from "az";
 import { Asset } from "expo-asset";
 import { createRussianAnalyzer } from "../models/language/russian";
 import type { Analyzer } from "../models/language/types";
+import { plainAnalyzer } from "../models/ReaderWords";
 
 // The dictionary files az needs, bundled with the app (about 11 MB).
 const JSON_FILES: Record<string, unknown> = {
@@ -59,4 +60,13 @@ export function analyzerFor(language: string): Promise<Analyzer | null> {
         throw error;
     });
     return russian;
+}
+
+/** The analyser the PDF reader uses: the language's own, or a plain one (a word is just itself) when it has none. */
+export async function readerAnalyzerFor(language: string): Promise<Analyzer> {
+    try {
+        return (await analyzerFor(language)) ?? plainAnalyzer(language);
+    } catch {
+        return plainAnalyzer(language);
+    }
 }

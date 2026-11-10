@@ -534,6 +534,28 @@ describe("words added", () => {
         expect(await db.getMyText(b)).toBeNull();
     });
 
+    test("a PDF book keeps its file path, its text once read and the page you stopped at; deleting returns the path", async () => {
+        const db = startApp();
+        const id = await db.addMyText("Libro", "es", "", 1000, "file:///pdfs/1.pdf");
+        expect(await db.getMyText(id)).toMatchObject({ body: "", pdfPath: "file:///pdfs/1.pdf", lastPage: null });
+        await db.setMyTextBody(id, "Hola mundo.");
+        await db.setLastPage(id, 7.9);
+        expect(await db.getMyText(id)).toMatchObject({ body: "Hola mundo.", lastPage: 7 });
+        await db.setLastPage(id, 0);
+        expect((await db.getMyText(id))?.lastPage).toBe(1);
+        expect((await db.getMyTexts("es"))[0]).toMatchObject({ pdfPath: "file:///pdfs/1.pdf", lastPage: 1 });
+        expect(await db.deleteMyText(id)).toBe("file:///pdfs/1.pdf");
+        expect(await db.deleteMyText(id)).toBeNull();
+    });
+
+    test("known lemmas: only words marked known, per language", async () => {
+        const db = startApp();
+        await db.setWordKnown("es", "perro", true);
+        await db.setWordKnown("es", "gato", false);
+        await db.setWordKnown("fr", "chien", true);
+        expect([...(await db.getKnownLemmas("es"))]).toEqual(["perro"]);
+    });
+
     test("shop: ledger and inventory are saved together, repeats are ignored, pet state can be set and cleared", async () => {
         const db = startApp();
         await db.recordShopAction({ ledger: [{ itemId: "case", gems: 40, kind: "case" }, { itemId: "cap", gems: -10, kind: "refund" }], addItem: "cap" });

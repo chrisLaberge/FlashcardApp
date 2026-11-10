@@ -1,49 +1,53 @@
 import * as DocumentPicker from "expo-document-picker";
-import { FileSystemUploadType, uploadAsync } from "expo-file-system/legacy";
+import { Directory, File, Paths } from "expo-file-system";
 import { addMyText } from "../database/database";
+import { base64Chunks } from "../models/Base64";
 import { titleFromFileName } from "../models/PdfText";
-import { authHeaders } from "./auth";
-import { API_URL } from "./imageApi";
 
 export class PdfError extends Error {}
 
-function messageFor(status: number | null): string {
-    if (status === null) return "Could not reach the server. Check your connection.";
-    if (status === 401) return "Sign in first (Account tab) to add PDFs.";
-    if (status === 413) return "That PDF is too big.";
-    if (status === 422) return "No text found. Scanned PDFs do not work.";
-    if (status === 429) return "Too many PDFs just now. Try again later.";
-    return "Could not read that PDF.";
-}
+const folder = () => new Directory(Paths.document, "pdfs");
 
-/** Lets the person pick a PDF, reads its text on the server and saves it. Returns the new id, or null if they cancelled. */
+/** Lets the person pick a PDF and keeps a copy on the phone. Everything after that happens on the phone too. Null if they cancelled. */
 export async function addPdf(language: string): Promise<number | null> {
     const picked = await DocumentPicker.getDocumentAsync({ type: "application/pdf", copyToCacheDirectory: true });
     if (picked.canceled || !picked.assets?.[0]) return null;
-    const file = picked.assets[0];
+    const asset = picked.assets[0];
 
-    // The phone streams the file straight from disk to the server, so even a big PDF is not loaded into memory.
-    let status: number;
-    let body: string;
+    const source = new File(asset.uri);
+    let header = "";
     try {
-        const result = await uploadAsync(`${API_URL}/pdf/text`, file.uri, {
-            httpMethod: "POST",
-            uploadType: FileSystemUploadType.BINARY_CONTENT,
-            headers: { "Content-Type": "application/pdf", ...(await authHeaders()) },
-        });
-        status = result.status;
-        body = result.body;
+        header = await source.slice(0, 5).text();
     } catch {
-        throw new PdfError(messageFor(null));
+        throw new PdfError("Could not open that file.");
     }
-    if (status < 200 || status >= 300) throw new PdfError(messageFor(status));
+    if (header !== "%PDF-") throw new PdfError("That is not a PDF.");
 
-    let data: { text?: unknown } | null = null;
     try {
-        data = JSON.parse(body) as { text?: unknown };
-    } catch {
-        // handled below
+        const directory = folder();
+        if (!directory.exists) directory.create({ intermediates: true });
+        const target = new File(directory, `${Date.now()}.pdf`);
+        source.copy(target);
+        return await addMyText(titleFromFileName(asset.name), language, "", Date.now(), target.uri);
+    } catch (error) {
+        throw new PdfError(`Could not save the PDF.${error instanceof Error ? ` (${error.message.slice(0, 100)})` : ""}`);
     }
-    if (typeof data?.text !== "string" || data.text.trim() === "") throw new PdfError(messageFor(422));
-    return addMyText(titleFromFileName(file.name), language, data.text);
+}
+
+/** The PDF's bytes as base64 pieces, ready to hand to the reader page. */
+export async function pdfChunks(path: string): Promise<string[]> {
+    const file = new File(path);
+    if (!file.exists) throw new PdfError("The PDF file is missing. Add it again.");
+    return base64Chunks(new Uint8Array(await file.arrayBuffer()));
+}
+
+/** Removes a book's PDF file; a file that is already gone is fine. */
+export function removePdfFile(path: string | null): void {
+    if (!path) return;
+    try {
+        const file = new File(path);
+        if (file.exists) file.delete();
+    } catch {
+        // Nothing more to do; the book is already gone.
+    }
 }

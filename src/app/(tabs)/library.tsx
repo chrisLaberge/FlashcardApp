@@ -7,7 +7,7 @@ import { deleteMyText, getBookSummaries, getCards, getDecks, type BookSummary } 
 import { cardKey, premadeDecksFor, presentIndexes } from "../../models/PremadeDecks";
 import { coveragePercent } from "../../models/Vocabulary";
 import { analyzerFor } from "../../services/morphology";
-import { addPdf } from "../../services/pdfReading";
+import { addPdf, removePdfFile } from "../../services/pdfReading";
 import { analyzeBook, analyzeNewBooks, syncKnownWords } from "../../services/vocabulary";
 import { useTheme } from "../../theme/ThemeProvider";
 import type { Palette } from "../../theme/themes";
@@ -74,18 +74,12 @@ export default function LibraryScreen() {
 
     const pickPdf = async () => {
         if (busy || !language) return;
-        setBusy("Reading PDF…");
+        setBusy("Adding…");
         try {
             const id = await addPdf(language);
             if (id !== null) {
-                setBusy("Analyzing…");
-                try {
-                    const analyzer = await analyzerFor(language);
-                    if (analyzer) await analyzeBook(id, analyzer);
-                } catch {
-                    // No coverage for this book yet; it is tried again next time the library opens.
-                }
                 await loadTexts();
+                // Its words are counted the first time it is opened.
                 router.push({ pathname: "/reading", params: { id: String(id) } });
             }
         } catch (error) {
@@ -98,7 +92,7 @@ export default function LibraryScreen() {
     const removeText = (id: number, title: string) =>
         Alert.alert(`Delete "${title}"?`, undefined, [
             { text: "Cancel", style: "cancel" },
-            { text: "Delete", style: "destructive", onPress: () => { void deleteMyText(id).then(loadTexts); } },
+            { text: "Delete", style: "destructive", onPress: () => { void deleteMyText(id).then((path) => { removePdfFile(path); return loadTexts(); }); } },
         ]);
 
     return (

@@ -82,7 +82,7 @@ export default function PetScreen() {
     );
 
     // Runs a shop action once at a time and refreshes the screen after it.
-    const act = async (action: () => Promise<void>) => {
+    const act = async (action: () => Promise<void>, refresh = true) => {
         if (busy.current) return;
         busy.current = true;
         try {
@@ -91,7 +91,7 @@ export default function PetScreen() {
             Alert.alert("Something went wrong", error instanceof Error ? error.message : String(error));
         } finally {
             busy.current = false;
-            await reload().catch(() => undefined);
+            if (refresh) await reload().catch(() => undefined);
         }
     };
 
@@ -115,7 +115,7 @@ export default function PetScreen() {
             const plan = await openCaseNow(free);
             if (!plan.ok) return Alert.alert("Can't open it", plan.error);
             if (plan.item) setPrize({ ...plan, ok: true, item: plan.item });
-        });
+        }, false); // the wardrobe and gems update when the spin is closed, so the prize is not given away early
 
     const buy = (label: string, run: () => Promise<{ ok: boolean; error?: string }>) =>
         act(async () => {
@@ -144,14 +144,14 @@ export default function PetScreen() {
         <View style={s.container}>
             <ScrollView contentContainerStyle={s.content}>
                 {/* pet */}
-                <BannerView id={state.banner} style={s.hero}>
+                <View style={s.hero}>
                     <View style={s.gems}>
                         <Text style={s.gemsText}>💎 {state.gems}</Text>
                     </View>
                     <View style={s.petWrap}>
                         <PetView level={state.petLevel} look={state.equipped} size={170} onPress={onPetTap} />
                     </View>
-                </BannerView>
+                </View>
 
                 <Pressable onPress={() => { setDraft(name); setRenaming(true); }} accessibilityRole="button" accessibilityLabel="Rename your pet">
                     <Text style={s.name}>{name}  ✎</Text>
@@ -294,7 +294,7 @@ export default function PetScreen() {
 const makeS = (t: Palette) => StyleSheet.create({
     container: { flex: 1, backgroundColor: t.bg },
     content: { padding: 16, paddingBottom: 60, gap: 10 },
-    hero: { height: 230, borderRadius: 20, alignItems: "center", justifyContent: "flex-end" },
+    hero: { height: 230, borderRadius: 20, backgroundColor: t.surface, alignItems: "center", justifyContent: "flex-end" },
     petWrap: { marginBottom: 4 },
     gems: { position: "absolute", top: 12, right: 12, backgroundColor: "rgba(0,0,0,0.35)", borderRadius: 14, paddingHorizontal: 12, paddingVertical: 6 },
     gemsText: { color: "#ffffff", fontWeight: "bold", fontSize: 15 },

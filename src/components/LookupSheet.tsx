@@ -15,12 +15,14 @@ type Props = {
     languageName: string;
     /** Start a new card from this entry. */
     onAdd: (lookup: Lookup) => void;
+    /** When given, a "Known" button marks this word as known (shown for a single word). */
+    onKnown?: () => void;
 };
 
 type State = { status: "loading" } | { status: "error"; message: string } | { status: "done"; lookup: Lookup };
 
 /** A sheet with the meaning of one tapped word or sentence, and a button to make it a card. Mount it fresh for each tap. */
-export default function LookupSheet({ onClose, text, context, languageName, onAdd }: Props) {
+export default function LookupSheet({ onClose, text, context, languageName, onAdd, onKnown }: Props) {
     const t = useTheme();
     const s = useMemo(() => makeS(t), [t]);
     const [state, setState] = useState<State>({ status: "loading" });
@@ -77,12 +79,20 @@ export default function LookupSheet({ onClose, text, context, languageName, onAd
                     )}
                 </ScrollView>
 
-                {state.status === "done" && (
-                    <Pressable style={s.add} onPress={() => onAdd(state.lookup)} accessibilityLabel="Add as a card">
-                        <Ionicons name="add" size={22} color={t.bg} />
-                        <Text style={s.addText}>Add as a card</Text>
-                    </Pressable>
-                )}
+                <View style={s.actions}>
+                    {onKnown ? (
+                        <Pressable style={s.known} onPress={onKnown} accessibilityRole="button" accessibilityLabel="I know this word">
+                            <Ionicons name="checkmark" size={20} color={t.green} />
+                            <Text style={s.knownText}>Known</Text>
+                        </Pressable>
+                    ) : null}
+                    {state.status === "done" && (
+                        <Pressable style={[s.add, { flex: 1 }]} onPress={() => onAdd(state.lookup)} accessibilityLabel="Add as a card">
+                            <Ionicons name="add" size={22} color={t.bg} />
+                            <Text style={s.addText}>Add as a card</Text>
+                        </Pressable>
+                    )}
+                </View>
             </View>
         </Modal>
     );
@@ -103,6 +113,9 @@ const makeS = (t: Palette) => StyleSheet.create({
     retry: { backgroundColor: t.green, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 20 },
     retryText: { color: t.bg, fontWeight: "bold" },
     note: { color: t.muted, fontSize: 12, textAlign: "center", marginTop: 8 },
-    add: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: t.green, borderRadius: 12, paddingVertical: 12, marginTop: 6 },
+    add: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: t.green, borderRadius: 12, paddingVertical: 12 },
+    actions: { flexDirection: "row", gap: 10, marginTop: 6 },
+    known: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 16, borderWidth: 1.5, borderColor: t.green },
+    knownText: { color: t.green, fontSize: 16, fontWeight: "bold" },
     addText: { color: t.bg, fontSize: 16, fontWeight: "bold" },
 });

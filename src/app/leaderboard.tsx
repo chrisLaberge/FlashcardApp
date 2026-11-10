@@ -22,14 +22,14 @@ export default function LeaderboardScreen() {
     const load = useCallback(async (where: "friends" | "global") => {
         setError("");
         try {
-            // Upload first so your own row is up to date; a failed upload should not hide the board.
-            await syncStats().catch(() => null);
-            if (where === "global") {
-                setGlobal(await getGlobalLeaderboard());
-            } else {
-                setEntries(await getLeaderboard());
-            }
+            const fetchBoard = async () => {
+                if (where === "global") setGlobal(await getGlobalLeaderboard());
+                else setEntries(await getLeaderboard());
+            };
+            // Show the board straight away; then send your latest stats and refresh once, so your own row is current.
+            await fetchBoard();
             setNeedsProfile(false);
+            void syncStats().then((sent) => (sent ? fetchBoard() : undefined)).catch(() => undefined);
         } catch (e) {
             if (e instanceof ApiError && e.status === 404) setNeedsProfile(true);
             else setError(e instanceof Error ? e.message : String(e));

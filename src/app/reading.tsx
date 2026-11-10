@@ -1,10 +1,12 @@
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import LookupSheet from "../components/LookupSheet";
+import PdfReader from "../components/pdf/PdfReader";
 import TappableText from "../components/TappableText";
 import { getLanguage } from "../constants/languages";
-import { getMyText, type MyText } from "../database/database";
+import { getBookSummary, getMyText, type MyText } from "../database/database";
+import { coveragePercent } from "../models/Vocabulary";
 import { pdfLines } from "../models/PdfText";
 import { textOfWords } from "../models/Selection";
 import { useTheme } from "../theme/ThemeProvider";
@@ -28,26 +30,60 @@ export default function ReadingScreen() {
         };
     }, [id]);
 
+    const [coverage, setCoverage] = useState<number | null>(null);
+    const refreshCoverage = useCallback(() => {
+        void getBookSummary(Number(id)).then((b) => setCoverage(b && b.totalTokens ? coveragePercent(b.knownTokens, b.totalTokens) : null)).catch(() => undefined);
+    }, [id]);
+    useEffect(() => { refreshCoverage(); }, [refreshCoverage]);
+
     const lines = useMemo(() => (text ? pdfLines(text.body) : []), [text]);
 
     if (text === undefined) return <View style={s.container}><ActivityIndicator color={t.blue} style={{ marginTop: 40 }} /></View>;
     if (text === null) return <View style={s.container}><Text style={s.missing}>Not found.</Text></View>;
     const language = getLanguage(text.language);
 
+    const header = (
+        <Stack.Screen
+            options={{
+                title: text.title,
+                headerRight: () => (coverage === null ? null : (
+                    <Pressable onPress={() => router.push({ pathname: "/book", params: { id: String(text.id) } })} hitSlop={10} accessibilityRole="button" accessibilityLabel="Words in this book">
+                        <Text style={s.coverage}>{coverage}%</Text>
+                    </Pressable>
+                )),
+            }}
+        />
+    );
+
+    // A PDF kept on the phone opens as the real PDF, page by page.
+    if (text.pdfPath && language) {
+        return (
+            <View style={s.container}>
+                {header}
+                <PdfReader book={text} languageName={language.name} onAnalyzed={refreshCoverage} />
+            </View>
+        );
+    }
+
     return (
         <View style={s.container}>
-            <Stack.Screen options={{ title: text.title }} />
-            <ScrollView contentContainerStyle={s.content}>
-                {lines.map((line, i) => (
+            {header}
+            {/* A list draws only the lines on screen, so a whole book stays smooth. */}
+            <FlatList
+                data={lines}
+                keyExtractor={(_, i) => String(i)}
+                contentContainerStyle={s.content}
+                initialNumToRender={12}
+                windowSize={7}
+                renderItem={({ item: line }) => (
                     <TappableText
-                        key={i}
                         text={line}
                         style={s.text}
                         onWord={(index) => setLookup({ text: textOfWords(line, index, index), context: line })}
                         onHold={(index) => setLookup({ text: textOfWords(line, index, index), context: line })}
                     />
-                ))}
-            </ScrollView>
+                )}
+            />
 
             {language && lookup && (
                 <LookupSheet
@@ -71,5 +107,6 @@ const makeS = (t: Palette) => StyleSheet.create({
     container: { flex: 1, backgroundColor: t.bg },
     content: { padding: 20, paddingBottom: 60, gap: 18 },
     text: { color: t.text, fontSize: 22, lineHeight: 34 },
+    coverage: { color: t.blue, fontSize: 16, fontWeight: "bold" },
     missing: { color: t.muted, textAlign: "center", marginTop: 40 },
 });
