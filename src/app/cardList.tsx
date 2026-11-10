@@ -10,6 +10,7 @@ import {
     TextInput,
     View
 } from "react-native";
+import AddedHistory from "../components/AddedHistory";
 import { getCardsPage } from "../database/database";
 import { formatTimeRemaining } from "../utils/timeRemaining";
 import { Card } from "../models/Card";
@@ -21,6 +22,7 @@ export default function CardsScreen() {
     const t = useTheme();
     const styles = useMemo(() => makeStyles(t), [t]);
 
+    const [view, setView] = useState<"cards" | "history">("cards");
     const [cards, setCards] = useState<Card[]>([]);
     const [search, setSearch] = useState("");
     const [deckId, setDeckId] = useState<string | null>(null);
@@ -112,6 +114,16 @@ export default function CardsScreen() {
                 <ActionButton label="Import" onPress={handleImport} />
             </View>
 
+            <View style={styles.toggle}>
+                {(["cards", "history"] as const).map((v) => (
+                    <Pressable key={v} style={[styles.toggleTab, view === v && styles.toggleTabOn]} onPress={() => setView(v)} accessibilityRole="button" accessibilityState={{ selected: view === v }}>
+                        <Text style={[styles.toggleText, view === v && styles.toggleTextOn]}>{v === "cards" ? "Cards" : "History"}</Text>
+                    </Pressable>
+                ))}
+            </View>
+
+            {view === "history" ? <AddedHistory /> : (
+            <>
             <View style={styles.searchContainer}>
                 <TextInput
                     style={styles.searchInput}
@@ -176,7 +188,8 @@ export default function CardsScreen() {
                         : undefined
                 }
             />
-
+            </>
+            )}
         </View>
     );
 }
@@ -336,6 +349,11 @@ const makeStyles = (t: Palette) => {
         fontSize: 14,
         fontWeight: "500",
     },
+    toggle: { flexDirection: "row", backgroundColor: t.surface, borderRadius: 10, padding: 3, marginBottom: 14 },
+    toggleTab: { flex: 1, paddingVertical: 9, borderRadius: 8, alignItems: "center" },
+    toggleTabOn: { backgroundColor: t.surfaceHigh },
+    toggleText: { color: t.muted, fontWeight: "600" },
+    toggleTextOn: { color: t.text },
     actionRow: {
         flexDirection: "row",
         justifyContent: "flex-end",
