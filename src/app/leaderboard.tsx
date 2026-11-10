@@ -77,7 +77,7 @@ export default function LeaderboardScreen() {
                         ListFooterComponent={
                             !global.me.visible ? (
                                 <Pressable onPress={() => router.push("/friends")}>
-                                    <Text style={s.link}>You are hidden from this board. Change it in Friends.</Text>
+                                    <Text style={s.link}>You are hidden. Change it in Friends.</Text>
                                 </Pressable>
                             ) : global.me.rank !== null && !global.entries.some((e) => e.isMe) ? (
                                 <View style={[s.row, s.me]}>

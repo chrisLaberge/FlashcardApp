@@ -5,7 +5,7 @@ import BannerView from "../../components/pet/BannerView";
 import CaseSpin from "../../components/pet/CaseSpin";
 import PetView from "../../components/pet/PetView";
 import KeyboardInsetView from "../../components/KeyboardInsetView";
-import { DEFAULT_PET_NAME, isMaxed, PET_NAME_MAX, petStage } from "../../models/Pet";
+import { DEFAULT_PET_NAME, isMaxed, PET_NAME_MAX, PET_STAGES, petStage } from "../../models/Pet";
 import { levelProgress } from "../../models/Progression";
 import {
     ACCESSORIES, BANNERS, CASE_PRICE, MAX_STREAK_SAVERS_HELD, RARITY_COLOR, STREAK_SAVER_PRICE, type Accessory, type Slot,
@@ -137,8 +137,8 @@ export default function PetScreen() {
     const progress = levelProgress(state.xp);
     const stage = petStage(state.petLevel);
     const maxed = isMaxed(state.petLevel);
+    const nextStage = PET_STAGES.find((st) => st.from > state.petLevel);
     const name = state.petName ?? DEFAULT_PET_NAME;
-    const hatched = state.petLevel >= 10;
 
     return (
         <View style={s.container}>
@@ -163,14 +163,13 @@ export default function PetScreen() {
                         <Text style={s.barText}>{progress.xpIntoLevel} / {progress.xpForNext} XP to level {progress.level + 1}</Text>
                     </View>
                 ) : null}
+                {nextStage ? <Text style={s.hint}>Grows into a {nextStage.name} at level {nextStage.from}</Text> : null}
                 {note ? <Text style={s.note}>{note}</Text> : null}
-                {!hatched ? <Text style={s.hint}>He hatches at level 10. Then he can wear things.</Text> : null}
-                <Text style={s.hint}>Gems come from leveling up (5 each) and achievements.</Text>
 
                 {/* cases */}
                 <Text style={s.heading}>Accessory case</Text>
                 <View style={s.card}>
-                    <Text style={s.cardText}>Spin for a hat, glasses or scarf. A free case at every 10 levels.</Text>
+                    <Text style={s.cardText}>Free spin every 10 levels</Text>
                     <View style={s.row}>
                         <Pressable style={[s.button, state.freeCasesLeft === 0 && s.buttonOff]} disabled={state.freeCasesLeft === 0} onPress={() => openCase(true)} accessibilityRole="button">
                             <Text style={s.buttonText}>Free spin ({state.freeCasesLeft})</Text>
@@ -217,7 +216,7 @@ export default function PetScreen() {
                     <View style={s.shopRow}>
                         <View style={{ flex: 1 }}>
                             <Text style={s.cardTitle}>🧊 Streak saver</Text>
-                            <Text style={s.muted}>Covers one missed day. Buy it before you miss. You have {state.savers} (up to {MAX_STREAK_SAVERS_HELD}).</Text>
+                            <Text style={s.muted}>Covers a missed day · you have {state.savers}/{MAX_STREAK_SAVERS_HELD}</Text>
                         </View>
                         <Pressable
                             style={[s.button, (state.gems < STREAK_SAVER_PRICE || state.savers >= MAX_STREAK_SAVERS_HELD) && s.buttonOff]}

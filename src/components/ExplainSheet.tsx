@@ -78,7 +78,7 @@ export default function ExplainSheet({ visible, onClose, card, languageName }: P
                                 </View>
                             ))}
 
-                            <Text style={s.note}>Written by an AI, so double-check anything important.</Text>
+                            <Text style={s.note}>AI-written. Double-check.</Text>
                             <Pressable onPress={() => load(true)}><Text style={s.link}>Explain again</Text></Pressable>
                         </>
                     )}

@@ -29,7 +29,7 @@ export default function AddedHistory() {
     );
 
     if (days === null) return null;
-    if (days.length === 0) return <Text style={s.empty}>No cards added yet. Add a card and it shows up here.</Text>;
+    if (days.length === 0) return <Text style={s.empty}>No cards added yet.</Text>;
 
     return (
         <SectionList

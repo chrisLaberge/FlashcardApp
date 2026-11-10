@@ -88,7 +88,7 @@ export default function AccountScreen() {
         <KeyboardInsetView style={{ flex: 1 }}>
             <ScrollView style={s.scroll} contentContainerStyle={s.scrollContent} keyboardShouldPersistTaps="handled">
                 <Text style={s.title}>{mode === "signIn" ? "Sign in" : "Create account"}</Text>
-                <Text style={s.muted}>The app works without an account. Sign in for friends and the leaderboard.</Text>
+                <Text style={s.muted}>Sign in for friends and the leaderboard.</Text>
 
                 <Pressable style={({ pressed }) => [s.button, s.google, pressed && s.pressed]} onPress={() => run(signInWithGoogle)} disabled={busy}>
                     <Text style={s.googleText}>Continue with Google</Text>

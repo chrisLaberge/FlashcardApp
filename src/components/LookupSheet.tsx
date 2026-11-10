@@ -72,7 +72,7 @@ export default function LookupSheet({ onClose, text, context, languageName, onAd
                         <>
                             <Text style={s.body}>{state.lookup.definition}</Text>
                             {state.lookup.grammar.map((g, i) => <Text key={i} style={s.body}>• {g}</Text>)}
-                            <Text style={s.note}>Written by an AI, so double-check anything important.</Text>
+                            <Text style={s.note}>AI-written. Double-check.</Text>
                         </>
                     )}
                 </ScrollView>
