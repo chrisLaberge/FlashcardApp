@@ -3,17 +3,8 @@ import PixabayCredit from "../components/PixabayCredit";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useRef, useState, type ComponentRef, useMemo } from "react";
-import {
-    ActivityIndicator,
-    Image,
-    Modal,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
-} from "react-native";
+import { ActivityIndicator, Image, Modal, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import Pressable from "../components/Pressable";
 
 import KeyboardInsetView from "@/components/KeyboardInsetView";
 
@@ -1136,7 +1127,7 @@ const makeStyles = (t: Palette) => {
         top: 9,
         width: 36,
         height: 36,
-        borderRadius: 18,
+        borderRadius: 12,
         alignItems: "center",
         justifyContent: "center",
         backgroundColor: "rgba(250,189,47,0.12)",
@@ -1157,7 +1148,7 @@ const makeStyles = (t: Palette) => {
     mainImageContainer: {
         width: "100%",
         height: 230,
-        borderRadius: 14,
+        borderRadius: 12,
         overflow: "hidden",
         marginBottom: 18,
         backgroundColor: COLORS.bg1,
@@ -1262,7 +1253,7 @@ const makeStyles = (t: Palette) => {
     modalTitle: {
         color: COLORS.fg,
         fontSize: 22,
-        fontWeight: "bold",
+        fontWeight: "600",
     },
 
     closeButton: {
@@ -1390,7 +1381,7 @@ const makeStyles = (t: Palette) => {
     buttonText: {
         color: COLORS.bg0,
         fontSize: 17,
-        fontWeight: "bold",
+        fontWeight: "600",
     },
 
     /* Duplicate dialog */
@@ -1457,18 +1448,18 @@ const makeStyles = (t: Palette) => {
 
     choiceLabel: {
         fontSize: 13,
-        fontWeight: "bold",
+        fontWeight: "600",
     },
 
     check: {
         fontSize: 16,
-        fontWeight: "bold",
+        fontWeight: "600",
     },
 
     choiceWord: {
         color: COLORS.fg,
         fontSize: 20,
-        fontWeight: "bold",
+        fontWeight: "600",
         marginTop: 6,
     },
 
@@ -1521,7 +1512,7 @@ const makeStyles = (t: Palette) => {
 
     renameText: {
         color: COLORS.aqua,
-        fontWeight: "bold",
+        fontWeight: "600",
         fontSize: 16,
     },
 

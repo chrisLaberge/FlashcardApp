@@ -4,21 +4,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import * as Speech from "expo-speech";
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-    Animated,
-    Dimensions,
-    Image,
-    Modal,
-    PanResponder,
-    PanResponderGestureState,
-    Pressable,
-    StyleProp,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
-    ViewStyle,
-} from "react-native";
+import { Animated, Dimensions, Image, Modal, PanResponder, PanResponderGestureState, StyleProp, StyleSheet, Text, TextInput, View, ViewStyle } from "react-native";
+import Pressable from "./Pressable";
 import ExplainSheet from "./ExplainSheet";
 import LookupSheet from "./LookupSheet";
 import TappableText from "./TappableText";
@@ -1006,7 +993,7 @@ function ActiveCards({
                 <KeyboardInsetView
                     style={styles.modalRoot}
                 >
-                    <Pressable style={styles.backdrop} onPress={() => setTyping(false)} />
+                    <Pressable style={styles.backdrop} dim={false} onPress={() => setTyping(false)} />
 
                     <View style={styles.sheet}>
                         <TextInput
@@ -1054,7 +1041,7 @@ const makeStyles = (t: Palette) => {
         justifyContent: "center",
         alignItems: "center",
         backgroundColor: COLORS.cardBackground,
-        borderRadius: 28,
+        borderRadius: 12,
         borderWidth: 2,
         borderColor: COLORS.cardBorder,
         shadowColor: "#000",
@@ -1128,7 +1115,7 @@ const makeStyles = (t: Palette) => {
     imageLarge: {
         width: "82%",
         height: 190,
-        borderRadius: 16,
+        borderRadius: 12,
         marginBottom: 20,
     },
 
@@ -1191,13 +1178,13 @@ const makeStyles = (t: Palette) => {
     speakLarge: {
         width: 44,
         height: 44,
-        borderRadius: 22,
+        borderRadius: 12,
     },
 
     speakSmall: {
         width: 32,
         height: 32,
-        borderRadius: 16,
+        borderRadius: 12,
     },
 
     speakPressed: {
@@ -1213,7 +1200,7 @@ const makeStyles = (t: Palette) => {
         right: 16,
         bottom: 12,
         backgroundColor: t.surfaceHigh,
-        borderRadius: 14,
+        borderRadius: 12,
         padding: 12,
         gap: 4,
         borderWidth: 1,
@@ -1226,7 +1213,7 @@ const makeStyles = (t: Palette) => {
     pickHint: { color: t.muted, fontSize: 12 },
     pickButtons: { flexDirection: "row", gap: 8, marginTop: 6 },
     pickButton: { borderRadius: 10, paddingVertical: 8, paddingHorizontal: 18, alignItems: "center", justifyContent: "center" },
-    pickButtonText: { color: t.bg, fontSize: 15, fontWeight: "bold" },
+    pickButtonText: { color: t.bg, fontSize: 15, fontWeight: "600" },
     pickButtonQuiet: { backgroundColor: t.surface },
     pickQuietText: { color: t.text, fontSize: 15, fontWeight: "600" },
     exampleRow: {
@@ -1278,7 +1265,7 @@ const makeStyles = (t: Palette) => {
         gap: 8,
         paddingHorizontal: 18,
         paddingVertical: 12,
-        borderRadius: 20,
+        borderRadius: 12,
         backgroundColor: COLORS.cardBorder,
     },
 
@@ -1314,7 +1301,7 @@ const makeStyles = (t: Palette) => {
         flex: 1,
         borderWidth: 1,
         borderColor: COLORS.cardBorder,
-        borderRadius: 14,
+        borderRadius: 12,
         paddingHorizontal: 16,
         paddingVertical: 12,
         fontSize: 18,
@@ -1325,7 +1312,7 @@ const makeStyles = (t: Palette) => {
     checkButton: {
         paddingHorizontal: 18,
         paddingVertical: 12,
-        borderRadius: 14,
+        borderRadius: 12,
         backgroundColor: COLORS.text,
     },
 
@@ -1354,7 +1341,7 @@ const makeStyles = (t: Palette) => {
     deleteText: {
         color: COLORS.danger,
         fontSize: 17,
-        fontWeight: "bold",
+        fontWeight: "600",
     },
     });
 };

@@ -1,8 +1,11 @@
 import { router, Stack, useFocusEffect, useLocalSearchParams } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { ActivityIndicator, FlatList, StyleSheet, Text, View } from "react-native";
+import Pressable from "../components/Pressable";
 import { getBookSummary, getTopUnknown, setWordKnown, type BookSummary } from "../database/database";
 import { coveragePercent } from "../models/Vocabulary";
+import { readerAnalyzerFor } from "../services/morphology";
+import { analyzeBook, syncKnownWords } from "../services/vocabulary";
 import { useTheme } from "../theme/ThemeProvider";
 import type { Palette } from "../theme/themes";
 
@@ -17,10 +20,26 @@ export default function BookScreen() {
     const [book, setBook] = useState<BookSummary | null | undefined>(undefined);
     const [words, setWords] = useState<Word[]>([]);
 
+    const tried = useRef(false);
+
     const load = useCallback(async () => {
         const [summary, unknown] = await Promise.all([getBookSummary(bookId), getTopUnknown(bookId, 100)]);
         setBook(summary);
         setWords(unknown);
+        // A book that has text but was never counted (an older book) is counted now, after the screen is up.
+        if (summary && summary.analyzerVersion === null && !tried.current) {
+            tried.current = true; // once per visit, so a failure cannot loop
+            try {
+                const analyzer = await readerAnalyzerFor(summary.language);
+                await syncKnownWords(summary.language, analyzer);
+                await analyzeBook(bookId, analyzer);
+                const [again, list] = await Promise.all([getBookSummary(bookId), getTopUnknown(bookId, 100)]);
+                setBook(again);
+                setWords(list);
+            } catch {
+                // Nothing to show yet; it is tried again next time.
+            }
+        }
     }, [bookId]);
 
     useFocusEffect(useCallback(() => { void load(); }, [load]));
@@ -79,8 +98,8 @@ const makeS = (t: Palette) => StyleSheet.create({
     percent: { color: t.text, fontSize: 52, fontWeight: "800" },
     counts: { color: t.muted, fontSize: 14 },
     read: { backgroundColor: t.green, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 40, marginTop: 8 },
-    readText: { color: t.bg, fontWeight: "bold", fontSize: 16 },
-    row: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: t.surface, borderRadius: 12, padding: 12 },
+    readText: { color: t.bg, fontWeight: "600", fontSize: 16 },
+    row: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: t.surface, borderRadius: 12, padding: 12, borderWidth: StyleSheet.hairlineWidth, borderColor: t.surfaceHigh },
     word: { color: t.text, fontSize: 18, fontWeight: "600" },
     count: { color: t.muted, fontSize: 12, marginTop: 2 },
     small: { backgroundColor: t.surfaceHigh, borderRadius: 10, paddingVertical: 9, paddingHorizontal: 12 },

@@ -1,6 +1,7 @@
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
-import { Pressable, SectionList, StyleSheet, Text } from "react-native";
+import { SectionList, StyleSheet, Text } from "react-native";
+import Pressable from "./Pressable";
 import { getAddedWords } from "../database/database";
 import { dayHeading, groupByDay, type AddedDay } from "../models/AddedWords";
 import { localDay } from "../models/Stats";
@@ -56,7 +57,7 @@ export default function AddedHistory() {
 const makeS = (t: Palette) => StyleSheet.create({
     list: { paddingBottom: 40 },
     heading: { color: t.yellow, fontSize: 13, fontWeight: "700", textTransform: "uppercase", marginTop: 8, marginBottom: 8 },
-    row: { backgroundColor: t.surface, borderRadius: 10, paddingVertical: 12, paddingHorizontal: 14, marginBottom: 6 },
+    row: { backgroundColor: t.surface, borderRadius: 10, paddingVertical: 12, paddingHorizontal: 14, marginBottom: 6, borderWidth: StyleSheet.hairlineWidth, borderColor: t.surfaceHigh },
     pressed: { opacity: 0.7 },
     word: { color: t.text, fontSize: 17, fontWeight: "600" },
     meaning: { color: t.muted, fontSize: 14, marginTop: 2 },

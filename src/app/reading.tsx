@@ -1,6 +1,7 @@
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, FlatList, StyleSheet, Text, View } from "react-native";
+import Pressable from "../components/Pressable";
 import LookupSheet from "../components/LookupSheet";
 import PdfReader from "../components/pdf/PdfReader";
 import TappableText from "../components/TappableText";
@@ -107,6 +108,6 @@ const makeS = (t: Palette) => StyleSheet.create({
     container: { flex: 1, backgroundColor: t.bg },
     content: { padding: 20, paddingBottom: 60, gap: 18 },
     text: { color: t.text, fontSize: 22, lineHeight: 34 },
-    coverage: { color: t.blue, fontSize: 16, fontWeight: "bold" },
+    coverage: { color: t.blue, fontSize: 16, fontWeight: "600" },
     missing: { color: t.muted, textAlign: "center", marginTop: 40 },
 });

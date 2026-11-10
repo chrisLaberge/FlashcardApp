@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Animated, Easing, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Animated, Easing, Modal, StyleSheet, Text, View } from "react-native";
+import Pressable from "../Pressable";
 import { CASE_POOL, RARITY_COLOR, type Accessory } from "../../models/Shop";
 import { useTheme } from "../../theme/ThemeProvider";
 import type { Palette } from "../../theme/themes";
@@ -92,5 +93,5 @@ const makeS = (t: Palette) => StyleSheet.create({
     prizeName: { color: "#ffffff", fontSize: 24, fontWeight: "700" },
     note: { color: t.muted, fontSize: 14 },
     button: { marginTop: 10, backgroundColor: t.green, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 40 },
-    buttonText: { color: t.bg, fontWeight: "bold", fontSize: 16 },
+    buttonText: { color: t.bg, fontWeight: "600", fontSize: 16 },
 });

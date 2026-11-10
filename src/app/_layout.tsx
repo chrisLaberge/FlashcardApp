@@ -20,9 +20,10 @@ function Navigator() {
           headerStyle: {
             backgroundColor: t.bg,
           },
+          headerShadowVisible: false,
           headerTintColor: t.text,
           headerTitleStyle: {
-            fontWeight: "bold",
+            fontWeight: "600",
           },
           contentStyle: { backgroundColor: t.bg },
         }}

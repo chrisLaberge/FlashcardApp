@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useMemo, useState } from "react";
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Modal, StyleSheet, Text, View } from "react-native";
+import Pressable from "./Pressable";
 import { useTheme, useThemeControls } from "../theme/ThemeProvider";
 import { THEMES, type Palette } from "../theme/themes";
 
@@ -27,7 +28,7 @@ export default function ThemePicker() {
             </Pressable>
 
             <Modal visible={open} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setOpen(false)}>
-                <Pressable style={s.backdrop} onPress={() => setOpen(false)}>
+                <Pressable style={s.backdrop} dim={false} onPress={() => setOpen(false)}>
                     <View style={s.menu}>
                         {THEMES.map((option) => {
                             const selected = option.id === theme.id;
@@ -62,7 +63,7 @@ const makeS = (t: Palette) => StyleSheet.create({
     dots: { flexDirection: "row", gap: 4 },
     dot: { width: 14, height: 14, borderRadius: 7 },
     backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: "center", padding: 28 },
-    menu: { backgroundColor: t.surface, borderRadius: 14, padding: 8, gap: 6 },
+    menu: { backgroundColor: t.surface, borderRadius: 12, padding: 8, gap: 6, borderWidth: StyleSheet.hairlineWidth, borderColor: t.surfaceHigh },
     row: { flexDirection: "row", alignItems: "center", gap: 12, borderRadius: 10, borderWidth: 2, borderColor: "transparent", paddingVertical: 12, paddingHorizontal: 14 },
     name: { flex: 1, fontSize: 16, fontWeight: "600" },
 });

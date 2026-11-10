@@ -1,15 +1,8 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState, useMemo } from "react";
-import {
-    Alert,
-    FlatList,
-    Pressable,
-    StyleSheet,
-    Text,
-    TextInput,
-    View
-} from "react-native";
+import { Alert, FlatList, StyleSheet, Text, TextInput, View } from "react-native";
+import Pressable from "../components/Pressable";
 import AddedHistory from "../components/AddedHistory";
 import { getCardsPage } from "../database/database";
 import { formatTimeRemaining } from "../utils/timeRemaining";
@@ -243,7 +236,7 @@ const makeStyles = (t: Palette) => {
     title: {
         color: t.text,
         fontSize: 32,
-        fontWeight: "bold",
+        fontWeight: "600",
         marginBottom: 20,
     },
 
@@ -278,7 +271,7 @@ const makeStyles = (t: Palette) => {
     front: {
         color: t.text,
         fontSize: 19,
-        fontWeight: "bold",
+        fontWeight: "600",
         marginBottom: 5,
     },
 
@@ -311,7 +304,7 @@ const makeStyles = (t: Palette) => {
     searchCount: {
         color: t.blue,
         fontSize: 16,
-        fontWeight: "bold",
+        fontWeight: "600",
         marginRight: 14,
     },
 
@@ -349,7 +342,7 @@ const makeStyles = (t: Palette) => {
         fontSize: 14,
         fontWeight: "500",
     },
-    toggle: { flexDirection: "row", backgroundColor: t.surface, borderRadius: 10, padding: 3, marginBottom: 14 },
+    toggle: { flexDirection: "row", backgroundColor: t.surface, borderRadius: 10, padding: 3, marginBottom: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: t.surfaceHigh },
     toggleTab: { flex: 1, paddingVertical: 9, borderRadius: 8, alignItems: "center" },
     toggleTabOn: { backgroundColor: t.surfaceHigh },
     toggleText: { color: t.muted, fontWeight: "600" },

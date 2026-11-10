@@ -1,21 +1,14 @@
-import { base64Chunks, toBase64 } from "../src/models/Base64";
+import { splitBase64 } from "../src/models/Base64";
 import { bookText, marksWords, plainAnalyzer, unknownKeys } from "../src/models/ReaderWords";
 
-describe("base64", () => {
-    test("matches Buffer for every length, including padding", () => {
-        for (let n = 0; n < 40; n++) {
-            const bytes = Uint8Array.from({ length: n }, (_, i) => (i * 37 + 11) % 256);
-            expect(toBase64(bytes)).toBe(Buffer.from(bytes).toString("base64"));
-        }
-    });
-
-    test("chunks decode on their own and join back to the original", () => {
-        const bytes = Uint8Array.from({ length: 1000 }, (_, i) => (i * 7) % 256);
-        const chunks = base64Chunks(bytes, 100);
-        expect(chunks.length).toBeGreaterThan(1);
-        const joined = Buffer.concat(chunks.map((c) => Buffer.from(c, "base64")));
-        expect(new Uint8Array(joined)).toEqual(bytes);
-        expect(base64Chunks(new Uint8Array(0))).toEqual([]);
+describe("base64 pieces", () => {
+    test("pieces are multiples of 4 and join back to the original", () => {
+        const data = Buffer.from(Uint8Array.from({ length: 1000 }, (_, i) => (i * 7) % 256)).toString("base64");
+        const pieces = splitBase64(data, 100);
+        expect(pieces.length).toBeGreaterThan(1);
+        for (const piece of pieces.slice(0, -1)) expect(piece.length % 4).toBe(0);
+        expect(pieces.join("")).toBe(data);
+        expect(splitBase64("")).toEqual([]);
     });
 });
 

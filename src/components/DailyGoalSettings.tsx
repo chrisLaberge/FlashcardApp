@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Pressable, StyleSheet, Switch, Text, View } from "react-native";
+import { Alert, StyleSheet, Switch, Text, View } from "react-native";
+import Pressable from "./Pressable";
 import { clampGoal, DEFAULT_GOAL_SETTINGS, formatTime, GOAL_STEP, type GoalSettings } from "../models/DailyGoal";
 import { loadGoalSettings, requestReminderPermission, saveGoalSettings } from "../services/dailyGoal";
 import { useTheme } from "../theme/ThemeProvider";
@@ -76,12 +77,12 @@ export default function DailyGoalSettings() {
 const makeS = (t: Palette) => StyleSheet.create({
     wrap: { gap: 10 },
     heading: { color: t.text, fontSize: 18, fontWeight: "600" },
-    card: { backgroundColor: t.surface, borderRadius: 14, padding: 14, gap: 14 },
+    card: { backgroundColor: t.surface, borderRadius: 12, padding: 14, gap: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: t.surfaceHigh },
     row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
     label: { color: t.text, fontSize: 15 },
     stepper: { flexDirection: "row", alignItems: "center", gap: 10 },
     step: { width: 36, height: 36, borderRadius: 18, backgroundColor: t.surfaceHigh, alignItems: "center", justifyContent: "center" },
     stepText: { color: t.text, fontSize: 20, lineHeight: 22 },
-    value: { color: t.text, fontSize: 18, fontWeight: "bold", minWidth: 36, textAlign: "center" },
+    value: { color: t.text, fontSize: 18, fontWeight: "600", minWidth: 36, textAlign: "center" },
     time: { color: t.text, fontSize: 16, fontWeight: "600", minWidth: 80, textAlign: "center" },
 });

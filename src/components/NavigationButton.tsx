@@ -1,5 +1,6 @@
 import { router } from "expo-router";
-import { Pressable, StyleSheet, Text } from "react-native";
+import { StyleSheet, Text } from "react-native";
+import Pressable from "./Pressable";
 import { useMemo } from "react";
 import { useTheme } from "../theme/ThemeProvider";
 import type { Palette } from "../theme/themes";
@@ -53,7 +54,7 @@ const makeStyles = (t: Palette) => StyleSheet.create({
     text: {
         color: t.bg,
         fontSize: 16,
-        fontWeight: "bold",
+        fontWeight: "600",
     },
 
     // Compact pill that matches Undo / Edit card

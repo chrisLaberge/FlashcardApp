@@ -12,6 +12,7 @@ import { readerAnalyzerFor } from "../../services/morphology";
 import { pdfChunks } from "../../services/pdfReading";
 import { analyzeBook, syncKnownWords } from "../../services/vocabulary";
 import { useTheme } from "../../theme/ThemeProvider";
+import type { Palette } from "../../theme/themes";
 import LookupSheet from "../LookupSheet";
 import { viewerHtml } from "./viewerHtml";
 
@@ -70,6 +71,7 @@ export default function PdfReader({ book, languageName, onAnalyzed }: Props) {
     const prep = useRef<Promise<Analyzer> | null>(null);
     const pagesText = useRef<string[]>([]);
     const needText = book.body.trim() === "";
+    const started = useRef(false);
     const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // The analyser and the words you know, loaded once while the page opens.
@@ -90,7 +92,6 @@ export default function PdfReader({ book, languageName, onAnalyzed }: Props) {
     useEffect(() => {
         let active = true;
         loadViewerHtml().then((h) => active && setHtml(h), (e: unknown) => active && setFailure(e instanceof Error ? e.message : String(e)));
-        void ready();
         return () => {
             active = false;
             if (saveTimer.current) clearTimeout(saveTimer.current);
@@ -145,6 +146,11 @@ export default function PdfReader({ book, languageName, onAnalyzed }: Props) {
                 void open();
                 break;
             case "page": {
+                // The page is on screen; only now load the word dictionary, so opening is never held up by it.
+                if (!started.current) {
+                    started.current = true;
+                    setTimeout(() => void ready(), 500);
+                }
                 if (saveTimer.current) clearTimeout(saveTimer.current);
                 const n = message.page;
                 saveTimer.current = setTimeout(() => void setLastPage(book.id, n).catch(() => undefined), 600);
@@ -230,11 +236,11 @@ export default function PdfReader({ book, languageName, onAnalyzed }: Props) {
     );
 }
 
-const makeS = (t: { bg: string; surface: string; text: string; muted: string; red: string }) => StyleSheet.create({
+const makeS = (t: Palette) => StyleSheet.create({
     container: { flex: 1, backgroundColor: t.bg },
     web: { flex: 1, backgroundColor: t.bg },
     center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 30, backgroundColor: t.bg },
     error: { color: t.red, textAlign: "center" },
-    badge: { position: "absolute", top: 10, alignSelf: "center", flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: t.surface, borderRadius: 16, paddingVertical: 6, paddingHorizontal: 14 },
+    badge: { position: "absolute", top: 10, alignSelf: "center", flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: t.surface, borderRadius: 16, paddingVertical: 6, paddingHorizontal: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: t.surfaceHigh },
     badgeText: { color: t.muted, fontSize: 13 },
 });

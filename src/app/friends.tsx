@@ -1,6 +1,7 @@
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState, useMemo } from "react";
-import { ActivityIndicator, Alert, Pressable, ScrollView, Share, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, ScrollView, Share, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import Pressable from "../components/Pressable";
 import Avatar from "../components/Avatar";
 import BannerView from "../components/pet/BannerView";
 import { PersonPet } from "../components/pet/PersonPet";
@@ -233,7 +234,7 @@ export default function FriendsScreen() {
                 {friends.friends.map((p) => (
                     <Pressable key={p.uid} style={s.personRow} onLongPress={() => confirmRemove(p)}>
                         <View style={s.nameWithPicture}><Avatar avatar={p.avatar} name={p.username} size={34} /><Text style={s.name}>{p.username}</Text><PersonPet pet={p.pet} level={p.level} size={34} /></View>
-                        <Text style={s.muted}>Level {p.level} · {p.currentStreak} 🔥</Text>
+                        <Text style={s.muted}>Level {p.level} · {p.currentStreak} day streak</Text>
                     </Pressable>
                 ))}
                 {friends.friends.length > 0 && <Text style={s.hint}>Hold a friend to remove them</Text>}
@@ -270,16 +271,16 @@ const makeS = (t: Palette) => StyleSheet.create({
     content: { gap: 14, paddingBottom: 60 },
     switchCard: { flexDirection: "row", alignItems: "center", gap: 12 },
     center: { alignItems: "center", justifyContent: "center", gap: 14 },
-    card: { backgroundColor: t.surface, borderRadius: 14, padding: 16, gap: 10 },
+    card: { backgroundColor: t.surface, borderRadius: 12, padding: 16, gap: 10, borderWidth: StyleSheet.hairlineWidth, borderColor: t.surfaceHigh },
     heading: { color: t.text, fontSize: 18, fontWeight: "600" },
     muted: { color: t.muted, fontSize: 13 },
     hint: { color: t.subtle, fontSize: 12, textAlign: "center" },
-    code: { color: t.yellow, fontSize: 32, fontWeight: "bold", letterSpacing: 4 },
+    code: { color: t.yellow, fontSize: 32, fontWeight: "600", letterSpacing: 4 },
     input: { backgroundColor: t.bg, color: t.text, borderRadius: 10, padding: 14, fontSize: 16, alignSelf: "stretch" },
     button: { borderRadius: 10, paddingVertical: 14, alignItems: "center", alignSelf: "stretch" },
     smallButton: { borderRadius: 10, paddingVertical: 10, paddingHorizontal: 16, alignItems: "center" },
     primary: { backgroundColor: t.green },
-    primaryText: { color: t.bg, fontSize: 15, fontWeight: "bold" },
+    primaryText: { color: t.bg, fontSize: 15, fontWeight: "600" },
     secondary: { backgroundColor: t.surfaceHigh },
     secondaryText: { color: t.text, fontSize: 15, fontWeight: "600" },
     row: { flexDirection: "row", gap: 10, alignItems: "center" },

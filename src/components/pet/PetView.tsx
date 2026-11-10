@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Animated, Easing, Pressable, StyleSheet, View } from "react-native";
+import { Animated, Easing, StyleSheet, View } from "react-native";
+import Pressable from "../Pressable";
 import Svg, { Circle, ClipPath, Defs, Ellipse, G, LinearGradient, Path, Polygon, Rect, Stop } from "react-native-svg";
 import { isMaxed, petLevel, petStage, stageProgress } from "../../models/Pet";
 import { renderAccessory, type Anchors } from "./Accessories";

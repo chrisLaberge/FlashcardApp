@@ -3,16 +3,8 @@ import * as DocumentPicker from "expo-document-picker";
 import { router } from "expo-router";
 import Papa from "papaparse";
 import { useEffect, useRef, useState, useMemo } from "react";
-import {
-    ActivityIndicator,
-    Animated,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
-} from "react-native";
+import { ActivityIndicator, Animated, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import Pressable from "../components/Pressable";
 import {
     addCard,
     deleteCard,
@@ -1062,7 +1054,7 @@ const makeStyles = (t: Palette) => {
     title: {
         color: c.fg,
         fontSize: 24,
-        fontWeight: "bold",
+        fontWeight: "600",
     },
 
     /* Status */
@@ -1099,7 +1091,7 @@ const makeStyles = (t: Palette) => {
     progressPercent: {
         color: c.yellow,
         fontSize: 14,
-        fontWeight: "bold",
+        fontWeight: "600",
     },
     progressTrack: {
         height: 8,
@@ -1146,7 +1138,7 @@ const makeStyles = (t: Palette) => {
     itemWord: {
         color: c.yellow,
         fontSize: 16,
-        fontWeight: "bold",
+        fontWeight: "600",
     },
     itemDefinition: {
         color: c.fg,
@@ -1167,7 +1159,7 @@ const makeStyles = (t: Palette) => {
     primaryText: {
         color: c.bg,
         fontSize: 16,
-        fontWeight: "bold",
+        fontWeight: "600",
     },
     secondaryButton: {
         backgroundColor: c.bg1,
@@ -1218,16 +1210,16 @@ const makeStyles = (t: Palette) => {
     },
     choiceLabel: {
         fontSize: 13,
-        fontWeight: "bold",
+        fontWeight: "600",
     },
     check: {
         fontSize: 16,
-        fontWeight: "bold",
+        fontWeight: "600",
     },
     cardWord: {
         color: c.fg,
         fontSize: 20,
-        fontWeight: "bold",
+        fontWeight: "600",
         marginTop: 6,
     },
     cardDefinition: {
@@ -1258,7 +1250,7 @@ const makeStyles = (t: Palette) => {
     renameLabel: {
         color: c.aqua,
         fontSize: 13,
-        fontWeight: "bold",
+        fontWeight: "600",
     },
     input: {
         backgroundColor: c.bg1,
@@ -1283,7 +1275,7 @@ const makeStyles = (t: Palette) => {
     },
     renameText: {
         color: c.aqua,
-        fontWeight: "bold",
+        fontWeight: "600",
         fontSize: 16,
     },
 
@@ -1309,7 +1301,7 @@ const makeStyles = (t: Palette) => {
     statValue: {
         color: c.yellow,
         fontSize: 16,
-        fontWeight: "bold",
+        fontWeight: "600",
     },
     });
 };

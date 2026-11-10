@@ -3,7 +3,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useNavigation } from "expo-router";
 import * as Speech from "expo-speech";
 import { useCallback, useEffect, useRef, useState, useMemo } from "react";
-import { Alert, Linking, Modal, Platform, Pressable, StyleSheet, Switch, Text, View } from "react-native";
+import { Alert, Linking, Modal, Platform, StyleSheet, Switch, Text, View } from "react-native";
+import Pressable from "../components/Pressable";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import CardStack from "../components/CardStack";
 
@@ -318,7 +319,7 @@ export default function LearnScreen() {
     return (
       <View style={[styles.container, styles.centered]}>
         <View style={styles.messageContainer}>
-          <Text style={styles.emptyTitle}>🎉 You're caught up!</Text>
+          <Text style={styles.emptyTitle}>You're caught up</Text>
 
           <Text style={styles.emptySubtitle}>
             Come back when your next cards are ready.
@@ -442,7 +443,7 @@ export default function LearnScreen() {
         onRequestClose={() => setSettingsOpen(false)}
       >
         <View style={styles.modalRoot}>
-          <Pressable style={styles.backdrop} onPress={() => setSettingsOpen(false)} />
+          <Pressable style={styles.backdrop} dim={false} onPress={() => setSettingsOpen(false)} />
 
           <View style={styles.settingsSheet}>
             <Text style={styles.settingsTitle}>Learn settings</Text>
@@ -607,14 +608,14 @@ const makeStyles = (t: Palette) => {
     backgroundColor: COLORS.surface,
     borderWidth: 1,
     borderColor: COLORS.border,
-    borderRadius: 20,
+    borderRadius: 12,
     padding: 20,
   },
 
   settingsTitle: {
     color: COLORS.text,
     fontSize: 20,
-    fontWeight: "bold",
+    fontWeight: "600",
     marginBottom: 16,
   },
 
@@ -719,7 +720,7 @@ const makeStyles = (t: Palette) => {
   emptyTitle: {
     color: COLORS.text,
     fontSize: 28,
-    fontWeight: "bold",
+    fontWeight: "600",
     textAlign: "center",
     marginBottom: 10,
   },
@@ -734,7 +735,7 @@ const makeStyles = (t: Palette) => {
   resultsTitle: {
     color: COLORS.text,
     fontSize: 32,
-    fontWeight: "bold",
+    fontWeight: "600",
     marginBottom: 6,
   },
 
@@ -749,7 +750,7 @@ const makeStyles = (t: Palette) => {
     backgroundColor: COLORS.surface,
     borderWidth: 1,
     borderColor: COLORS.border,
-    borderRadius: 15,
+    borderRadius: 12,
     paddingVertical: 25,
     alignItems: "center",
     marginBottom: 12,
@@ -758,7 +759,7 @@ const makeStyles = (t: Palette) => {
   mainStatNumber: {
     color: COLORS.accent,
     fontSize: 48,
-    fontWeight: "bold",
+    fontWeight: "600",
   },
 
   mainStatLabel: {
@@ -778,7 +779,7 @@ const makeStyles = (t: Palette) => {
     backgroundColor: COLORS.surface,
     borderWidth: 1,
     borderColor: COLORS.border,
-    borderRadius: 15,
+    borderRadius: 12,
     paddingVertical: 20,
     alignItems: "center",
   },
@@ -786,7 +787,7 @@ const makeStyles = (t: Palette) => {
   statNumber: {
     color: COLORS.text,
     fontSize: 22,
-    fontWeight: "bold",
+    fontWeight: "600",
     marginBottom: 5,
   },
 

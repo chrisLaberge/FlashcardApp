@@ -3,7 +3,8 @@ import NavigationButton from "@/components/NavigationButton";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useRef, useState, useMemo } from "react";
-import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
+import { Animated, StyleSheet, Text, View } from "react-native";
+import Pressable from "../../components/Pressable";
 import { getLanguage } from "../../constants/languages";
 import { getDecks, getProgressCounts } from "../../database/database";
 import { useFocusedInterval } from "../../hooks/useFocusedInterval";
@@ -219,11 +220,11 @@ const makeStyles = (t: Palette) => StyleSheet.create({
     startButton: {
         backgroundColor: t.gold,
         paddingVertical: 28,
-        borderRadius: 14,
+        borderRadius: 12,
         alignItems: "center",
         marginBottom: 12,
     },
-    startText: { color: t.bg, fontSize: 24, fontWeight: "bold" },
+    startText: { color: t.bg, fontSize: 24, fontWeight: "600" },
 
     secondaryButton: {
         backgroundColor: t.surface,
@@ -234,7 +235,7 @@ const makeStyles = (t: Palette) => StyleSheet.create({
         alignItems: "center",
         marginBottom: 24,
     },
-    secondaryText: { color: t.text, fontSize: 17, fontWeight: "bold" },
+    secondaryText: { color: t.text, fontSize: 17, fontWeight: "600" },
 
     statsBox: {
         backgroundColor: t.surface,
@@ -253,6 +254,6 @@ const makeStyles = (t: Palette) => StyleSheet.create({
     },
     row: { flexDirection: "row" },
     stat: { flex: 1, alignItems: "center" },
-    statNumber: { fontSize: 22, fontWeight: "bold" },
+    statNumber: { fontSize: 22, fontWeight: "600" },
     statLabel: { color: t.muted, fontSize: 13, marginTop: 2 },
 });

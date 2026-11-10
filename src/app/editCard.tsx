@@ -4,17 +4,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState, useMemo } from "react";
 import KeyboardInsetView from "@/components/KeyboardInsetView";
-import {
-    ActivityIndicator,
-    Image,
-    Modal,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
-} from "react-native";
+import { ActivityIndicator, Image, Modal, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import Pressable from "../components/Pressable";
 
 import { invalidateCardImage } from "@/components/CardStack";
 import {
@@ -1143,7 +1134,7 @@ const makeStyles = (t: Palette) => {
     title: {
         color: COLORS.fg,
         fontSize: 32,
-        fontWeight: "bold",
+        fontWeight: "600",
         marginBottom: 24,
     },
 
@@ -1194,7 +1185,7 @@ const makeStyles = (t: Palette) => {
         top: 9,
         width: 36,
         height: 36,
-        borderRadius: 18,
+        borderRadius: 12,
         alignItems: "center",
         justifyContent: "center",
         backgroundColor: "rgba(250,189,47,0.12)",
@@ -1223,7 +1214,7 @@ const makeStyles = (t: Palette) => {
     saveButtonText: {
         color: COLORS.bg0,
         fontSize: 17,
-        fontWeight: "bold",
+        fontWeight: "600",
     },
 
     progressSection: {
@@ -1253,7 +1244,7 @@ const makeStyles = (t: Palette) => {
     sectionTitle: {
         color: COLORS.fg,
         fontSize: 17,
-        fontWeight: "bold",
+        fontWeight: "600",
     },
 
     statsContainer: {
@@ -1276,7 +1267,7 @@ const makeStyles = (t: Palette) => {
     statNumber: {
         color: COLORS.yellowDark,
         fontSize: 21,
-        fontWeight: "bold",
+        fontWeight: "600",
         marginBottom: 5,
     },
 
@@ -1305,7 +1296,7 @@ const makeStyles = (t: Palette) => {
     resetButtonText: {
         color: COLORS.blue,
         fontSize: 16,
-        fontWeight: "bold",
+        fontWeight: "600",
     },
 
     deleteButton: {
@@ -1321,7 +1312,7 @@ const makeStyles = (t: Palette) => {
     deleteButtonText: {
         color: COLORS.red,
         fontSize: 16,
-        fontWeight: "bold",
+        fontWeight: "600",
     },
 
     buttonPressed: {
@@ -1344,14 +1335,14 @@ const makeStyles = (t: Palette) => {
         backgroundColor: COLORS.bg1,
         borderWidth: 1,
         borderColor: COLORS.bg2,
-        borderRadius: 15,
+        borderRadius: 12,
         padding: 22,
     },
 
     modalTitle: {
         color: COLORS.fg,
         fontSize: 22,
-        fontWeight: "bold",
+        fontWeight: "600",
         marginBottom: 10,
     },
 
@@ -1378,7 +1369,7 @@ const makeStyles = (t: Palette) => {
     cancelButtonText: {
         color: COLORS.fg,
         fontSize: 16,
-        fontWeight: "bold",
+        fontWeight: "600",
     },
 
     resetConfirmButton: {
@@ -1392,7 +1383,7 @@ const makeStyles = (t: Palette) => {
     resetConfirmText: {
         color: COLORS.bg0,
         fontSize: 16,
-        fontWeight: "bold",
+        fontWeight: "600",
     },
 
     deleteConfirmButton: {
@@ -1406,13 +1397,13 @@ const makeStyles = (t: Palette) => {
     deleteConfirmText: {
         color: COLORS.fg,
         fontSize: 16,
-        fontWeight: "bold",
+        fontWeight: "600",
     },
 
     mainImageContainer: {
         width: "100%",
         height: 230,
-        borderRadius: 14,
+        borderRadius: 12,
         overflow: "hidden",
         marginBottom: 18,
         backgroundColor: COLORS.bg1,
@@ -1489,7 +1480,7 @@ const makeStyles = (t: Palette) => {
     imageModalTitle: {
         color: COLORS.fg,
         fontSize: 22,
-        fontWeight: "bold",
+        fontWeight: "600",
     },
 
     imageSearchRow: {
@@ -1567,7 +1558,7 @@ const makeStyles = (t: Palette) => {
     buttonText: {
         color: COLORS.bg0,
         fontSize: 17,
-        fontWeight: "bold",
+        fontWeight: "600",
     },
 
     /* Duplicate dialog */
@@ -1634,18 +1625,18 @@ const makeStyles = (t: Palette) => {
 
     choiceLabel: {
         fontSize: 13,
-        fontWeight: "bold",
+        fontWeight: "600",
     },
 
     check: {
         fontSize: 16,
-        fontWeight: "bold",
+        fontWeight: "600",
     },
 
     choiceWord: {
         color: COLORS.fg,
         fontSize: 20,
-        fontWeight: "bold",
+        fontWeight: "600",
         marginTop: 6,
     },
 
@@ -1707,7 +1698,7 @@ const makeStyles = (t: Palette) => {
 
     renameText: {
         color: COLORS.aqua,
-        fontWeight: "bold",
+        fontWeight: "600",
         fontSize: 16,
     },
 

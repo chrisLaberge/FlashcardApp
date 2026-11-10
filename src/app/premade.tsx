@@ -1,7 +1,8 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Stack, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, View } from "react-native";
+import Pressable from "../components/Pressable";
 import { addDeck, deleteDeck, getDecks } from "../database/database";
 import { getPremadeDeck, presentIndexes, targetDeckFor } from "../models/PremadeDecks";
 import { addPremadeCards, existingWords } from "../services/premadeDecks";
@@ -115,15 +116,15 @@ const makeS = (t: Palette) => StyleSheet.create({
     container: { flex: 1, backgroundColor: t.bg },
     list: { padding: 16, paddingBottom: 110, gap: 8 },
     status: { color: t.text, fontSize: 15, fontWeight: "600", marginBottom: 6 },
-    card: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: t.surface, borderRadius: 12, padding: 14 },
+    card: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: t.surface, borderRadius: 12, padding: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: t.surfaceHigh },
     cardHere: { opacity: 0.5 },
     box: { color: t.muted, fontSize: 24 },
     learning: { color: t.text, fontSize: 18, fontWeight: "600" },
     meaning: { color: t.muted, fontSize: 13, marginTop: 2 },
-    badge: { color: t.green, fontSize: 12, fontWeight: "bold" },
+    badge: { color: t.green, fontSize: 12, fontWeight: "600" },
     empty: { color: t.muted, textAlign: "center", marginTop: 40 },
     bar: { position: "absolute", left: 0, right: 0, bottom: 0, padding: 14, backgroundColor: t.bg, borderTopWidth: 1, borderTopColor: t.surfaceHigh },
     button: { backgroundColor: t.green, borderRadius: 12, paddingVertical: 15, alignItems: "center", justifyContent: "center" },
-    buttonText: { color: t.bg, fontWeight: "bold", fontSize: 16 },
+    buttonText: { color: t.bg, fontWeight: "600", fontSize: 16 },
     off: { opacity: 0.4 },
 });

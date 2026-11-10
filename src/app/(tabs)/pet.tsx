@@ -1,6 +1,7 @@
 import { useFocusEffect } from "expo-router";
 import { useCallback, useMemo, useRef, useState } from "react";
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Modal, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import Pressable from "../../components/Pressable";
 import BannerView from "../../components/pet/BannerView";
 import CaseSpin from "../../components/pet/CaseSpin";
 import PetView from "../../components/pet/PetView";
@@ -146,7 +147,7 @@ export default function PetScreen() {
                 {/* pet */}
                 <View style={s.hero}>
                     <View style={s.gems}>
-                        <Text style={s.gemsText}>💎 {state.gems}</Text>
+                        <Text style={s.gemsText}>{state.gems} gems</Text>
                     </View>
                     <View style={s.petWrap}>
                         <PetView level={state.petLevel} look={state.equipped} size={170} onPress={onPetTap} />
@@ -154,7 +155,7 @@ export default function PetScreen() {
                 </View>
 
                 <Pressable onPress={() => { setDraft(name); setRenaming(true); }} accessibilityRole="button" accessibilityLabel="Rename your pet">
-                    <Text style={s.name}>{name}  ✎</Text>
+                    <Text style={s.name}>{name}</Text>
                 </Pressable>
                 <Text style={s.stage}>{maxed ? "Golden Pukeko · Level 100 (max)" : `${stage.name} · Level ${state.petLevel}`}</Text>
                 {!maxed ? (
@@ -175,7 +176,7 @@ export default function PetScreen() {
                             <Text style={s.buttonText}>Free spin ({state.freeCasesLeft})</Text>
                         </Pressable>
                         <Pressable style={[s.button, state.gems < CASE_PRICE && s.buttonOff]} disabled={state.gems < CASE_PRICE} onPress={() => openCase(false)} accessibilityRole="button">
-                            <Text style={s.buttonText}>Spin · 💎 {CASE_PRICE}</Text>
+                            <Text style={s.buttonText}>Spin · {CASE_PRICE} gems</Text>
                         </Pressable>
                     </View>
                 </View>
@@ -215,7 +216,7 @@ export default function PetScreen() {
                 <View style={s.card}>
                     <View style={s.shopRow}>
                         <View style={{ flex: 1 }}>
-                            <Text style={s.cardTitle}>🧊 Streak saver</Text>
+                            <Text style={s.cardTitle}>Streak saver</Text>
                             <Text style={s.muted}>Covers a missed day · you have {state.savers}/{MAX_STREAK_SAVERS_HELD}</Text>
                         </View>
                         <Pressable
@@ -224,7 +225,7 @@ export default function PetScreen() {
                             onPress={() => buy("Streak saver", buySaver)}
                             accessibilityRole="button"
                         >
-                            <Text style={s.buttonText}>💎 {STREAK_SAVER_PRICE}</Text>
+                            <Text style={s.buttonText}>{STREAK_SAVER_PRICE} gems</Text>
                         </Pressable>
                     </View>
                 </View>
@@ -244,7 +245,7 @@ export default function PetScreen() {
                                 onPress={() => (owned ? act(() => chooseBanner(banner.id)) : buy(banner.name, () => buyBanner(banner.id)))}
                                 accessibilityRole="button"
                             >
-                                <Text style={s.buttonText}>{using ? "Using" : owned ? "Use" : `💎 ${banner.price}`}</Text>
+                                <Text style={s.buttonText}>{using ? "Using" : owned ? "Use" : `${banner.price} gems`}</Text>
                             </Pressable>
                         </View>
                     );
@@ -297,7 +298,7 @@ const makeS = (t: Palette) => StyleSheet.create({
     hero: { height: 230, borderRadius: 20, backgroundColor: t.surface, alignItems: "center", justifyContent: "flex-end" },
     petWrap: { marginBottom: 4 },
     gems: { position: "absolute", top: 12, right: 12, backgroundColor: "rgba(0,0,0,0.35)", borderRadius: 14, paddingHorizontal: 12, paddingVertical: 6 },
-    gemsText: { color: "#ffffff", fontWeight: "bold", fontSize: 15 },
+    gemsText: { color: "#ffffff", fontWeight: "600", fontSize: 15 },
     name: { color: t.text, fontSize: 26, fontWeight: "800", textAlign: "center", marginTop: 6 },
     stage: { color: t.muted, fontSize: 14, textAlign: "center", fontWeight: "600" },
     barWrap: { gap: 4, marginTop: 4 },
@@ -308,14 +309,14 @@ const makeS = (t: Palette) => StyleSheet.create({
     hint: { color: t.muted, fontSize: 12, textAlign: "center" },
     heading: { color: t.text, fontSize: 18, fontWeight: "700", marginTop: 14 },
     subheading: { color: t.muted, fontSize: 14, fontWeight: "600", marginTop: 8 },
-    card: { backgroundColor: t.surface, borderRadius: 14, padding: 14, gap: 10 },
+    card: { backgroundColor: t.surface, borderRadius: 12, padding: 14, gap: 10, borderWidth: StyleSheet.hairlineWidth, borderColor: t.surfaceHigh },
     cardTitle: { color: t.text, fontSize: 16, fontWeight: "700" },
     cardText: { color: t.muted, fontSize: 13 },
     muted: { color: t.muted, fontSize: 13 },
     row: { flexDirection: "row", gap: 10 },
     button: { flex: 1, backgroundColor: t.green, borderRadius: 12, paddingVertical: 11, paddingHorizontal: 14, alignItems: "center", justifyContent: "center" },
     buttonOff: { opacity: 0.4 },
-    buttonText: { color: t.bg, fontWeight: "bold", fontSize: 14 },
+    buttonText: { color: t.bg, fontWeight: "600", fontSize: 14 },
     chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
     chip: { flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 2, borderRadius: 12, paddingVertical: 6, paddingHorizontal: 10 },
     chipEmoji: { fontSize: 18 },
@@ -326,8 +327,8 @@ const makeS = (t: Palette) => StyleSheet.create({
     bannerName: { color: "#ffffff", fontWeight: "800", fontSize: 15 },
     bannerButton: { flex: 0, minWidth: 92 },
     modalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: "center", padding: 24 },
-    modalCard: { backgroundColor: t.bg, borderRadius: 18, padding: 18, gap: 14, borderWidth: 1, borderColor: t.surfaceHigh },
-    input: { color: t.text, backgroundColor: t.surface, borderRadius: 12, padding: 12, fontSize: 18 },
+    modalCard: { backgroundColor: t.bg, borderRadius: 12, padding: 18, gap: 14, borderWidth: 1, borderColor: t.surfaceHigh },
+    input: { color: t.text, backgroundColor: t.surface, borderRadius: 12, padding: 12, fontSize: 18, borderWidth: StyleSheet.hairlineWidth, borderColor: t.surfaceHigh },
     quiet: { backgroundColor: t.surface },
     quietText: { color: t.text, fontWeight: "600" },
 });

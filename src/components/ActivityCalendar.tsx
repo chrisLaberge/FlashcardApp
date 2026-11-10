@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
+import Pressable from "./Pressable";
 import { intensity, monthGrid, shiftMonth } from "../models/Calendar";
 import type { DayStats } from "../models/Stats";
 import { useTheme } from "../theme/ThemeProvider";
@@ -98,7 +99,7 @@ export default function ActivityCalendar({ reviewDays, addedDays, today }: Props
 }
 
 const makeS = (t: Palette) => StyleSheet.create({
-    card: { backgroundColor: t.surface, borderRadius: 14, padding: 16, gap: 6 },
+    card: { backgroundColor: t.surface, borderRadius: 12, padding: 16, gap: 6, borderWidth: StyleSheet.hairlineWidth, borderColor: t.surfaceHigh },
     header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 4 },
     title: { color: t.text, fontSize: 16, fontWeight: "600" },
     arrow: { color: t.text, fontSize: 28, paddingHorizontal: 12, lineHeight: 30 },
@@ -114,6 +115,6 @@ const makeS = (t: Palette) => StyleSheet.create({
     legendText: { color: t.muted, fontSize: 12, marginRight: 8 },
     counts: { flexDirection: "row", marginTop: 10, gap: 10 },
     count: { flex: 1, backgroundColor: t.bg, borderRadius: 10, paddingVertical: 10, alignItems: "center" },
-    countValue: { color: t.text, fontSize: 22, fontWeight: "bold" },
+    countValue: { color: t.text, fontSize: 22, fontWeight: "600" },
     countLabel: { color: t.muted, fontSize: 12 },
 });
