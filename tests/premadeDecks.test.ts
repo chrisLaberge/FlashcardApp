@@ -1,5 +1,5 @@
 import { getLanguage } from "../src/constants/languages";
-import { BASICS, premadeDecks } from "../src/models/PremadeDecks";
+import { BASICS, cardKey, premadeDecks, presentIndexes } from "../src/models/PremadeDecks";
 import { getReading, readings, readingsFor } from "../src/models/Readings";
 import { tokenize } from "../src/models/Tokens";
 
@@ -41,5 +41,19 @@ describe("library readings", () => {
                 expect(tokenize(line.text).some((token) => token.word)).toBe(true);
             }
         }
+    });
+});
+
+describe("premade decks vs a deck you own", () => {
+    const cards = [{ learning: "你好", meaning: "Hello" }, { learning: "谢谢", meaning: "Thank you" }, { learning: "水", meaning: "Water" }];
+
+    test("finds the cards already there, ignoring case and spacing", () => {
+        const existing = new Set([cardKey(" 谢谢 "), cardKey("other")]);
+        expect([...presentIndexes(cards, existing)]).toEqual([1]);
+        expect(cardKey("  Hello   There ")).toBe("hello there");
+    });
+
+    test("an empty deck has none", () => {
+        expect(presentIndexes(cards, new Set()).size).toBe(0);
     });
 });

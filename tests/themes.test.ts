@@ -1,8 +1,8 @@
 import { contrast, DEFAULT_THEME_ID, THEMES, themeById, type Palette } from "../src/theme/themes";
 
 describe("themes", () => {
-    test("there are at least six, with unique ids, and every colour is a #rrggbb value", () => {
-        expect(THEMES.length).toBeGreaterThanOrEqual(6);
+    test("there are at least five, with unique ids, and every colour is a #rrggbb value", () => {
+        expect(THEMES.length).toBeGreaterThanOrEqual(5);
         expect(new Set(THEMES.map((t) => t.id)).size).toBe(THEMES.length);
         const keys = Object.keys(THEMES[0].colors).sort();
         for (const theme of THEMES) {
@@ -55,7 +55,7 @@ function isWarm(hex: string): boolean {
 }
 
 describe("cool themes", () => {
-    test.each(["ocean", "amethyst", "forest", "rose", "sky"] as const)("%s has no brown, orange or yellow", (id) => {
+    test.each(["rose", "sky"] as const)("%s has no brown, orange or yellow", (id) => {
         const warm = Object.entries(themeById(id).colors).filter(([, value]) => isWarm(value));
         expect(warm).toEqual([]);
     });

@@ -33,7 +33,7 @@ export type Palette = {
     paperText: string;
 };
 
-export type ThemeId = "gruvbox" | "light" | "dark" | "nord" | "dracula" | "sepia" | "ocean" | "amethyst" | "forest" | "rose" | "sky";
+export type ThemeId = "gruvbox" | "dark" | "nord" | "dracula" | "sepia" | "rose" | "sky";
 
 export type Theme = { id: ThemeId; name: string; isDark: boolean; colors: Palette };
 
@@ -46,16 +46,6 @@ export const THEMES: readonly Theme[] = [
             blue: "#83a598", green: "#b8bb26", yellow: "#fabd2f", gold: "#d79921", red: "#fb4934", redDark: "#cc241d",
             aqua: "#8ec07c", orange: "#fe8019", success: "#136d18",
             paper: "#ebdbb2", paperBorder: "#d5c4a1", paperText: "#282828",
-        },
-    },
-    {
-        id: "light", name: "Light", isDark: false,
-        colors: {
-            bg: "#f6f7f9", bgSoft: "#eceef2", surface: "#ffffff", surfaceHigh: "#e3e6ec", surfaceTop: "#cfd4dc",
-            subtle: "#6f7887", muted: "#566070", text: "#1c2330", textBright: "#000000", textDim: "#3b4350",
-            blue: "#1f6feb", green: "#1a7f37", yellow: "#8a5a00", gold: "#a86f00", red: "#cf222e", redDark: "#a40e26",
-            aqua: "#1b7c83", orange: "#bc4c00", success: "#116329",
-            paper: "#ffffff", paperBorder: "#d0d7de", paperText: "#1c2330",
         },
     },
     {
@@ -100,36 +90,6 @@ export const THEMES: readonly Theme[] = [
     },
     // The next five have no brown, orange or yellow anywhere. The palette still has yellow / gold /
     // orange slots (highlights, buttons, streak colours), so those slots hold cyan, violet and pink.
-    {
-        id: "ocean", name: "Ocean", isDark: true,
-        colors: {
-            bg: "#0b1e2d", bgSoft: "#0e2638", surface: "#12304a", surfaceHigh: "#1b4262", surfaceTop: "#2a5a82",
-            subtle: "#6f93b0", muted: "#9bbbd4", text: "#e6f1fa", textBright: "#ffffff", textDim: "#c3d9ea",
-            blue: "#5eb4ff", green: "#4fdc9a", yellow: "#5fdcf0", gold: "#38bdf8", red: "#ff7a90", redDark: "#d6455e",
-            aqua: "#5eead4", orange: "#f08fd0", success: "#1f9d6a",
-            paper: "#e6f1fa", paperBorder: "#c3d9ea", paperText: "#0b1e2d",
-        },
-    },
-    {
-        id: "amethyst", name: "Amethyst", isDark: true,
-        colors: {
-            bg: "#17132a", bgSoft: "#1d1836", surface: "#262042", surfaceHigh: "#352d5a", surfaceTop: "#4a3f78",
-            subtle: "#8c82b8", muted: "#b0a8d6", text: "#ece8fa", textBright: "#ffffff", textDim: "#cfc9ea",
-            blue: "#8fb4ff", green: "#5fe0a8", yellow: "#c4a7ff", gold: "#a78bfa", red: "#ff7a9c", redDark: "#d6456b",
-            aqua: "#67e8f9", orange: "#f48fd0", success: "#24a06e",
-            paper: "#ece8fa", paperBorder: "#cfc9ea", paperText: "#17132a",
-        },
-    },
-    {
-        id: "forest", name: "Forest", isDark: true,
-        colors: {
-            bg: "#0c1f19", bgSoft: "#10281f", surface: "#16352a", surfaceHigh: "#1f4a3a", surfaceTop: "#2c6350",
-            subtle: "#74a898", muted: "#9fcbbb", text: "#e4f5ee", textBright: "#ffffff", textDim: "#bfe0d3",
-            blue: "#6fc2ff", green: "#6ee79a", yellow: "#7af0d0", gold: "#34d399", red: "#ff7a8a", redDark: "#d14456",
-            aqua: "#5eead4", orange: "#f2a0d6", success: "#1f9d62",
-            paper: "#e4f5ee", paperBorder: "#bfe0d3", paperText: "#0c1f19",
-        },
-    },
     {
         id: "rose", name: "Rose", isDark: false,
         colors: {
