@@ -2,57 +2,53 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import { Alert, FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { getLanguage, languages } from "../../constants/languages";
+import { getLanguage } from "../../constants/languages";
 import { deleteMyText, getCards, getDecks, getMyTexts } from "../../database/database";
-import { cardKey, premadeDecks, premadeDecksFor, presentIndexes, targetDeckFor } from "../../models/PremadeDecks";
+import { cardKey, premadeDecksFor, presentIndexes } from "../../models/PremadeDecks";
 import { addPdf } from "../../services/pdfReading";
 import { useTheme } from "../../theme/ThemeProvider";
 import type { Palette } from "../../theme/themes";
 
 
-// Every language in the app. The ones with premade decks come first.
-const withContent = new Set(premadeDecks.map((d) => d.language));
-const libraryLanguages = [
-    ...languages.filter((l) => withContent.has(l.code)).map((l) => l.code),
-    ...languages.filter((l) => !withContent.has(l.code)).map((l) => l.code),
-];
-
 export default function LibraryScreen() {
     const t = useTheme();
     const s = useMemo(() => makeS(t), [t]);
-    // Words in the deck premade cards go into, per language.
-    const [owned, setOwned] = useState<Map<string, Set<string>>>(new Map());
+    type MyDeck = { id: number; name: string; language: string };
+    const [myDecks, setMyDecks] = useState<MyDeck[] | null>(null);
+    const [lastId, setLastId] = useState<number | null>(null);
+    const [chosenId, setChosenId] = useState<number | null>(null);
+    // Words already in the selected deck.
+    const [owned, setOwned] = useState<Set<string>>(new Set());
     const [picking, setPicking] = useState(false);
-    const [deckLanguage, setDeckLanguage] = useState<string | null>(null);
-    const [chosen, setChosen] = useState<string | null>(null);
     const [tab, setTab] = useState<"decks" | "pdfs">("decks");
     const [texts, setTexts] = useState<{ id: number; title: string }[]>([]);
     const [adding, setAdding] = useState(false);
 
+    // The deck whose resources are shown: the one you picked, else the one you last studied, else the first.
+    const deck = myDecks?.find((d) => d.id === (chosenId ?? lastId)) ?? myDecks?.[0] ?? null;
+    const deckId = deck?.id ?? null;
+    const language = deck?.language ?? null;
+    const lang = language ? getLanguage(language) : undefined;
+    const decks = language ? premadeDecksFor(language) : [];
+
     const load = useCallback(async () => {
-        const [decks, lastDeckId] = await Promise.all([getDecks(), AsyncStorage.getItem("lastDeckId")]);
-        const last = lastDeckId ? Number(lastDeckId) : null;
-        const words = new Map<string, Set<string>>();
-        for (const code of new Set(decks.map((d) => d.language))) {
-            const target = targetDeckFor(decks, code, last);
-            if (target) words.set(code, new Set((await getCards(target.id)).map((c) => cardKey(c.learningText))));
-        }
-        setOwned(words);
-        setDeckLanguage(decks.find((d) => d.id === Number(lastDeckId))?.language ?? null);
+        const [all, last] = await Promise.all([getDecks(), AsyncStorage.getItem("lastDeckId")]);
+        setMyDecks(all.map((d) => ({ id: d.id, name: d.name, language: d.language })));
+        setLastId(last ? Number(last) : null);
     }, []);
 
     useFocusEffect(useCallback(() => { void load(); }, [load]));
 
-    // Start on the language of the deck being studied, if the library has something for it.
-    const language = chosen ?? (deckLanguage && libraryLanguages.includes(deckLanguage) ? deckLanguage : libraryLanguages[0]);
-    const lang = getLanguage(language);
-    const decks = premadeDecksFor(language);
+    const loadOwned = useCallback(async () => {
+        setOwned(deckId === null ? new Set() : new Set((await getCards(deckId)).map((c) => cardKey(c.learningText))));
+    }, [deckId]);
+    useFocusEffect(useCallback(() => { void loadOwned(); }, [loadOwned]));
 
-    const loadTexts = useCallback(async () => setTexts(await getMyTexts(language)), [language]);
+    const loadTexts = useCallback(async () => setTexts(language ? await getMyTexts(language) : []), [language]);
     useFocusEffect(useCallback(() => { void loadTexts(); }, [loadTexts]));
 
     const pickPdf = async () => {
-        if (adding) return;
+        if (adding || !language) return;
         setAdding(true);
         try {
             const id = await addPdf(language);
@@ -76,9 +72,9 @@ export default function LibraryScreen() {
     return (
         <View style={s.container}>
             <View style={s.dropWrap}>
-                <Pressable style={({ pressed }) => [s.deckButton, pressed && { opacity: 0.7 }]} onPress={() => setPicking(true)} accessibilityRole="button" accessibilityLabel="Choose a language">
+                <Pressable style={({ pressed }) => [s.deckButton, pressed && { opacity: 0.7 }]} onPress={() => setPicking(true)} accessibilityRole="button" accessibilityLabel="Choose a deck">
                     <Text style={s.dropFlag}>{lang?.flag ?? "🌐"}</Text>
-                    <Text style={s.deckName} numberOfLines={1}>{lang?.name ?? language}</Text>
+                    <Text style={s.deckName} numberOfLines={1}>{deck?.name ?? "No decks"}</Text>
                     <Text style={s.dropArrow}>▼</Text>
                 </Pressable>
             </View>
@@ -86,10 +82,10 @@ export default function LibraryScreen() {
             <Modal visible={picking} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setPicking(false)}>
                 <Pressable style={s.backdrop} onPress={() => setPicking(false)}>
                     <ScrollView style={s.menu} showsVerticalScrollIndicator>
-                        {libraryLanguages.map((code) => (
-                            <Pressable key={code} style={[s.menuRow, code === language && s.menuRowOn]} onPress={() => { setChosen(code); setPicking(false); }} accessibilityRole="button">
-                                <Text style={s.dropFlag}>{getLanguage(code)?.flag ?? "🌐"}</Text>
-                                <Text style={[s.menuText, !withContent.has(code) && { color: t.muted }]}>{getLanguage(code)?.name ?? code}</Text>
+                        {(myDecks ?? []).map((d) => (
+                            <Pressable key={d.id} style={[s.menuRow, d.id === deckId && s.menuRowOn]} onPress={() => { setChosenId(d.id); setPicking(false); }} accessibilityRole="button">
+                                <Text style={s.dropFlag}>{getLanguage(d.language)?.flag ?? "🌐"}</Text>
+                                <Text style={s.menuText} numberOfLines={1}>{d.name}</Text>
                             </Pressable>
                         ))}
                     </ScrollView>
@@ -109,14 +105,14 @@ export default function LibraryScreen() {
                     data={decks}
                     keyExtractor={(d) => d.id}
                     contentContainerStyle={s.list}
-                    ListEmptyComponent={<Text style={s.empty}>Coming soon.</Text>}
+                    ListEmptyComponent={<Text style={s.empty}>{deck ? "Coming soon." : "Create a deck first."}</Text>}
                     renderItem={({ item }) => {
-                        const have = presentIndexes(item.cards, owned.get(item.language) ?? new Set()).size;
+                        const have = presentIndexes(item.cards, owned).size;
                         const all = have === item.cards.length;
                         return (
                             <Pressable
                                 style={({ pressed }) => [s.card, pressed && s.pressed]}
-                                onPress={() => router.push({ pathname: "/premade", params: { id: item.id } })}
+                                onPress={() => router.push({ pathname: "/premade", params: { id: item.id, deckId: String(deckId) } })}
                                 accessibilityRole="button"
                             >
                                 <Text style={s.flag}>{lang?.flag ?? "🌐"}</Text>
