@@ -1,49 +1,52 @@
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
 import LookupSheet from "../components/LookupSheet";
 import TappableText from "../components/TappableText";
 import { getLanguage } from "../constants/languages";
-import { getReading } from "../models/Readings";
+import { getMyText, type MyText } from "../database/database";
+import { pdfLines } from "../models/PdfText";
 import { textOfWords } from "../models/Selection";
 import { useTheme } from "../theme/ThemeProvider";
 import type { Palette } from "../theme/themes";
 
+/** A PDF you added. Tap any word to see what it means and add it as a card. */
 export default function ReadingScreen() {
     const t = useTheme();
     const s = useMemo(() => makeS(t), [t]);
     const { id } = useLocalSearchParams<{ id?: string }>();
-    const reading = id ? getReading(id) : undefined;
-    const [showMeaning, setShowMeaning] = useState(false);
+    const [text, setText] = useState<MyText | null | undefined>(undefined);
     const [lookup, setLookup] = useState<{ text: string; context: string } | null>(null);
 
-    if (!reading) {
-        return <View style={s.container}><Text style={s.meaning}>That text could not be found.</Text></View>;
-    }
-    const language = getLanguage(reading.language);
+    useEffect(() => {
+        let active = true;
+        getMyText(Number(id)).then((found) => {
+            if (active) setText(found);
+        });
+        return () => {
+            active = false;
+        };
+    }, [id]);
+
+    const lines = useMemo(() => (text ? pdfLines(text.body) : []), [text]);
+
+    if (text === undefined) return <View style={s.container}><ActivityIndicator color={t.blue} style={{ marginTop: 40 }} /></View>;
+    if (text === null) return <View style={s.container}><Text style={s.missing}>Not found.</Text></View>;
+    const language = getLanguage(text.language);
 
     return (
         <View style={s.container}>
-            <Stack.Screen options={{ title: reading.titleMeaning }} />
+            <Stack.Screen options={{ title: text.title }} />
             <ScrollView contentContainerStyle={s.content}>
-                <Text style={s.title}>{reading.title}</Text>
-                <Text style={s.hint}>Tap a word to see what it means.</Text>
-
-                {reading.lines.map((line) => (
-                    <View key={line.text} style={s.line}>
-                        <TappableText
-                            text={line.text}
-                            style={s.text}
-                            onWord={(index) => setLookup({ text: textOfWords(line.text, index, index), context: line.text })}
-                            onHold={(index) => setLookup({ text: textOfWords(line.text, index, index), context: line.text })}
-                        />
-                        {showMeaning ? <Text style={s.meaning}>{line.meaning}</Text> : null}
-                    </View>
+                {lines.map((line, i) => (
+                    <TappableText
+                        key={i}
+                        text={line}
+                        style={s.text}
+                        onWord={(index) => setLookup({ text: textOfWords(line, index, index), context: line })}
+                        onHold={(index) => setLookup({ text: textOfWords(line, index, index), context: line })}
+                    />
                 ))}
-
-                <Pressable style={({ pressed }) => [s.button, pressed && s.pressed]} onPress={() => setShowMeaning((v) => !v)}>
-                    <Text style={s.buttonText}>{showMeaning ? "Hide English" : "Show English"}</Text>
-                </Pressable>
             </ScrollView>
 
             {language && lookup && (
@@ -66,13 +69,7 @@ export default function ReadingScreen() {
 
 const makeS = (t: Palette) => StyleSheet.create({
     container: { flex: 1, backgroundColor: t.bg },
-    content: { padding: 20, paddingBottom: 60 },
-    title: { color: t.text, fontSize: 26, fontWeight: "700" },
-    hint: { color: t.muted, fontSize: 13, marginTop: 4, marginBottom: 20 },
-    line: { marginBottom: 18 },
-    text: { color: t.text, fontSize: 24, lineHeight: 36 },
-    meaning: { color: t.muted, fontSize: 15, marginTop: 4 },
-    button: { alignSelf: "center", backgroundColor: t.surface, borderRadius: 12, paddingVertical: 11, paddingHorizontal: 22, marginTop: 10 },
-    buttonText: { color: t.text, fontWeight: "600" },
-    pressed: { opacity: 0.7 },
+    content: { padding: 20, paddingBottom: 60, gap: 18 },
+    text: { color: t.text, fontSize: 22, lineHeight: 34 },
+    missing: { color: t.muted, textAlign: "center", marginTop: 40 },
 });

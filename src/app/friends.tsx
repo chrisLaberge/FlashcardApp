@@ -65,7 +65,7 @@ export default function FriendsScreen() {
         return (
             <View style={[s.container, s.center]}>
                 <Text style={s.heading}>Sign in to add friends</Text>
-                <Text style={s.muted}>Friends and the leaderboard need an account. Your decks stay on this phone.</Text>
+                <Text style={s.muted}>Sign in to use friends and the leaderboard.</Text>
                 <Pressable style={[s.button, s.primary]} onPress={() => router.push("/account")}>
                     <Text style={s.primaryText}>Sign in</Text>
                 </Pressable>
@@ -79,7 +79,7 @@ export default function FriendsScreen() {
         return (
             <KeyboardInsetView style={[s.container, s.center]}>
                 <Text style={s.heading}>{profile ? "Change username" : "Pick a username"}</Text>
-                <Text style={s.muted}>Every username is unique. It is shown to your friends and, unless you turn it off, on the global leaderboard with your level and XP. 3 to 20 letters, numbers or underscores. Your email is never shown.</Text>
+                <Text style={s.muted}>3 to 20 letters, numbers or _. Friends and the leaderboard see it, never your email.</Text>
                 <TextInput
                     style={s.input}
                     value={username}
@@ -220,7 +220,7 @@ export default function FriendsScreen() {
 
             <View style={s.card}>
                 <Text style={s.heading}>Friends ({friends.friends.length})</Text>
-                {friends.friends.length === 0 && <Text style={s.muted}>No friends yet. Share your code or add theirs above.</Text>}
+                {friends.friends.length === 0 && <Text style={s.muted}>No friends yet.</Text>}
                 {friends.friends.map((p) => (
                     <Pressable key={p.uid} style={s.personRow} onLongPress={() => confirmRemove(p)}>
                         <View style={s.nameWithPicture}><Avatar avatar={p.avatar} name={p.username} size={34} /><Text style={s.name}>{p.username}</Text><PersonPet pet={p.pet} level={p.level} size={34} /></View>

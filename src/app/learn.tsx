@@ -449,13 +449,13 @@ export default function LearnScreen() {
 
             <SettingRow
               label="Automatic pronunciation"
-              hint="Speak the word whenever it appears. The speaker button always works."
+              hint="Say each word out loud."
               value={settings.autoSpeak}
               onChange={(autoSpeak) => updateSettings({ autoSpeak })}
             />
             <SettingRow
               label="Show romanization"
-              hint="Pinyin, romaji and similar under the word."
+              hint="Pinyin, romaji and similar."
               value={settings.showRomanization}
               onChange={(showRomanization) => updateSettings({ showRomanization })}
             />
@@ -463,10 +463,10 @@ export default function LearnScreen() {
               label="Listening reviews"
               hint={
                 !settings.autoSpeak
-                  ? "Needs automatic pronunciation. Off: the word is shown instead."
+                  ? "Needs automatic pronunciation."
                   : !voiceAvailable
-                    ? "No voice for this language on this phone, so the word is shown instead."
-                    : "Sometimes play only the sound, with no text, for words you know well. Off: the word is shown instead."
+                    ? "No voice for this language on this phone."
+                    : "Sometimes play only the sound."
               }
               value={settings.listeningCards}
               onChange={(listeningCards) => updateSettings({ listeningCards })}

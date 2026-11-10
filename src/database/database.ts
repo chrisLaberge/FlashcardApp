@@ -133,6 +133,14 @@ async function openAndPrepareDatabase(): Promise<SQLite.SQLiteDatabase> {
                 kind TEXT NOT NULL,
                 at INTEGER NOT NULL
             );
+            -- Texts the person added from a PDF, to read with tap-a-word lookups.
+            CREATE TABLE IF NOT EXISTS my_texts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                language TEXT NOT NULL,
+                body TEXT NOT NULL,
+                added_at INTEGER NOT NULL
+            );
             CREATE INDEX IF NOT EXISTS idx_card_add_log_time ON card_add_log(added_at);
             CREATE INDEX IF NOT EXISTS idx_review_log_time ON review_log(reviewed_at);
             CREATE INDEX IF NOT EXISTS idx_review_log_card ON review_log(card_id);
@@ -862,4 +870,34 @@ export async function recordShopAction(action: { ledger: readonly Omit<LedgerEnt
             await database.runAsync("INSERT OR IGNORE INTO shop_inventory (item_id, acquired_at) VALUES (?, ?)", action.addItem, atMs);
         }
     });
+}
+
+export type MyText = { id: number; title: string; language: string; body: string; addedAt: number };
+
+export async function addMyText(title: string, language: string, body: string, atMs = Date.now()): Promise<number> {
+    const database = await getDatabase();
+    const result = await database.runAsync("INSERT INTO my_texts (title, language, body, added_at) VALUES (?, ?, ?, ?)", title, language, body, atMs);
+    return result.lastInsertRowId;
+}
+
+/** The titles of the added texts for a language, newest first (the body is loaded when one is opened). */
+export async function getMyTexts(language: string): Promise<Omit<MyText, "body">[]> {
+    const database = await getDatabase();
+    const rows = await database.getAllAsync<{ id: number; title: string; language: string; added_at: number }>(
+        "SELECT id, title, language, added_at FROM my_texts WHERE language = ? ORDER BY added_at DESC, id DESC", language,
+    );
+    return rows.map((r) => ({ id: r.id, title: r.title, language: r.language, addedAt: r.added_at }));
+}
+
+export async function getMyText(id: number): Promise<MyText | null> {
+    const database = await getDatabase();
+    const row = await database.getFirstAsync<{ id: number; title: string; language: string; body: string; added_at: number }>(
+        "SELECT id, title, language, body, added_at FROM my_texts WHERE id = ?", id,
+    );
+    return row ? { id: row.id, title: row.title, language: row.language, body: row.body, addedAt: row.added_at } : null;
+}
+
+export async function deleteMyText(id: number): Promise<void> {
+    const database = await getDatabase();
+    await database.runAsync("DELETE FROM my_texts WHERE id = ?", id);
 }

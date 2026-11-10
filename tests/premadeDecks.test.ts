@@ -1,7 +1,5 @@
 import { getLanguage } from "../src/constants/languages";
-import { BASICS, cardKey, premadeDecks, presentIndexes } from "../src/models/PremadeDecks";
-import { getReading, readings, readingsFor } from "../src/models/Readings";
-import { tokenize } from "../src/models/Tokens";
+import { BASICS, cardKey, premadeDecks, presentIndexes, targetDeckFor } from "../src/models/PremadeDecks";
 
 describe("premade decks", () => {
     test("every deck has the same cards in the same order, with meanings and text filled in", () => {
@@ -25,25 +23,6 @@ describe("premade decks", () => {
     });
 });
 
-describe("library readings", () => {
-    test("every premade-deck language also has something to read", () => {
-        for (const deck of premadeDecks) expect(readingsFor(deck.language).length).toBeGreaterThan(0);
-    });
-
-    test("ids are unique, lines have text and an English meaning, and every line has words to tap", () => {
-        expect(new Set(readings.map((r) => r.id)).size).toBe(readings.length);
-        for (const reading of readings) {
-            expect(getLanguage(reading.language)).toBeDefined();
-            expect(getReading(reading.id)).toBe(reading);
-            expect(reading.lines.length).toBeGreaterThan(0);
-            for (const line of reading.lines) {
-                expect(line.meaning.trim()).not.toBe("");
-                expect(tokenize(line.text).some((token) => token.word)).toBe(true);
-            }
-        }
-    });
-});
-
 describe("premade decks vs a deck you own", () => {
     const cards = [{ learning: "你好", meaning: "Hello" }, { learning: "谢谢", meaning: "Thank you" }, { learning: "水", meaning: "Water" }];
 
@@ -55,5 +34,15 @@ describe("premade decks vs a deck you own", () => {
 
     test("an empty deck has none", () => {
         expect(presentIndexes(cards, new Set()).size).toBe(0);
+    });
+});
+
+describe("which deck premade cards go into", () => {
+    const decks = [{ id: 1, language: "es" }, { id: 2, language: "zh" }, { id: 3, language: "zh" }];
+    test("the last studied deck if it matches the language, else the first of that language, else none", () => {
+        expect(targetDeckFor(decks, "zh", 3)?.id).toBe(3);
+        expect(targetDeckFor(decks, "zh", 1)?.id).toBe(2);
+        expect(targetDeckFor(decks, "zh", null)?.id).toBe(2);
+        expect(targetDeckFor(decks, "fr", 1)).toBeNull();
     });
 });

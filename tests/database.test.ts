@@ -43,7 +43,7 @@ describe("startup and schema", () => {
             .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
             .all()
             .map((r) => (r as { name: string }).name);
-        expect(tables).toEqual(["achievement_unlocks", "card_add_log", "card_explanations", "card_progress", "cards", "decks", "images", "pet_state", "review_log", "shop_inventory", "shop_ledger", "word_lookups"]);
+        expect(tables).toEqual(["achievement_unlocks", "card_add_log", "card_explanations", "card_progress", "cards", "decks", "images", "my_texts", "pet_state", "review_log", "shop_inventory", "shop_ledger", "word_lookups"]);
     });
 
     test("upgrades a pre-FSRS database without losing progress", async () => {
@@ -520,6 +520,18 @@ describe("words added", () => {
         await db.addCard("gato", "cat", "", "", deck);
         expect((await db.getAddedWords()).map((w) => w.learningText)).toEqual(["gato"]);
         expect(await dueIds(db, deck)).toContain(premade);
+    });
+
+    test("added texts: saved per language, newest first, opened by id, deleted", async () => {
+        const db = startApp();
+        const a = await db.addMyText("First", "es", "Hola.", 1000);
+        const b = await db.addMyText("Second", "es", "Adiós.", 2000);
+        await db.addMyText("Other", "fr", "Salut.", 3000);
+        expect((await db.getMyTexts("es")).map((t) => t.title)).toEqual(["Second", "First"]);
+        expect((await db.getMyText(a))?.body).toBe("Hola.");
+        await db.deleteMyText(b);
+        expect((await db.getMyTexts("es")).map((t) => t.id)).toEqual([a]);
+        expect(await db.getMyText(b)).toBeNull();
     });
 
     test("shop: ledger and inventory are saved together, repeats are ignored, pet state can be set and cleared", async () => {
