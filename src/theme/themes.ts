@@ -33,7 +33,7 @@ export type Palette = {
     paperText: string;
 };
 
-export type ThemeId = "gruvbox" | "light" | "dark" | "nord" | "dracula" | "sepia";
+export type ThemeId = "gruvbox" | "light" | "dark" | "nord" | "dracula" | "sepia" | "ocean" | "amethyst" | "forest" | "rose" | "sky";
 
 export type Theme = { id: ThemeId; name: string; isDark: boolean; colors: Palette };
 
@@ -96,6 +96,58 @@ export const THEMES: readonly Theme[] = [
             blue: "#2f6f8f", green: "#4f7a17", yellow: "#8a5d00", gold: "#9a6a05", red: "#b3362a", redDark: "#8f2a20",
             aqua: "#3d7d6b", orange: "#b5541c", success: "#3f6b1c",
             paper: "#fbf5e6", paperBorder: "#d8caa6", paperText: "#3b3226",
+        },
+    },
+    // The next five have no brown, orange or yellow anywhere. The palette still has yellow / gold /
+    // orange slots (highlights, buttons, streak colours), so those slots hold cyan, violet and pink.
+    {
+        id: "ocean", name: "Ocean", isDark: true,
+        colors: {
+            bg: "#0b1e2d", bgSoft: "#0e2638", surface: "#12304a", surfaceHigh: "#1b4262", surfaceTop: "#2a5a82",
+            subtle: "#6f93b0", muted: "#9bbbd4", text: "#e6f1fa", textBright: "#ffffff", textDim: "#c3d9ea",
+            blue: "#5eb4ff", green: "#4fdc9a", yellow: "#5fdcf0", gold: "#38bdf8", red: "#ff7a90", redDark: "#d6455e",
+            aqua: "#5eead4", orange: "#f08fd0", success: "#1f9d6a",
+            paper: "#e6f1fa", paperBorder: "#c3d9ea", paperText: "#0b1e2d",
+        },
+    },
+    {
+        id: "amethyst", name: "Amethyst", isDark: true,
+        colors: {
+            bg: "#17132a", bgSoft: "#1d1836", surface: "#262042", surfaceHigh: "#352d5a", surfaceTop: "#4a3f78",
+            subtle: "#8c82b8", muted: "#b0a8d6", text: "#ece8fa", textBright: "#ffffff", textDim: "#cfc9ea",
+            blue: "#8fb4ff", green: "#5fe0a8", yellow: "#c4a7ff", gold: "#a78bfa", red: "#ff7a9c", redDark: "#d6456b",
+            aqua: "#67e8f9", orange: "#f48fd0", success: "#24a06e",
+            paper: "#ece8fa", paperBorder: "#cfc9ea", paperText: "#17132a",
+        },
+    },
+    {
+        id: "forest", name: "Forest", isDark: true,
+        colors: {
+            bg: "#0c1f19", bgSoft: "#10281f", surface: "#16352a", surfaceHigh: "#1f4a3a", surfaceTop: "#2c6350",
+            subtle: "#74a898", muted: "#9fcbbb", text: "#e4f5ee", textBright: "#ffffff", textDim: "#bfe0d3",
+            blue: "#6fc2ff", green: "#6ee79a", yellow: "#7af0d0", gold: "#34d399", red: "#ff7a8a", redDark: "#d14456",
+            aqua: "#5eead4", orange: "#f2a0d6", success: "#1f9d62",
+            paper: "#e4f5ee", paperBorder: "#bfe0d3", paperText: "#0c1f19",
+        },
+    },
+    {
+        id: "rose", name: "Rose", isDark: false,
+        colors: {
+            bg: "#fdf1f6", bgSoft: "#f8e4ed", surface: "#ffffff", surfaceHigh: "#f3d6e3", surfaceTop: "#e6b9cf",
+            subtle: "#8a5f74", muted: "#6e4659", text: "#2a1520", textBright: "#000000", textDim: "#4a2a39",
+            blue: "#2563eb", green: "#15803d", yellow: "#be185d", gold: "#9d174d", red: "#c81e1e", redDark: "#991b1b",
+            aqua: "#0f766e", orange: "#a21caf", success: "#116329",
+            paper: "#ffffff", paperBorder: "#ebc8d9", paperText: "#2a1520",
+        },
+    },
+    {
+        id: "sky", name: "Sky", isDark: false,
+        colors: {
+            bg: "#eef6fd", bgSoft: "#e0eefa", surface: "#ffffff", surfaceHigh: "#d3e5f6", surfaceTop: "#b7d2ea",
+            subtle: "#587794", muted: "#42607c", text: "#10243a", textBright: "#000000", textDim: "#2c425a",
+            blue: "#1d4ed8", green: "#15803d", yellow: "#0369a1", gold: "#0e7490", red: "#c81e1e", redDark: "#991b1b",
+            aqua: "#0f766e", orange: "#6d28d9", success: "#116329",
+            paper: "#ffffff", paperBorder: "#c4daee", paperText: "#10243a",
         },
     },
 ];
