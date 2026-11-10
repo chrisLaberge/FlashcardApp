@@ -7,10 +7,11 @@ import { API_URL } from "./imageApi";
 
 export class PdfError extends Error {}
 
-function messageFor(status: number | null): string {
-    if (status === null) return "Could not reach the server. Check your connection.";
+function messageFor(status: number | null, detail?: string): string {
+    if (status === null) return `Could not reach the server.${detail ? ` (${detail})` : ""}`;
     if (status === 401) return "Sign in first (Account tab) to add PDFs.";
     if (status === 413) return "That PDF is too big.";
+    if (status === 404) return "The server does not support PDFs yet.";
     if (status === 422) return "No text found. Scanned PDFs do not work.";
     if (status === 429) return "Too many PDFs just now. Try again later.";
     return "Could not read that PDF.";
@@ -33,8 +34,9 @@ export async function addPdf(language: string): Promise<number | null> {
         });
         status = result.status;
         body = result.body;
-    } catch {
-        throw new PdfError(messageFor(null));
+    } catch (error) {
+        // The reason is shown so a failure can be told apart (offline, timeout, file unreadable).
+        throw new PdfError(messageFor(null, error instanceof Error ? error.message.slice(0, 120) : undefined));
     }
     if (status < 200 || status >= 300) throw new PdfError(messageFor(status));
 
