@@ -12,16 +12,17 @@ const many = (count: number, when: number, extra: Partial<LoggedReview> = {}) =>
 const find = (list: ReturnType<typeof achievements>, id: string) => list.find((a) => a.id === id)!;
 
 describe("achievements", () => {
-    test("six tiers, bronze to diamond, with different colours", () => {
-        expect(TIERS.map((t) => t.id)).toEqual(["bronze", "silver", "gold", "platinum", "emerald", "diamond"]);
-        expect(new Set(TIERS.map((t) => t.color)).size).toBe(6);
+    test("seven tiers, bronze to diamond then the pink God tier, with different colours", () => {
+        expect(TIERS.map((t) => t.id)).toEqual(["bronze", "silver", "gold", "platinum", "emerald", "diamond", "god"]);
+        expect(new Set(TIERS.map((t) => t.color)).size).toBe(7);
+        expect(TIERS[6].color).toBe("#ff4fa3");
     });
 
     test("every track has six rising targets", () => {
         for (const a of achievements({ reviews: [], cardsAdded: 0, nowMs: NOW })) {
-            expect(a.targets).toHaveLength(6);
+            expect(a.targets).toHaveLength(7);
             expect([...a.targets].sort((x, y) => x - y)).toEqual([...a.targets]);
-            expect(new Set(a.targets).size).toBe(6);
+            expect(new Set(a.targets).size).toBe(7);
         }
     });
 
@@ -44,7 +45,8 @@ describe("achievements", () => {
 
     test("the top tier has no next goal and a full bar", () => {
         const list = achievements({ reviews: [], cardsAdded: 5000, nowMs: NOW });
-        expect(find(list, "added")).toMatchObject({ tier: 6, nextTarget: null, nextGoal: null, fraction: 1 });
+        expect(find(list, "added")).toMatchObject({ tier: 7, nextTarget: null, nextGoal: null, fraction: 1 });
+        expect(find(achievements({ reviews: [], cardsAdded: 2500, nowMs: NOW }), "added")).toMatchObject({ tier: 6, nextTarget: 5000 });
     });
 
     test("cards added come from the count that is passed in", () => {
@@ -93,10 +95,10 @@ describe("achievements", () => {
     });
 
     test("bonus XP: bigger for higher tiers, and the most anyone can earn stays under the server cap", () => {
-        expect([...TIER_BONUS_XP]).toEqual([...TIER_BONUS_XP].sort((a, b) => a - b));
+        expect([...TIER_BONUS_XP].slice(0, 6)).toEqual([...TIER_BONUS_XP].slice(0, 6).sort((a, b) => a - b)); // God's bonus is smaller to stay under the cap
         expect(bonusXpFor([{ tier: 1 }, { tier: 2 }, { tier: 3 }])).toBe(25 + 50 + 100);
         const tracks = achievements({ reviews: [], cardsAdded: 0, nowMs: NOW }).length;
-        expect(tracks * bonusXpFor([1, 2, 3, 4, 5, 6].map((tier) => ({ tier })))).toBeLessThanOrEqual(25_000);
+        expect(tracks * bonusXpFor([1, 2, 3, 4, 5, 6, 7].map((tier) => ({ tier })))).toBeLessThanOrEqual(25_000);
     });
 
     test("newly earned tiers are the earned ones that were not recorded yet", () => {

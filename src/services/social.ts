@@ -2,6 +2,9 @@ import type { UploadDay } from "../models/Progression";
 import { authHeaders } from "./auth";
 import { API_URL } from "./imageApi";
 
+/** The pet shown on a profile: its name and what it wears (ids from models/Shop). */
+export type PetLook = { name: string; hat: string | null; glasses: string | null; scarf: string | null };
+
 export type Profile = {
     username: string;
     friendCode: string;
@@ -15,13 +18,15 @@ export type Profile = {
     showGlobal: boolean;
     /** The chosen profile picture, or null until one is picked. */
     avatar: string | null;
+    pet: PetLook | null;
+    banner: string | null;
 };
 
-export type Person = { uid: string; username: string; avatar: string | null; level: number; totalXp: number; currentStreak: number };
+export type Person = { uid: string; username: string; avatar: string | null; pet: PetLook | null; banner: string | null; level: number; totalXp: number; currentStreak: number };
 export type Friends = { friends: Person[]; incoming: Person[]; outgoing: Person[] };
 export type LeaderboardEntry = Person & { rank: number; xp: number; isMe: boolean };
 
-export type GlobalRow = { rank: number; uid: string; username: string; avatar: string | null; level: number; xp: number; currentStreak: number; isMe: boolean };
+export type GlobalRow = { rank: number; uid: string; username: string; avatar: string | null; pet: PetLook | null; banner: string | null; level: number; xp: number; currentStreak: number; isMe: boolean };
 export type GlobalBoard = {
     entries: GlobalRow[];
     /** Your own standing, even when you are outside the top list. `rank` is null with no XP or when hidden. */
@@ -68,6 +73,15 @@ export const getProfile = async () => (await request<{ profile: Profile | null }
 export const saveUsername = async (username: string) => (await request<{ profile: Profile }>("POST", "/me", { username })).profile;
 export const uploadDays = async (days: UploadDay[], bonusXp = 0, freezeDays: string[] = []) =>
     (await request<{ profile: Profile }>("PUT", "/me/days", { days, bonusXp, freezeDays })).profile;
+/** Saves the pet and banner shown to friends. Resolves quietly when there is no profile yet. */
+export const saveLook = async (pet: PetLook | null, banner: string | null) => {
+    try {
+        await request("PUT", "/me/settings", { pet, banner });
+    } catch (error) {
+        if (error instanceof ApiError && (error.status === 404 || error.status === 401)) return;
+        throw error;
+    }
+};
 export const deleteMyData = () => request<void>("DELETE", "/me");
 
 export const getFriends = () => request<Friends>("GET", "/friends");

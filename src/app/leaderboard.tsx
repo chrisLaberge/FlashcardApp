@@ -2,6 +2,7 @@ import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState, useMemo } from "react";
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import Avatar from "../components/Avatar";
+import { PersonPet, RowBanner } from "../components/pet/PersonPet";
 import { useUser } from "../hooks/useUser";
 import { ApiError, getGlobalLeaderboard, getLeaderboard, type GlobalBoard, type LeaderboardEntry } from "../services/social";
 import { syncStats } from "../services/syncStats";
@@ -88,12 +89,14 @@ export default function LeaderboardScreen() {
                         }
                         renderItem={({ item }) => (
                             <View style={[s.row, item.isMe && s.me]}>
+<RowBanner banner={item.banner} />
                                 <Text style={s.rank}>{item.rank === 1 ? "🥇" : item.rank === 2 ? "🥈" : item.rank === 3 ? "🥉" : item.rank}</Text>
                                 <Avatar avatar={item.avatar} name={item.username} size={38} />
                                 <View style={{ flex: 1 }}>
                                     <Text style={s.name} numberOfLines={1}>{item.username}{item.isMe ? " (you)" : ""}</Text>
                                     <Text style={s.muted}>Level {item.level} · {item.currentStreak} 🔥</Text>
                                 </View>
+                                <PersonPet pet={item.pet} level={item.level} />
                                 <Text style={s.xp}>{item.xp.toLocaleString("en-US")} XP</Text>
                             </View>
                         )}
@@ -116,12 +119,14 @@ export default function LeaderboardScreen() {
                     }
                     renderItem={({ item }) => (
                         <View style={[s.row, item.isMe && s.me]}>
+<RowBanner banner={item.banner} />
                             <Text style={s.rank}>{item.rank === 1 ? "🥇" : item.rank === 2 ? "🥈" : item.rank === 3 ? "🥉" : item.rank}</Text>
                             <Avatar avatar={item.avatar} name={item.username} size={38} />
                             <View style={{ flex: 1 }}>
                                 <Text style={s.name} numberOfLines={1}>{item.username}{item.isMe ? " (you)" : ""}</Text>
                                 <Text style={s.muted}>Level {item.level} · {item.currentStreak} 🔥</Text>
                             </View>
+                            <PersonPet pet={item.pet} level={item.level} />
                             <Text style={s.xp}>{item.xp.toLocaleString("en-US")} XP</Text>
                         </View>
                     )}
@@ -142,7 +147,7 @@ const makeS = (t: Palette) => StyleSheet.create({
     tabOn: { backgroundColor: t.surfaceHigh },
     tabText: { color: t.muted, fontWeight: "600" },
     tabTextOn: { color: t.text },
-    row: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: t.surface, borderRadius: 12, padding: 14 },
+    row: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: t.surface, borderRadius: 12, padding: 14, overflow: "hidden" },
     me: { borderWidth: 1, borderColor: t.yellow },
     rank: { color: t.text, fontSize: 20, width: 34, textAlign: "center" },
     name: { color: t.text, fontSize: 16, fontWeight: "600" },

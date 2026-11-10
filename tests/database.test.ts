@@ -43,7 +43,7 @@ describe("startup and schema", () => {
             .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
             .all()
             .map((r) => (r as { name: string }).name);
-        expect(tables).toEqual(["achievement_unlocks", "card_add_log", "card_explanations", "card_progress", "cards", "decks", "images", "review_log", "word_lookups"]);
+        expect(tables).toEqual(["achievement_unlocks", "card_add_log", "card_explanations", "card_progress", "cards", "decks", "images", "pet_state", "review_log", "shop_inventory", "shop_ledger", "word_lookups"]);
     });
 
     test("upgrades a pre-FSRS database without losing progress", async () => {
@@ -520,5 +520,18 @@ describe("words added", () => {
         await db.addCard("gato", "cat", "", "", deck);
         expect((await db.getAddedWords()).map((w) => w.learningText)).toEqual(["gato"]);
         expect(await dueIds(db, deck)).toContain(premade);
+    });
+
+    test("shop: ledger and inventory are saved together, repeats are ignored, pet state can be set and cleared", async () => {
+        const db = startApp();
+        await db.recordShopAction({ ledger: [{ itemId: "case", gems: 40, kind: "case" }, { itemId: "cap", gems: -10, kind: "refund" }], addItem: "cap" });
+        await db.recordShopAction({ ledger: [], addItem: "cap" });
+        expect(await db.getInventory()).toEqual(["cap"]);
+        expect((await db.getLedger()).map((e) => `${e.kind}:${e.gems}`)).toEqual(["case:40", "refund:-10"]);
+
+        await db.setPetState("name", "Pip");
+        expect(await db.getPetState()).toEqual({ name: "Pip" });
+        await db.setPetState("name", null);
+        expect(await db.getPetState()).toEqual({});
     });
 });

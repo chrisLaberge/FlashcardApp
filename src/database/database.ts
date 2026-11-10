@@ -116,6 +116,23 @@ async function openAndPrepareDatabase(): Promise<SQLite.SQLiteDatabase> {
                 data TEXT NOT NULL,
                 created_at INTEGER NOT NULL
             );
+            -- The pet and the shop. Gems are never stored as a balance: what you earned comes from the
+            -- review log, and this ledger holds only what was spent (and refunded).
+            CREATE TABLE IF NOT EXISTS pet_state (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS shop_inventory (
+                item_id TEXT PRIMARY KEY,
+                acquired_at INTEGER NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS shop_ledger (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                item_id TEXT NOT NULL,
+                gems INTEGER NOT NULL,
+                kind TEXT NOT NULL,
+                at INTEGER NOT NULL
+            );
             CREATE INDEX IF NOT EXISTS idx_card_add_log_time ON card_add_log(added_at);
             CREATE INDEX IF NOT EXISTS idx_review_log_time ON review_log(reviewed_at);
             CREATE INDEX IF NOT EXISTS idx_review_log_card ON review_log(card_id);
@@ -799,4 +816,50 @@ export async function restoreFromBackup(source: RestoreSource): Promise<RestoreR
 export async function serializeDatabase(): Promise<Uint8Array> {
     const database = await getDatabase();
     return database.serializeAsync();
+}
+
+/* ------------------------------- pet and shop ------------------------------- */
+
+export async function getPetState(): Promise<Record<string, string>> {
+    const database = await getDatabase();
+    const rows = await database.getAllAsync<{ key: string; value: string }>("SELECT key, value FROM pet_state");
+    return Object.fromEntries(rows.map((row) => [row.key, row.value]));
+}
+
+export async function setPetState(key: string, value: string | null): Promise<void> {
+    const database = await getDatabase();
+    if (value === null) await database.runAsync("DELETE FROM pet_state WHERE key = ?", key);
+    else await database.runAsync("INSERT OR REPLACE INTO pet_state (key, value) VALUES (?, ?)", key, value);
+}
+
+export async function getInventory(): Promise<string[]> {
+    const database = await getDatabase();
+    const rows = await database.getAllAsync<{ item_id: string }>("SELECT item_id FROM shop_inventory ORDER BY acquired_at, item_id");
+    return rows.map((row) => row.item_id);
+}
+
+export type LedgerEntry = { itemId: string; gems: number; kind: string; at: number };
+
+export async function getLedger(): Promise<LedgerEntry[]> {
+    const database = await getDatabase();
+    const rows = await database.getAllAsync<{ item_id: string; gems: number; kind: string; at: number }>(
+        "SELECT item_id, gems, kind, at FROM shop_ledger ORDER BY id",
+    );
+    return rows.map((row) => ({ itemId: row.item_id, gems: row.gems, kind: row.kind, at: row.at }));
+}
+
+/**
+ * One shop action, saved together: the ledger entries (what it cost, any refund) and the item
+ * added to the inventory. Either all of it is saved or none.
+ */
+export async function recordShopAction(action: { ledger: readonly Omit<LedgerEntry, "at">[]; addItem?: string }, atMs = Date.now()): Promise<void> {
+    const database = await getDatabase();
+    await database.withTransactionAsync(async () => {
+        for (const entry of action.ledger) {
+            await database.runAsync("INSERT INTO shop_ledger (item_id, gems, kind, at) VALUES (?, ?, ?, ?)", entry.itemId, entry.gems, entry.kind, atMs);
+        }
+        if (action.addItem) {
+            await database.runAsync("INSERT OR IGNORE INTO shop_inventory (item_id, acquired_at) VALUES (?, ?)", action.addItem, atMs);
+        }
+    });
 }
