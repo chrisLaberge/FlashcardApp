@@ -1,5 +1,5 @@
 import { getLanguage } from "../src/constants/languages";
-import { BASICS, cardKey, premadeDecks, presentIndexes } from "../src/models/PremadeDecks";
+import { BASICS, cardKey, premadeDecks, presentIndexes, targetDeckFor } from "../src/models/PremadeDecks";
 import { getReading, readings, readingsFor } from "../src/models/Readings";
 import { tokenize } from "../src/models/Tokens";
 
@@ -55,5 +55,15 @@ describe("premade decks vs a deck you own", () => {
 
     test("an empty deck has none", () => {
         expect(presentIndexes(cards, new Set()).size).toBe(0);
+    });
+});
+
+describe("which deck premade cards go into", () => {
+    const decks = [{ id: 1, language: "es" }, { id: 2, language: "zh" }, { id: 3, language: "zh" }];
+    test("the last studied deck if it matches the language, else the first of that language, else none", () => {
+        expect(targetDeckFor(decks, "zh", 3)?.id).toBe(3);
+        expect(targetDeckFor(decks, "zh", 1)?.id).toBe(2);
+        expect(targetDeckFor(decks, "zh", null)?.id).toBe(2);
+        expect(targetDeckFor(decks, "fr", 1)).toBeNull();
     });
 });

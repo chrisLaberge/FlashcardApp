@@ -67,3 +67,12 @@ export function presentIndexes(cards: readonly PremadeCard[], existing: Readonly
 }
 
 export const getPremadeDeck = (id: string): PremadeDeck | undefined => premadeDecks.find((d) => d.id === id);
+
+/**
+ * The one deck of yours that premade cards go into: the deck you last studied if it is in this
+ * language, otherwise your first deck in this language. Null means a new deck will be made.
+ */
+export function targetDeckFor<T extends { id: number; language: string }>(decks: readonly T[], language: string, lastDeckId: number | null): T | null {
+    const mine = decks.filter((d) => d.language === language);
+    return mine.find((d) => d.id === lastDeckId) ?? mine[0] ?? null;
+}

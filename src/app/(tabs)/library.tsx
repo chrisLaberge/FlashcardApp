@@ -1,22 +1,26 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
-import { FlatList, Modal, Pressable, StyleSheet, Text, View } from "react-native";
-import { getLanguage } from "../../constants/languages";
+import { FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { getLanguage, languages } from "../../constants/languages";
 import { getCards, getDecks } from "../../database/database";
-import { cardKey, premadeDecks, premadeDecksFor, presentIndexes } from "../../models/PremadeDecks";
+import { cardKey, premadeDecks, premadeDecksFor, presentIndexes, targetDeckFor } from "../../models/PremadeDecks";
 import { readings, readingsFor } from "../../models/Readings";
 import { useTheme } from "../../theme/ThemeProvider";
 import type { Palette } from "../../theme/themes";
 
 
-// Languages that have something in the library, in the order they were written.
-const libraryLanguages = [...new Set([...premadeDecks.map((d) => d.language), ...readings.map((r) => r.language)])];
+// Every language in the app. The ones with something in the library come first.
+const withContent = new Set([...premadeDecks.map((d) => d.language), ...readings.map((r) => r.language)]);
+const libraryLanguages = [
+    ...languages.filter((l) => withContent.has(l.code)).map((l) => l.code),
+    ...languages.filter((l) => !withContent.has(l.code)).map((l) => l.code),
+];
 
 export default function LibraryScreen() {
     const t = useTheme();
     const s = useMemo(() => makeS(t), [t]);
-    // Words you already have, per language (across all your decks of that language).
+    // Words in the deck premade cards go into, per language.
     const [owned, setOwned] = useState<Map<string, Set<string>>>(new Map());
     const [picking, setPicking] = useState(false);
     const [deckLanguage, setDeckLanguage] = useState<string | null>(null);
@@ -25,11 +29,11 @@ export default function LibraryScreen() {
 
     const load = useCallback(async () => {
         const [decks, lastDeckId] = await Promise.all([getDecks(), AsyncStorage.getItem("lastDeckId")]);
+        const last = lastDeckId ? Number(lastDeckId) : null;
         const words = new Map<string, Set<string>>();
-        for (const d of decks) {
-            const set = words.get(d.language) ?? new Set<string>();
-            for (const c of await getCards(d.id)) set.add(cardKey(c.learningText));
-            words.set(d.language, set);
+        for (const code of new Set(decks.map((d) => d.language))) {
+            const target = targetDeckFor(decks, code, last);
+            if (target) words.set(code, new Set((await getCards(target.id)).map((c) => cardKey(c.learningText))));
         }
         setOwned(words);
         setDeckLanguage(decks.find((d) => d.id === Number(lastDeckId))?.language ?? null);
@@ -55,14 +59,14 @@ export default function LibraryScreen() {
 
             <Modal visible={picking} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setPicking(false)}>
                 <Pressable style={s.backdrop} onPress={() => setPicking(false)}>
-                    <View style={s.menu}>
+                    <ScrollView style={s.menu} showsVerticalScrollIndicator>
                         {libraryLanguages.map((code) => (
                             <Pressable key={code} style={[s.menuRow, code === language && s.menuRowOn]} onPress={() => { setChosen(code); setPicking(false); }} accessibilityRole="button">
                                 <Text style={s.dropFlag}>{getLanguage(code)?.flag ?? "🌐"}</Text>
-                                <Text style={s.menuText}>{getLanguage(code)?.name ?? code}</Text>
+                                <Text style={[s.menuText, !withContent.has(code) && { color: t.muted }]}>{getLanguage(code)?.name ?? code}</Text>
                             </Pressable>
                         ))}
-                    </View>
+                    </ScrollView>
                 </Pressable>
             </Modal>
 
@@ -79,8 +83,8 @@ export default function LibraryScreen() {
                     data={decks}
                     keyExtractor={(d) => d.id}
                     contentContainerStyle={s.list}
-                    ListHeaderComponent={<Text style={s.hint}>Open a deck to add all its cards or pick just the ones you want. Added cards are yours to change or delete.</Text>}
-                    ListEmptyComponent={<Text style={s.empty}>No premade decks for {lang?.name ?? "this language"} yet.</Text>}
+                    ListHeaderComponent={<Text style={s.hint}>Tap a deck to add its cards to your deck.</Text>}
+                    ListEmptyComponent={<Text style={s.empty}>Nothing here for {lang?.name ?? "this language"} yet. Coming soon.</Text>}
                     renderItem={({ item }) => {
                         const have = presentIndexes(item.cards, owned.get(item.language) ?? new Set()).size;
                         const all = have === item.cards.length;
@@ -94,7 +98,7 @@ export default function LibraryScreen() {
                                 <View style={{ flex: 1 }}>
                                     <Text style={s.name}>{item.name}</Text>
                                     <Text style={s.meta}>{item.cards.length} cards · {item.description}</Text>
-                                    <Text style={[s.meta, all && s.metaDone]}>{all ? "All cards in your decks ✓" : have > 0 ? `${have} of ${item.cards.length} already in your decks` : "None in your decks yet"}</Text>
+                                    <Text style={[s.meta, all && s.metaDone]}>{all ? "All cards in your deck ✓" : have > 0 ? `${have} of ${item.cards.length} already in your deck` : "None in your deck yet"}</Text>
                                 </View>
                                 <Text style={s.arrow}>›</Text>
                             </Pressable>
@@ -107,7 +111,7 @@ export default function LibraryScreen() {
                     keyExtractor={(r) => r.id}
                     contentContainerStyle={s.list}
                     ListHeaderComponent={<Text style={s.hint}>Tap any word while reading to see what it means and add it as a card.</Text>}
-                    ListEmptyComponent={<Text style={s.empty}>No reading for {lang?.name ?? "this language"} yet.</Text>}
+                    ListEmptyComponent={<Text style={s.empty}>Nothing here for {lang?.name ?? "this language"} yet. Coming soon.</Text>}
                     renderItem={({ item }) => (
                         <Pressable
                             style={({ pressed }) => [s.card, pressed && s.pressed]}
@@ -135,7 +139,7 @@ const makeS = (t: Palette) => StyleSheet.create({
     dropFlag: { fontSize: 16 },
     dropArrow: { color: t.muted, fontSize: 9, marginLeft: 6 },
     backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", padding: 28 },
-    menu: { backgroundColor: t.surface, borderRadius: 14, borderWidth: 1, borderColor: t.surfaceHigh, paddingVertical: 6 },
+    menu: { maxHeight: "75%", backgroundColor: t.surface, borderRadius: 14, borderWidth: 1, borderColor: t.surfaceHigh, paddingVertical: 6 },
     menuRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 14, paddingHorizontal: 16 },
     menuRowOn: { backgroundColor: t.surfaceHigh },
     menuText: { color: t.text, fontSize: 16, fontWeight: "600" },
