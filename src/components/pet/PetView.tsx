@@ -79,7 +79,6 @@ export default function PetView({ level, look = {}, size = 160, animated = true,
     const body = maxed ? "url(#gold)" : adult ? "#1d2440" : "#262b3d";
     const chest = maxed ? "#fff3b0" : "#3b4fb8";
     const beak = maxed ? "#e0a21b" : "#e5484d";
-    const anchors: Anchors = { cx: 60, headTop: shape.headCy - shape.headR, eyeY: shape.headCy - 2, neckY: shape.headCy + shape.headR - 3, r: shape.headR };
 
     const sway = bob.interpolate({ inputRange: [0, 1], outputRange: [0, -4] });
     const lift = hop.interpolate({ inputRange: [0, 1], outputRange: [0, -18] });
@@ -108,6 +107,20 @@ export default function PetView({ level, look = {}, size = 160, animated = true,
     const egg = stage.id === "egg";
     const crack = lvl >= 5;
     const hatchling = stage.id === "hatchling";
+
+    // Where accessories go: on the egg's top and middle, on the hatchling's head in its shell, or on the grown head.
+    const anchors: Anchors = egg
+        ? { cx: 60, headTop: 36, eyeY: 62, neckY: 88, r: 17 }
+        : hatchling
+            ? { cx: 60, headTop: 53, eyeY: 68, neckY: 86, r: 17 }
+            : { cx: 60, headTop: shape.headCy - shape.headR, eyeY: shape.headCy - 2, neckY: shape.headCy + shape.headR - 3, r: shape.headR };
+    const worn = (
+        <G>
+            {renderAccessory(look.scarf, anchors)}
+            {renderAccessory(look.glasses, anchors)}
+            {renderAccessory(look.hat, anchors)}
+        </G>
+    );
 
     return (
         <Pressable onPress={jump} disabled={!onPress && !animated} accessibilityRole="image" accessibilityLabel={`${stage.name}, level ${lvl}`} style={{ width: size, height: size }}>
@@ -139,6 +152,7 @@ export default function PetView({ level, look = {}, size = 160, animated = true,
                             ))}
                             {crack ? <Path d={`M60 36 l-6 9 l7 5 l-8 9 ${lvl >= 8 ? "M61 50 l8 6 l-5 6" : ""}`} stroke="#6b6554" strokeWidth={1.8} fill="none" strokeLinecap="round" strokeLinejoin="round" /> : null}
                             {lvl >= 8 ? <Circle cx={57} cy={63} r={2.2} fill="#0c0b0d" opacity={0.7} /> : null}
+                            {worn}
                         </G>
                     ) : (
                         <G>
@@ -166,14 +180,7 @@ export default function PetView({ level, look = {}, size = 160, animated = true,
                                     <Circle cx={75} cy={shape.headCy + 5} r={3} fill="#ff8fb8" opacity={0.55} />
                                 </G>
                             )}
-                            {/* accessories (only once hatched) */}
-                            {hatchling ? null : (
-                                <G>
-                                    {renderAccessory(look.scarf, anchors)}
-                                    {renderAccessory(look.glasses, anchors)}
-                                    {renderAccessory(look.hat, anchors)}
-                                </G>
-                            )}
+                            {worn}
                             {/* the gold shine sweeps across the body and head only */}
                             {maxed && animated ? (
                                 <G clipPath="url(#silhouette)">

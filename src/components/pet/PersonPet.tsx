@@ -20,5 +20,5 @@ export function RowBanner({ banner }: { banner: string | null | undefined }) {
 }
 
 const s = StyleSheet.create({
-    fill: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, opacity: 0.35 },
+    fill: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, opacity: 0.6 },
 });

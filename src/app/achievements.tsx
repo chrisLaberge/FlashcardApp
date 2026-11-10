@@ -6,6 +6,13 @@ import { achievements, TIERS, tierSummary, type Achievement } from "../models/Ac
 import { useTheme } from "../theme/ThemeProvider";
 import type { Palette } from "../theme/themes";
 
+/** Mixes a colour into the card colour. An opaque result matters: a see-through background lets Android show a black box where the glow shadow sits. */
+function tint(base: string, color: string, amount: number): string {
+    const channel = (hex: string, i: number) => parseInt(hex.slice(1 + i * 2, 3 + i * 2), 16);
+    const mixed = [0, 1, 2].map((i) => Math.round(channel(base, i) * (1 - amount) + channel(color, i) * amount));
+    return `#${mixed.map((v) => v.toString(16).padStart(2, "0")).join("")}`;
+}
+
 export default function AchievementsScreen() {
     const t = useTheme();
     const s = useMemo(() => makeS(t), [t]);
@@ -36,7 +43,7 @@ export default function AchievementsScreen() {
                 return (
                     <View
                         key={a.id}
-                        style={[s.card, god && { backgroundColor: `${color}26`, borderWidth: 2, borderColor: color, shadowColor: color, shadowOpacity: 0.9, shadowRadius: 18, shadowOffset: { width: 0, height: 0 }, elevation: 12 }]}
+                        style={[s.card, god && { backgroundColor: tint(t.surface, color, 0.16), borderWidth: 2, borderColor: color, shadowColor: color, shadowOpacity: 0.9, shadowRadius: 18, shadowOffset: { width: 0, height: 0 }, elevation: 12 }]}
                     >
                         <View style={s.top}>
                             <View style={[s.medal, { borderColor: color }]}>

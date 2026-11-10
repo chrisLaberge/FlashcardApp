@@ -59,6 +59,17 @@ export default function FriendsScreen() {
         }
     };
 
+    // For settings: the screen changes at once and the server is told in the background. If that fails, the change is undone and why is shown.
+    const quick = (change: Partial<Profile>, send: () => Promise<unknown>) => {
+        if (!profile) return;
+        const before = profile;
+        setProfile({ ...profile, ...change });
+        send().catch((error: unknown) => {
+            setProfile(before);
+            setNotice(message(error));
+        });
+    };
+
     if (user === undefined) return <View style={[s.container, s.center]}><ActivityIndicator color={t.blue} /></View>;
 
     if (!user) {
@@ -152,8 +163,7 @@ export default function FriendsScreen() {
                     {AVATARS.map((a) => (
                         <Pressable
                             key={a}
-                            disabled={busy}
-                            onPress={() => run(() => setAvatar(a))}
+                            onPress={() => quick({ avatar: a }, () => setAvatar(a))}
                             hitSlop={6}
                             style={[s.avatarOption, profile.avatar === a && s.avatarOn]}
                             accessibilityLabel={`Use ${a} as your picture`}
@@ -171,8 +181,7 @@ export default function FriendsScreen() {
                 </View>
                 <Switch
                     value={profile.showGlobal}
-                    disabled={busy}
-                    onValueChange={(value) => run(() => setShowGlobal(value))}
+                    onValueChange={(value) => quick({ showGlobal: value }, () => setShowGlobal(value))}
                     trackColor={{ true: t.green, false: t.surfaceHigh }}
                 />
             </View>

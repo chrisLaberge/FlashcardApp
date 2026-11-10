@@ -64,20 +64,20 @@ export async function wear(slot: Slot, id: string | null): Promise<void> {
         if (!item || item.slot !== slot || !state.owned.has(id)) return;
     }
     await setPetState(slot, id);
-    await syncLook();
+    void syncLook(); // friends are told in the background; the screen never waits for the network
 }
 
 export async function chooseBanner(id: string): Promise<void> {
     const state = await loadShop();
     if (!state.owned.has(id)) return;
     await setPetState("banner", id);
-    await syncLook();
+    void syncLook();
 }
 
 export async function renamePet(input: string): Promise<string> {
     const name = cleanPetName(input) || DEFAULT_PET_NAME;
     await setPetState("name", name);
-    await syncLook();
+    void syncLook();
     return name;
 }
 
