@@ -141,6 +141,25 @@ async function openAndPrepareDatabase(): Promise<SQLite.SQLiteDatabase> {
                 body TEXT NOT NULL,
                 added_at INTEGER NOT NULL
             );
+            -- The words you know, per language, by dictionary form (lemma). Kept apart from card review
+            -- scheduling. known = 0 is a word you said you do not know (it beats what the cards say).
+            CREATE TABLE IF NOT EXISTS known_words (
+                language TEXT NOT NULL,
+                lemma TEXT NOT NULL,
+                known INTEGER NOT NULL,
+                source TEXT NOT NULL,
+                PRIMARY KEY (language, lemma)
+            );
+            -- Every word of an analysed book with how often it occurs, known or not.
+            CREATE TABLE IF NOT EXISTS book_vocab (
+                book_id INTEGER NOT NULL,
+                lemma TEXT NOT NULL,
+                count INTEGER NOT NULL,
+                sample TEXT NOT NULL,
+                PRIMARY KEY (book_id, lemma),
+                FOREIGN KEY(book_id) REFERENCES my_texts(id) ON DELETE CASCADE
+            );
+            CREATE INDEX IF NOT EXISTS idx_book_vocab_lemma ON book_vocab(lemma);
             CREATE INDEX IF NOT EXISTS idx_card_add_log_time ON card_add_log(added_at);
             CREATE INDEX IF NOT EXISTS idx_review_log_time ON review_log(reviewed_at);
             CREATE INDEX IF NOT EXISTS idx_review_log_card ON review_log(card_id);
@@ -164,6 +183,15 @@ async function openAndPrepareDatabase(): Promise<SQLite.SQLiteDatabase> {
                 ALTER TABLE card_progress ADD COLUMN level INTEGER NOT NULL DEFAULT 0;
                 UPDATE card_progress SET level = ${MASTERED_START_LEVEL} WHERE mastered = 1;
             `);
+        }
+
+        // Books remember how many words they have and which analyser version counted them (additive).
+        const textColumns = await db.getAllAsync<{ name: string }>("PRAGMA table_info(my_texts)");
+        if (!textColumns.some((column) => column.name === "total_tokens")) {
+            await db.execAsync("ALTER TABLE my_texts ADD COLUMN total_tokens INTEGER");
+        }
+        if (!textColumns.some((column) => column.name === "analyzer_version")) {
+            await db.execAsync("ALTER TABLE my_texts ADD COLUMN analyzer_version INTEGER");
         }
 
         // Images are also kept on the phone (additive).
@@ -881,12 +909,12 @@ export async function addMyText(title: string, language: string, body: string, a
 }
 
 /** The titles of the added texts for a language, newest first (the body is loaded when one is opened). */
-export async function getMyTexts(language: string): Promise<Omit<MyText, "body">[]> {
+export async function getMyTexts(language: string): Promise<(Omit<MyText, "body"> & { analyzerVersion: number | null })[]> {
     const database = await getDatabase();
-    const rows = await database.getAllAsync<{ id: number; title: string; language: string; added_at: number }>(
-        "SELECT id, title, language, added_at FROM my_texts WHERE language = ? ORDER BY added_at DESC, id DESC", language,
+    const rows = await database.getAllAsync<{ id: number; title: string; language: string; added_at: number; analyzer_version: number | null }>(
+        "SELECT id, title, language, added_at, analyzer_version FROM my_texts WHERE language = ? ORDER BY added_at DESC, id DESC", language,
     );
-    return rows.map((r) => ({ id: r.id, title: r.title, language: r.language, addedAt: r.added_at }));
+    return rows.map((r) => ({ id: r.id, title: r.title, language: r.language, addedAt: r.added_at, analyzerVersion: r.analyzer_version }));
 }
 
 export async function getMyText(id: number): Promise<MyText | null> {
@@ -899,5 +927,88 @@ export async function getMyText(id: number): Promise<MyText | null> {
 
 export async function deleteMyText(id: number): Promise<void> {
     const database = await getDatabase();
+    await database.runAsync("DELETE FROM book_vocab WHERE book_id = ?", id);
     await database.runAsync("DELETE FROM my_texts WHERE id = ?", id);
+}
+
+/* ---------------------------- Known words and books ---------------------------- */
+
+export type BookSummary = { id: number; title: string; language: string; totalTokens: number | null; analyzerVersion: number | null; knownTokens: number };
+
+/**
+ * Sets what you say about a word: known, not known, or null to go back to what your cards say.
+ * Coverage of every book follows automatically, because it is always counted from these rows.
+ */
+export async function setWordKnown(language: string, lemma: string, known: boolean | null): Promise<void> {
+    const database = await getDatabase();
+    if (known === null) {
+        await database.runAsync("DELETE FROM known_words WHERE language = ? AND lemma = ? AND source = 'manual'", language, lemma);
+        return;
+    }
+    await database.runAsync(
+        "INSERT INTO known_words (language, lemma, known, source) VALUES (?, ?, ?, 'manual') ON CONFLICT(language, lemma) DO UPDATE SET known = excluded.known, source = 'manual'",
+        language, lemma, known ? 1 : 0,
+    );
+}
+
+/** The words the cards say are known, as of now. Manual choices are left alone; card-based ones are replaced. */
+export async function replaceCardKnownWords(language: string, lemmas: ReadonlySet<string>): Promise<void> {
+    const database = await getDatabase();
+    await database.withTransactionAsync(async () => {
+        await database.runAsync("DELETE FROM known_words WHERE language = ? AND source = 'card'", language);
+        for (const lemma of lemmas) {
+            await database.runAsync("INSERT OR IGNORE INTO known_words (language, lemma, known, source) VALUES (?, ?, 1, 'card')", language, lemma);
+        }
+    });
+}
+
+/** Every card of a language with its study progress (for working out which words the cards say are known). */
+export async function getCardsForVocabulary(language: string): Promise<{ text: string; level: number; mastered: boolean }[]> {
+    const database = await getDatabase();
+    const rows = await database.getAllAsync<{ learning_text: string; level: number | null; mastered: number | null }>(`
+        SELECT c.learning_text, p.level, p.mastered
+        FROM cards c JOIN decks d ON d.id = c.deck_id LEFT JOIN card_progress p ON p.card_id = c.id
+        WHERE d.language = ?
+    `, language);
+    return rows.map((r) => ({ text: r.learning_text, level: r.level ?? 0, mastered: r.mastered === 1 }));
+}
+
+/** Saves a book's analysis in one go: the old counts are replaced and the totals set, or nothing changes. */
+export async function saveBookAnalysis(bookId: number, version: number, total: number, lemmas: ReadonlyMap<string, { count: number; sample: string }>): Promise<void> {
+    const database = await getDatabase();
+    await database.withTransactionAsync(async () => {
+        await database.runAsync("DELETE FROM book_vocab WHERE book_id = ?", bookId);
+        for (const [lemma, entry] of lemmas) {
+            await database.runAsync("INSERT INTO book_vocab (book_id, lemma, count, sample) VALUES (?, ?, ?, ?)", bookId, lemma, entry.count, entry.sample);
+        }
+        await database.runAsync("UPDATE my_texts SET total_tokens = ?, analyzer_version = ? WHERE id = ?", total, version, bookId);
+    });
+}
+
+/** Books of a language with how many of their word occurrences you know. Counted fresh from the known words every time. */
+export async function getBookSummaries(language: string): Promise<BookSummary[]> {
+    const database = await getDatabase();
+    const rows = await database.getAllAsync<{ id: number; title: string; language: string; total_tokens: number | null; analyzer_version: number | null; known_tokens: number | null }>(`
+        SELECT t.id, t.title, t.language, t.total_tokens, t.analyzer_version,
+               (SELECT SUM(v.count) FROM book_vocab v JOIN known_words k ON k.language = t.language AND k.lemma = v.lemma AND k.known = 1 WHERE v.book_id = t.id) AS known_tokens
+        FROM my_texts t WHERE t.language = ? ORDER BY t.added_at DESC, t.id DESC
+    `, language);
+    return rows.map((r) => ({ id: r.id, title: r.title, language: r.language, totalTokens: r.total_tokens, analyzerVersion: r.analyzer_version, knownTokens: r.known_tokens ?? 0 }));
+}
+
+export async function getBookSummary(id: number): Promise<BookSummary | null> {
+    const row = await getMyText(id);
+    if (!row) return null;
+    return (await getBookSummaries(row.language)).find((b) => b.id === id) ?? null;
+}
+
+/** The words of a book you do not know yet, most frequent first. */
+export async function getTopUnknown(bookId: number, limit = 100): Promise<{ lemma: string; count: number; sample: string }[]> {
+    const database = await getDatabase();
+    return database.getAllAsync<{ lemma: string; count: number; sample: string }>(`
+        SELECT v.lemma, v.count, v.sample FROM book_vocab v JOIN my_texts t ON t.id = v.book_id
+        LEFT JOIN known_words k ON k.language = t.language AND k.lemma = v.lemma
+        WHERE v.book_id = ? AND COALESCE(k.known, 0) = 0
+        ORDER BY v.count DESC, v.lemma LIMIT ?
+    `, bookId, limit);
 }
