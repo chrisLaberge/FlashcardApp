@@ -1,6 +1,7 @@
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
+import SessionSummaryPopup from "../components/SessionSummaryPopup";
 import AchievementToast from "../components/AchievementToast";
 import { scheduleAchievementCheck } from "../services/achievementUnlocks";
 import { refreshReminders } from "../services/dailyGoal";
@@ -29,6 +30,7 @@ function Navigator() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       </Stack>
       <AchievementToast />
+      <SessionSummaryPopup />
     </>
   );
 }
