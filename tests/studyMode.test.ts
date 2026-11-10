@@ -91,9 +91,11 @@ describe("pickPromptSide", () => {
 });
 
 describe("levels move with answers", () => {
-    test("right goes up one, left goes down one, within 0..MAX", () => {
+    test("right goes up one, left halves the level (rounded down), within 0..MAX", () => {
         expect(nextLevel(0, "right")).toBe(1);
-        expect(nextLevel(3, "left")).toBe(2);
+        expect(nextLevel(3, "left")).toBe(1);
+        expect(nextLevel(8, "left")).toBe(4);
+        expect(nextLevel(1, "left")).toBe(0);
         expect(nextLevel(0, "left")).toBe(0);
         expect(nextLevel(MAX_LEVEL, "right")).toBe(MAX_LEVEL);
         expect(nextLevel(undefined, "right")).toBe(1);

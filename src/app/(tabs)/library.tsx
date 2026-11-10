@@ -1,69 +1,97 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { Alert, FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { getLanguage, languages } from "../../constants/languages";
-import { deleteMyText, getCards, getDecks, getMyTexts } from "../../database/database";
-import { cardKey, premadeDecks, premadeDecksFor, presentIndexes, targetDeckFor } from "../../models/PremadeDecks";
+import { getLanguage } from "../../constants/languages";
+import { deleteMyText, getBookSummaries, getCards, getDecks, type BookSummary } from "../../database/database";
+import { cardKey, premadeDecksFor, presentIndexes } from "../../models/PremadeDecks";
+import { coveragePercent } from "../../models/Vocabulary";
+import { analyzerFor } from "../../services/morphology";
 import { addPdf } from "../../services/pdfReading";
+import { analyzeBook, analyzeNewBooks, syncKnownWords } from "../../services/vocabulary";
 import { useTheme } from "../../theme/ThemeProvider";
 import type { Palette } from "../../theme/themes";
 
 
-// Every language in the app. The ones with premade decks come first.
-const withContent = new Set(premadeDecks.map((d) => d.language));
-const libraryLanguages = [
-    ...languages.filter((l) => withContent.has(l.code)).map((l) => l.code),
-    ...languages.filter((l) => !withContent.has(l.code)).map((l) => l.code),
-];
-
 export default function LibraryScreen() {
     const t = useTheme();
     const s = useMemo(() => makeS(t), [t]);
-    // Words in the deck premade cards go into, per language.
-    const [owned, setOwned] = useState<Map<string, Set<string>>>(new Map());
+    type MyDeck = { id: number; name: string; language: string };
+    const [myDecks, setMyDecks] = useState<MyDeck[] | null>(null);
+    const [lastId, setLastId] = useState<number | null>(null);
+    const [chosenId, setChosenId] = useState<number | null>(null);
+    // Words already in the selected deck.
+    const [owned, setOwned] = useState<Set<string>>(new Set());
     const [picking, setPicking] = useState(false);
-    const [deckLanguage, setDeckLanguage] = useState<string | null>(null);
-    const [chosen, setChosen] = useState<string | null>(null);
     const [tab, setTab] = useState<"decks" | "pdfs">("decks");
-    const [texts, setTexts] = useState<{ id: number; title: string }[]>([]);
-    const [adding, setAdding] = useState(false);
+    const [texts, setTexts] = useState<BookSummary[]>([]);
+    const [busy, setBusy] = useState<string | null>(null);
+    const working = useRef(false);
+
+    // The deck whose resources are shown: the one you picked, else the one you last studied, else the first.
+    const deck = myDecks?.find((d) => d.id === (chosenId ?? lastId)) ?? myDecks?.[0] ?? null;
+    const deckId = deck?.id ?? null;
+    const language = deck?.language ?? null;
+    const lang = language ? getLanguage(language) : undefined;
+    const decks = language ? premadeDecksFor(language) : [];
 
     const load = useCallback(async () => {
-        const [decks, lastDeckId] = await Promise.all([getDecks(), AsyncStorage.getItem("lastDeckId")]);
-        const last = lastDeckId ? Number(lastDeckId) : null;
-        const words = new Map<string, Set<string>>();
-        for (const code of new Set(decks.map((d) => d.language))) {
-            const target = targetDeckFor(decks, code, last);
-            if (target) words.set(code, new Set((await getCards(target.id)).map((c) => cardKey(c.learningText))));
-        }
-        setOwned(words);
-        setDeckLanguage(decks.find((d) => d.id === Number(lastDeckId))?.language ?? null);
+        const [all, last] = await Promise.all([getDecks(), AsyncStorage.getItem("lastDeckId")]);
+        setMyDecks(all.map((d) => ({ id: d.id, name: d.name, language: d.language })));
+        setLastId(last ? Number(last) : null);
     }, []);
 
     useFocusEffect(useCallback(() => { void load(); }, [load]));
 
-    // Start on the language of the deck being studied, if the library has something for it.
-    const language = chosen ?? (deckLanguage && libraryLanguages.includes(deckLanguage) ? deckLanguage : libraryLanguages[0]);
-    const lang = getLanguage(language);
-    const decks = premadeDecksFor(language);
+    const loadOwned = useCallback(async () => {
+        setOwned(deckId === null ? new Set() : new Set((await getCards(deckId)).map((c) => cardKey(c.learningText))));
+    }, [deckId]);
+    useFocusEffect(useCallback(() => { void loadOwned(); }, [loadOwned]));
 
-    const loadTexts = useCallback(async () => setTexts(await getMyTexts(language)), [language]);
-    useFocusEffect(useCallback(() => { void loadTexts(); }, [loadTexts]));
+    const loadTexts = useCallback(async () => setTexts(language ? await getBookSummaries(language) : []), [language]);
+
+    // Shows the books at once, then brings known words and book analysis up to date (shown as "Analyzing…").
+    const refreshBooks = useCallback(async () => {
+        await loadTexts();
+        if (!language || working.current) return;
+        working.current = true;
+        try {
+            const analyzer = await analyzerFor(language).catch(() => null);
+            if (analyzer) {
+                setBusy("Analyzing…");
+                await syncKnownWords(language, analyzer);
+                await analyzeNewBooks(language, analyzer);
+                await loadTexts();
+            }
+        } catch {
+            // Coverage is a bonus: the PDFs still open and read without it.
+        } finally {
+            working.current = false;
+            setBusy(null);
+        }
+    }, [language, loadTexts]);
+    useFocusEffect(useCallback(() => { void refreshBooks(); }, [refreshBooks]));
 
     const pickPdf = async () => {
-        if (adding) return;
-        setAdding(true);
+        if (busy || !language) return;
+        setBusy("Reading PDF…");
         try {
             const id = await addPdf(language);
             if (id !== null) {
+                setBusy("Analyzing…");
+                try {
+                    const analyzer = await analyzerFor(language);
+                    if (analyzer) await analyzeBook(id, analyzer);
+                } catch {
+                    // No coverage for this book yet; it is tried again next time the library opens.
+                }
                 await loadTexts();
                 router.push({ pathname: "/reading", params: { id: String(id) } });
             }
         } catch (error) {
             Alert.alert("Could not add the PDF", error instanceof Error ? error.message : String(error));
         } finally {
-            setAdding(false);
+            setBusy(null);
         }
     };
 
@@ -76,9 +104,9 @@ export default function LibraryScreen() {
     return (
         <View style={s.container}>
             <View style={s.dropWrap}>
-                <Pressable style={({ pressed }) => [s.deckButton, pressed && { opacity: 0.7 }]} onPress={() => setPicking(true)} accessibilityRole="button" accessibilityLabel="Choose a language">
+                <Pressable style={({ pressed }) => [s.deckButton, pressed && { opacity: 0.7 }]} onPress={() => setPicking(true)} accessibilityRole="button" accessibilityLabel="Choose a deck">
                     <Text style={s.dropFlag}>{lang?.flag ?? "🌐"}</Text>
-                    <Text style={s.deckName} numberOfLines={1}>{lang?.name ?? language}</Text>
+                    <Text style={s.deckName} numberOfLines={1}>{deck?.name ?? "No decks"}</Text>
                     <Text style={s.dropArrow}>▼</Text>
                 </Pressable>
             </View>
@@ -86,10 +114,10 @@ export default function LibraryScreen() {
             <Modal visible={picking} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setPicking(false)}>
                 <Pressable style={s.backdrop} onPress={() => setPicking(false)}>
                     <ScrollView style={s.menu} showsVerticalScrollIndicator>
-                        {libraryLanguages.map((code) => (
-                            <Pressable key={code} style={[s.menuRow, code === language && s.menuRowOn]} onPress={() => { setChosen(code); setPicking(false); }} accessibilityRole="button">
-                                <Text style={s.dropFlag}>{getLanguage(code)?.flag ?? "🌐"}</Text>
-                                <Text style={[s.menuText, !withContent.has(code) && { color: t.muted }]}>{getLanguage(code)?.name ?? code}</Text>
+                        {(myDecks ?? []).map((d) => (
+                            <Pressable key={d.id} style={[s.menuRow, d.id === deckId && s.menuRowOn]} onPress={() => { setChosenId(d.id); setPicking(false); }} accessibilityRole="button">
+                                <Text style={s.dropFlag}>{getLanguage(d.language)?.flag ?? "🌐"}</Text>
+                                <Text style={s.menuText} numberOfLines={1}>{d.name}</Text>
                             </Pressable>
                         ))}
                     </ScrollView>
@@ -109,14 +137,14 @@ export default function LibraryScreen() {
                     data={decks}
                     keyExtractor={(d) => d.id}
                     contentContainerStyle={s.list}
-                    ListEmptyComponent={<Text style={s.empty}>Coming soon.</Text>}
+                    ListEmptyComponent={<Text style={s.empty}>{deck ? "Coming soon." : "Create a deck first."}</Text>}
                     renderItem={({ item }) => {
-                        const have = presentIndexes(item.cards, owned.get(item.language) ?? new Set()).size;
+                        const have = presentIndexes(item.cards, owned).size;
                         const all = have === item.cards.length;
                         return (
                             <Pressable
                                 style={({ pressed }) => [s.card, pressed && s.pressed]}
-                                onPress={() => router.push({ pathname: "/premade", params: { id: item.id } })}
+                                onPress={() => router.push({ pathname: "/premade", params: { id: item.id, deckId: String(deckId) } })}
                                 accessibilityRole="button"
                             >
                                 <Text style={s.flag}>{lang?.flag ?? "🌐"}</Text>
@@ -135,8 +163,8 @@ export default function LibraryScreen() {
                     keyExtractor={(r) => String(r.id)}
                     contentContainerStyle={s.list}
                     ListHeaderComponent={
-                        <Pressable style={[s.addButton, adding && { opacity: 0.5 }]} onPress={pickPdf} disabled={adding} accessibilityRole="button">
-                            <Text style={s.addText}>{adding ? "Reading PDF…" : "+ Add a PDF"}</Text>
+                        <Pressable style={[s.addButton, busy !== null && { opacity: 0.5 }]} onPress={pickPdf} disabled={busy !== null} accessibilityRole="button">
+                            <Text style={s.addText}>{busy ?? "+ Add a PDF"}</Text>
                         </Pressable>
                     }
                     renderItem={({ item }) => (
@@ -147,6 +175,12 @@ export default function LibraryScreen() {
                             accessibilityRole="button"
                         >
                             <Text style={[s.name, { flex: 1 }]} numberOfLines={2}>{item.title}</Text>
+                            {item.totalTokens ? (
+                                <Pressable onPress={() => router.push({ pathname: "/book", params: { id: String(item.id) } })} hitSlop={8} accessibilityRole="button" accessibilityLabel={`${item.title} words`} style={s.coverage}>
+                                    <Text style={s.percent}>{coveragePercent(item.knownTokens, item.totalTokens)}%</Text>
+                                    <Text style={s.meta}>{item.knownTokens.toLocaleString("en-US")} / {item.totalTokens.toLocaleString("en-US")}</Text>
+                                </Pressable>
+                            ) : null}
                             <Pressable onPress={() => removeText(item.id, item.title)} hitSlop={12} accessibilityRole="button" accessibilityLabel={`Delete ${item.title}`}>
                                 <Text style={s.remove}>✕</Text>
                             </Pressable>
@@ -183,6 +217,8 @@ const makeS = (t: Palette) => StyleSheet.create({
     name: { color: t.text, fontSize: 16, fontWeight: "600" },
     addButton: { backgroundColor: t.green, borderRadius: 12, paddingVertical: 14, alignItems: "center", marginBottom: 12 },
     addText: { color: t.bg, fontWeight: "bold", fontSize: 16 },
+    coverage: { alignItems: "flex-end", paddingHorizontal: 6 },
+    percent: { color: t.green, fontSize: 18, fontWeight: "800" },
     remove: { color: t.muted, fontSize: 18, paddingHorizontal: 4 },
     metaDone: { color: t.green, fontWeight: "600" },
     meta: { color: t.muted, fontSize: 12, marginTop: 2 },

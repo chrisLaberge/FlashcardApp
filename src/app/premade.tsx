@@ -14,7 +14,7 @@ type Target = { id: number; name: string } | null;
 export default function PremadeDeckScreen() {
     const t = useTheme();
     const s = useMemo(() => makeS(t), [t]);
-    const { id } = useLocalSearchParams<{ id?: string }>();
+    const { id, deckId } = useLocalSearchParams<{ id?: string; deckId?: string }>();
     const deck = id ? getPremadeDeck(id) : undefined;
     const [loaded, setLoaded] = useState(false);
     const [target, setTarget] = useState<Target>(null);
@@ -25,11 +25,11 @@ export default function PremadeDeckScreen() {
     const load = useCallback(async () => {
         if (!deck) return;
         const [decks, lastId] = await Promise.all([getDecks(), AsyncStorage.getItem("lastDeckId")]);
-        const found = targetDeckFor(decks, deck.language, lastId ? Number(lastId) : null);
+        const found = decks.find((d) => d.id === Number(deckId) && d.language === deck.language) ?? targetDeckFor(decks, deck.language, lastId ? Number(lastId) : null);
         setTarget(found ? { id: found.id, name: found.name } : null);
         setPresent(found ? presentIndexes(deck.cards, await existingWords(found.id)) : new Set());
         setLoaded(true);
-    }, [deck]);
+    }, [deck, deckId]);
 
     useFocusEffect(useCallback(() => { void load(); }, [load]));
 
