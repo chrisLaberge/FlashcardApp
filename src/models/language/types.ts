@@ -14,4 +14,6 @@ export type Analyzer = {
     /** Bump when the rules change; books analysed with an older version are analysed again. */
     version: number;
     lemma(surface: string): Lemma;
+    /** True for languages written without spaces: text reaches the analyser already cut into words, separated by spaces. */
+    segmented?: boolean;
 };

@@ -12,8 +12,8 @@ const STYLE = String.raw`
 :root { --bg:#14151a; --bar:#1d1f26; --fg:#e8e8ee; --muted:#8b8d99; --accent:#4f9dff; --hl:rgba(79,157,255,0.30); }
 html, body { margin:0; height:100%; background:var(--bg); color:var(--fg); overflow:hidden;
   font-family: -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif; -webkit-tap-highlight-color: transparent; }
-#scroller { position:absolute; top:0; left:0; right:0; bottom:60px; overflow:auto; -webkit-overflow-scrolling:touch; }
-#sheet { position:relative; margin:10px auto; background:#fff; box-shadow:0 2px 14px rgba(0,0,0,0.45); }
+#scroller { touch-action: pan-x pan-y; position:absolute; top:0; left:0; right:0; bottom:60px; overflow:auto; -webkit-overflow-scrolling:touch; }
+#sheet { position:relative; margin:10px auto; transform-origin:0 0; background:#fff; box-shadow:0 2px 14px rgba(0,0,0,0.45); }
 #sheet.night canvas { filter: invert(0.9) hue-rotate(180deg); }
 canvas { display:block; }
 #text { position:absolute; left:0; top:0; right:0; bottom:0; overflow:hidden; line-height:1; text-size-adjust:none; -webkit-text-size-adjust:none; }
@@ -49,12 +49,25 @@ const SCRIPT = String.raw`
   var prevBtn = document.getElementById("prev");
   var nextBtn = document.getElementById("next");
 
-  var doc = null, pages = 0, pageNo = 1, zoom = 1, token = 0, needText = false;
-  var unknown = {}, asked = {}, textDivs = [];
-  var chunks = [], expected = 0;
+  var doc = null, pages = 0, pageNo = 1, zoom = 1, token = 0, needText = false, headless = false;
+  var unknown = {}, asked = {}, textDivs = [], lang = "en", segment = false, segmenter = null, pendingScroll = null;
+  var chunks = [], expected = 0, received = 0;
   var WORD = /[\p{L}\p{M}][\p{L}\p{M}'’\-]*/gu;
 
   var key = function (w) { return w.normalize("NFC").toLowerCase().replace(/ё/g, "е"); };
+  // The words of a piece of text: [{text, index}]. Languages written without spaces are split by the browser's own word splitter.
+  function wordsOf(raw) {
+    var out = [], m;
+    if (segment && segmenter) {
+      var it = segmenter.segment(raw)[Symbol.iterator](), r;
+      while (!(r = it.next()).done) { if (r.value.isWordLike) out.push({ text: r.value.segment, index: r.value.index }); }
+      return out;
+    }
+    WORD.lastIndex = 0;
+    while ((m = WORD.exec(raw))) out.push({ text: m[0], index: m.index });
+    return out;
+  }
+  var minLen = function () { return segment ? 1 : 2; };
   var setMsg = function (t) { msg.textContent = t || ""; msg.style.display = t ? "block" : "none"; };
 
   function setTheme(t) {
@@ -108,29 +121,71 @@ const SCRIPT = String.raw`
         var layer = pdfjs.renderTextLayer({ textContentSource: content, container: textEl, viewport: viewport, textDivs: textDivs });
         layer.promise.then(function () {
           if (my !== token) return;
-          for (var i = 0; i < textDivs.length; i++) textDivs[i].setAttribute("data-raw", textDivs[i].textContent);
+          for (var i = 0; i < textDivs.length; i++) {
+            var raw = textDivs[i].textContent;
+            // Some PDFs write Chinese with look-alike radical characters (the radical for 文 instead of 文); make them real letters.
+            if (segment) { var fixed = raw.normalize("NFKC"); if (fixed !== raw) { textDivs[i].textContent = fixed; raw = fixed; } }
+            textDivs[i].setAttribute("data-raw", raw);
+          }
           highlight();
           announceWords();
         }, function () {});
       });
-      scroller.scrollTop = top;
+      if (pendingScroll) { scroller.scrollLeft = pendingScroll.l; scroller.scrollTop = pendingScroll.t; pendingScroll = null; }
+      else scroller.scrollTop = top;
       updateBar();
       post({ type: "page", page: pageNo, pages: pages });
     });
   }
 
   /* ---------- words you do not know yet ---------- */
+  // For languages without spaces a word can run across several pieces of the text layer, so the page is cut into words as one string.
+  function layout() {
+    var full = "", starts = [];
+    for (var i = 0; i < textDivs.length; i++) {
+      if (i > 0 && textDivs[i].style.top !== textDivs[i - 1].style.top) full += " ";
+      starts.push(full.length);
+      full += textDivs[i].getAttribute("data-raw") || "";
+    }
+    return { full: full, starts: starts };
+  }
+  function highlightSegmented() {
+    var L = layout(), ranges = [], i;
+    for (i = 0; i < textDivs.length; i++) ranges.push([]);
+    var ws = wordsOf(L.full), d = 0;
+    for (var j = 0; j < ws.length; j++) {
+      var w = ws[j];
+      if (!unknown[key(w.text)]) continue;
+      var s0 = w.index, e0 = w.index + w.text.length;
+      while (d > 0 && L.starts[d] > s0) d--;
+      for (var k = d; k < textDivs.length && L.starts[k] < e0; k++) {
+        var len = (textDivs[k].getAttribute("data-raw") || "").length;
+        var a = Math.max(s0, L.starts[k]) - L.starts[k], b = Math.min(e0, L.starts[k] + len) - L.starts[k];
+        if (b > a) ranges[k].push([a, b, w.text]);
+      }
+    }
+    for (i = 0; i < textDivs.length; i++) {
+      var raw = textDivs[i].getAttribute("data-raw") || "", html = "", last = 0, rs = ranges[i];
+      if (!rs.length) { if (textDivs[i].children.length) textDivs[i].textContent = raw; continue; }
+      for (var q = 0; q < rs.length; q++) {
+        html += esc(raw.slice(last, rs[q][0])) + '<span class="u" data-w="' + esc(rs[q][2]) + '">' + esc(raw.slice(rs[q][0], rs[q][1])) + "</span>";
+        last = rs[q][1];
+      }
+      textDivs[i].innerHTML = html + esc(raw.slice(last));
+    }
+  }
   function highlight() {
+    if (segment) return highlightSegmented();
     for (var i = 0; i < textDivs.length; i++) {
       var div = textDivs[i];
       var raw = div.getAttribute("data-raw");
       if (raw === null || raw === "") continue;
-      var html = "", last = 0, m, any = false;
-      WORD.lastIndex = 0;
-      while ((m = WORD.exec(raw))) {
-        if (m[0].length > 1 && unknown[key(m[0])]) {
-          html += esc(raw.slice(last, m.index)) + '<span class="u">' + esc(m[0]) + "</span>";
-          last = m.index + m[0].length;
+      var html = "", last = 0, any = false, ws = wordsOf(raw);
+      for (var j = 0; j < ws.length; j++) {
+        var w = ws[j];
+        if (w.text.length >= minLen() && unknown[key(w.text)]) {
+          html += esc(raw.slice(last, w.index)) + '<span class="u">' + esc(w.text) + "</span>";
+          last = w.index + w.text.length;
           any = true;
         }
       }
@@ -143,12 +198,21 @@ const SCRIPT = String.raw`
   // Asks the app which of this page's words are unknown (each word is only asked once).
   function announceWords(all) {
     var fresh = [], seen = {};
-    for (var i = 0; i < textDivs.length; i++) {
+    if (segment) {
+      var seg = wordsOf(layout().full);
+      for (var x = 0; x < seg.length; x++) {
+        var kk = key(seg[x].text);
+        if (seen[kk]) continue;
+        seen[kk] = 1;
+        if (all || !asked[kk]) { asked[kk] = 1; fresh.push(kk); }
+      }
+    }
+    for (var i = 0; i < (segment ? 0 : textDivs.length); i++) {
       var raw = textDivs[i].getAttribute("data-raw") || "";
-      var m; WORD.lastIndex = 0;
-      while ((m = WORD.exec(raw))) {
-        if (m[0].length < 2) continue;
-        var k = key(m[0]);
+      var ws = wordsOf(raw);
+      for (var j = 0; j < ws.length; j++) {
+        if (ws[j].text.length < minLen()) continue;
+        var k = key(ws[j].text);
         if (seen[k]) continue;
         seen[k] = 1;
         if (all || !asked[k]) { asked[k] = 1; fresh.push(k); }
@@ -179,11 +243,21 @@ const SCRIPT = String.raw`
     clearTimeout(selTimer);
     selTimer = setTimeout(sendSelection, 500);
   });
-  textEl.addEventListener("click", function (e) {
+  var selectedAtStart = false, pinched = false;
+  scroller.addEventListener("touchstart", function () {
+    var sel = window.getSelection();
+    selectedAtStart = !!(sel && !sel.isCollapsed);
+  }, { passive: true });
+  scroller.addEventListener("click", function (e) {
     var sel = window.getSelection();
     if (sel && !sel.isCollapsed) return;
+    if (pinched) { pinched = false; return; }
     var t = e.target;
-    if (t && t.className === "u") post({ type: "select", text: t.textContent, context: contextFor(t) });
+    if (t && t.className === "u") { post({ type: "select", text: t.getAttribute("data-w") || t.textContent, context: contextFor(t) }); return; }
+    if (selectedAtStart) return; // this tap only dropped a selection
+    var f = e.clientX / window.innerWidth;
+    if (f > 0.65) goto(pageNo + 1);
+    else if (f < 0.35) goto(pageNo - 1);
   });
 
   /* ---------- moving around ---------- */
@@ -218,6 +292,42 @@ const SCRIPT = String.raw`
     thumb.style.left = (f * track.clientWidth) + "px";
   }
 
+  // Two fingers zoom: the page follows the fingers while they move, then is drawn sharp at the new size.
+  var pinch = null;
+  var spread = function (e) { var a = e.touches[0], b = e.touches[1]; return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY); };
+  scroller.addEventListener("touchstart", function (e) {
+    if (e.touches.length === 2) {
+      var a = e.touches[0], b = e.touches[1];
+      var rect = sheet.getBoundingClientRect();
+      pinch = { d: spread(e), scale: 1, cx: (a.clientX + b.clientX) / 2, cy: (a.clientY + b.clientY) / 2, ox: 0, oy: 0 };
+      pinch.ox = pinch.cx - rect.left; pinch.oy = pinch.cy - rect.top;
+      sheet.style.transformOrigin = pinch.ox + "px " + pinch.oy + "px";
+      window.getSelection().removeAllRanges();
+    }
+  }, { passive: true });
+  scroller.addEventListener("touchmove", function (e) {
+    if (!pinch || e.touches.length !== 2) return;
+    e.preventDefault();
+    pinch.scale = Math.max(0.6 / zoom, Math.min(4 / zoom, spread(e) / pinch.d));
+    sheet.style.transform = "scale(" + pinch.scale + ")";
+  }, { passive: false });
+  scroller.addEventListener("touchend", function (e) {
+    if (!pinch || e.touches.length >= 2) return;
+    var p = pinch; pinch = null; pinched = true;
+    setTimeout(function () { pinched = false; }, 400);
+    sheet.style.transform = ""; sheet.style.transformOrigin = "0 0";
+    var next = Math.max(0.6, Math.min(4, zoom * p.scale));
+    var ratio = next / zoom;
+    var rect = scroller.getBoundingClientRect();
+    // keep the point between the fingers where it was on screen
+    pendingScroll = {
+      l: Math.max(0, (scroller.scrollLeft + p.cx - rect.left) * ratio - (p.cx - rect.left)),
+      t: Math.max(0, (scroller.scrollTop + p.cy - rect.top) * ratio - (p.cy - rect.top)),
+    };
+    zoom = next;
+    render(true);
+  }, { passive: true });
+
   // A quick sideways swipe turns the page (only when the page is not zoomed in, and not while picking text).
   var sx = 0, sy = 0, st = 0;
   scroller.addEventListener("touchstart", function (e) { var t = e.touches[0]; sx = t.clientX; sy = t.clientY; st = Date.now(); }, { passive: true });
@@ -225,7 +335,7 @@ const SCRIPT = String.raw`
     var t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy;
     var sel = window.getSelection();
     if (sel && !sel.isCollapsed) return;
-    if (zoom > 1.01 || Date.now() - st > 450 || Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 2) return;
+    if (pinched || zoom > 1.01 || Date.now() - st > 450 || Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 2) return;
     goto(pageNo + (dx < 0 ? 1 : -1));
   }, { passive: true });
   window.addEventListener("resize", function () { render(true); updateBar(); });
@@ -245,7 +355,14 @@ const SCRIPT = String.raw`
       if (it.hasEOL) out += "\n";
       if (it.str.length) prev = it;
     }
-    return out.replace(/[ \t]+/g, " ").trim();
+    out = out.replace(/[ \t]+/g, " ").trim();
+    if (segment) out = out.normalize("NFKC");
+    if (segment && segmenter) {
+      var spaced = "", it = segmenter.segment(out)[Symbol.iterator](), r;
+      while (!(r = it.next()).done) spaced += r.value.isWordLike ? " " + r.value.segment + " " : r.value.segment;
+      out = spaced.replace(/[ \t]+/g, " ").trim();
+    }
+    return out;
   }
   function extractAll() {
     var n = 1, batch = [], from = 1;
@@ -258,6 +375,7 @@ const SCRIPT = String.raw`
       doc.getPage(n).then(function (p) { return p.getTextContent(); }).then(function (c) {
         batch.push(pageText(c));
         n++;
+        if (headless && (n % 3 === 0 || n > pages)) post({ type: "progress", page: n - 1, pages: pages });
         if (batch.length >= 10) { post({ type: "text", from: from, pages: batch }); from = n; batch = []; }
         setTimeout(step, 0);
       }, function () { batch.push(""); n++; setTimeout(step, 0); });
@@ -266,38 +384,60 @@ const SCRIPT = String.raw`
   }
 
   /* ---------- the app talking to this page ---------- */
+  function decode(b64) {
+    var bin = atob(b64);
+    var arr = new Uint8Array(bin.length);
+    for (var j = 0; j < bin.length; j++) arr[j] = bin.charCodeAt(j);
+    return arr;
+  }
   function openFromChunks() {
-    var parts = [], total = 0, i;
-    for (i = 0; i < chunks.length; i++) {
-      var bin = atob(chunks[i]);
-      var arr = new Uint8Array(bin.length);
-      for (var j = 0; j < bin.length; j++) arr[j] = bin.charCodeAt(j);
-      parts.push(arr); total += arr.length;
-    }
-    chunks = [];
+    var total = 0, i;
+    for (i = 0; i < chunks.length; i++) total += chunks[i].length;
     var data = new Uint8Array(total), off = 0;
-    for (i = 0; i < parts.length; i++) { data.set(parts[i], off); off += parts[i].length; }
-    pdfjs.getDocument({ data: data }).promise.then(function (d) {
+    for (i = 0; i < chunks.length; i++) { data.set(chunks[i], off); off += chunks[i].length; chunks[i] = null; }
+    chunks = [];
+    var task = pdfjs.getDocument({
+      data: data,
+      verbosity: 0,
+      isEvalSupported: false,
+      // Chinese, Japanese and Korean PDFs sometimes need these; without a connection they are simply skipped.
+      cMapUrl: "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/cmaps/",
+      cMapPacked: true,
+      standardFontDataUrl: "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/standard_fonts/"
+    });
+    task.promise.then(function (d) {
       doc = d; pages = d.numPages;
+      if (!pages) { post({ type: "error", code: "InvalidPDFException", message: "no pages" }); return; }
       pageNo = Math.max(1, Math.min(pages, pageNo));
       setMsg("");
+      if (headless) { post({ type: "opened", pages: pages }); extractAll(); return; }
       render(false);
       if (needText) setTimeout(extractAll, 400);
     }, function (err) {
       setMsg("Could not open this PDF.");
-      post({ type: "error", message: String(err && err.message || err) });
+      post({ type: "error", code: String(err && err.name || ""), message: String(err && err.message || err) });
     });
   }
 
   window.onRN = function (m) {
     if (m.t === "open") {
+      // A fresh start: forget the previous book completely.
+      token++;
+      if (doc) { try { doc.destroy(); } catch (e) {} }
+      doc = null; pages = 0; unknown = {}; asked = {}; textDivs = []; textEl.innerHTML = "";
       if (m.theme) setTheme(m.theme);
-      if (m.night) sheet.classList.add("night");
-      pageNo = m.page || 1; needText = !!m.needText; expected = m.chunks; chunks = [];
+      sheet.classList.toggle("night", !!m.night);
+      lang = m.lang || "en"; segment = !!m.segment; segmenter = null;
+      if (segment && window.Intl && Intl.Segmenter) { try { segmenter = new Intl.Segmenter(lang, { granularity: "word" }); } catch (e) { segmenter = null; } }
+      pageNo = m.page || 1; needText = !!m.needText; headless = !!m.headless;
+      expected = m.chunks; chunks = []; received = 0;
       setMsg("Opening…");
+      updateBar();
     } else if (m.t === "chunk") {
-      chunks[m.i] = m.d;
-      if (chunks.length === expected && chunks.every(function (c) { return typeof c === "string"; })) openFromChunks();
+      if (typeof m.i !== "number" || chunks[m.i]) return; // a repeated piece is ignored
+      try { chunks[m.i] = decode(m.d); } catch (e) { post({ type: "error", code: "", message: "bad data" }); return; }
+      received++;
+      if (received === expected) openFromChunks();
     } else if (m.t === "unknown") {
       if (m.replace) unknown = {};
       for (var i = 0; i < m.keys.length; i++) unknown[m.keys[i]] = 1;

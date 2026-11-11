@@ -9,6 +9,7 @@ import { getLanguage } from "../constants/languages";
 import { getBookSummary, getMyText, type MyText } from "../database/database";
 import { coveragePercent } from "../models/Vocabulary";
 import { pdfLines } from "../models/PdfText";
+import { openAddCard } from "../services/openAddCard";
 import { textOfWords } from "../models/Selection";
 import { useTheme } from "../theme/ThemeProvider";
 import type { Palette } from "../theme/themes";
@@ -33,7 +34,7 @@ export default function ReadingScreen() {
 
     const [coverage, setCoverage] = useState<number | null>(null);
     const refreshCoverage = useCallback(() => {
-        void getBookSummary(Number(id)).then((b) => setCoverage(b && b.totalTokens ? coveragePercent(b.knownTokens, b.totalTokens) : null)).catch(() => undefined);
+        void getBookSummary(Number(id)).then((b) => setCoverage(b && b.totalTokens ? coveragePercent(b.knownTokens, b.totalTokens - b.ignoredTokens) : null)).catch(() => undefined);
     }, [id]);
     useEffect(() => { refreshCoverage(); }, [refreshCoverage]);
 
@@ -96,7 +97,7 @@ export default function ReadingScreen() {
                     onAdd={(entry) => {
                         const example = lookup.context !== lookup.text ? lookup.context : "";
                         setLookup(null);
-                        router.push({ pathname: "/addCard", params: { text: entry.word, meaning: entry.translation, example } });
+                        void openAddCard(text.language, { text: entry.word, meaning: entry.translation, example });
                     }}
                 />
             )}

@@ -1,6 +1,7 @@
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
+import PdfImporter from "../components/pdf/PdfImporter";
 import SessionSummaryPopup from "../components/SessionSummaryPopup";
 import AchievementToast from "../components/AchievementToast";
 import { scheduleAchievementCheck } from "../services/achievementUnlocks";
@@ -33,6 +34,7 @@ function Navigator() {
       </Stack>
       <AchievementToast />
       <SessionSummaryPopup />
+      <PdfImporter />
     </>
   );
 }

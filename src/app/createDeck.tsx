@@ -169,7 +169,7 @@ export default function CreateDeckScreen() {
                                     </Text>
 
                                     <View style={styles.optionText}>
-                                        <Text style={styles.optionName}>
+                                        <Text style={styles.optionIgnore}>
                                             {item.name}
                                         </Text>
 
@@ -402,7 +402,7 @@ const makeStyles = (t: Palette) => StyleSheet.create({
         marginLeft: 10,
     },
 
-    optionName: {
+    optionIgnore: {
         color: t.text,
         fontSize: 16,
         fontWeight: "600",

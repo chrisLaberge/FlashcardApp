@@ -55,7 +55,7 @@ describe("counting a book", () => {
 
     test("the sample is the form seen most often", async () => {
         const stats = await analyzeText("книги книги книгу", russian);
-        expect(stats.lemmas.get("книга")).toEqual({ count: 3, sample: "книги" });
+        expect(stats.lemmas.get("книга")).toEqual({ count: 3, sample: "книги", ignored: false });
     });
 
     test("text with no words gives a total of zero", async () => {
@@ -227,7 +227,7 @@ describe("migration", () => {
             expect(cards.map((c) => c.learningText)).toEqual(["книга"]);
             expect(await db.getCardProgress(cards[0].id!)).toMatchObject({ reviewCount: 4, level: 6 });
             const books = await db.getBookSummaries("ru");
-            expect(books).toEqual([{ id: 1, title: "Old book", language: "ru", totalTokens: null, analyzerVersion: null, knownTokens: 0 }]);
+            expect(books).toEqual([{ id: 1, title: "Old book", language: "ru", totalTokens: null, analyzerVersion: null, knownTokens: 0, ignoredTokens: 0 }]);
 
             await service().analyzeNewBooks("ru", russian); // the old book is picked up
             expect((await db.getBookSummaries("ru"))[0].totalTokens).toBe(2);

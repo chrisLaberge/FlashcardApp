@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- Metro needs these paths written out as plain require() calls */
 import Az from "az";
 import { Asset } from "expo-asset";
+import * as FileSystem from "expo-file-system/legacy";
+import { fromBase64 } from "../models/Base64";
 import { createRussianAnalyzer } from "../models/language/russian";
 import type { Analyzer } from "../models/language/types";
 import { plainAnalyzer } from "../models/ReaderWords";
@@ -34,18 +36,38 @@ Az.load = (url, responseType, callback) => {
         callback(new Error(`Missing ${name}`));
         return;
     }
-    const asset = Asset.fromModule(module);
-    asset.downloadAsync()
-        .then(() => fetch(asset.localUri ?? asset.uri))
-        .then((response) => response.arrayBuffer())
-        .then((buffer) => callback(null, buffer), (error: unknown) => callback(error instanceof Error ? error : new Error(String(error))));
+    readBundled(module).then((buffer) => {
+        try {
+            callback(null, buffer);
+        } catch (error) {
+            // A file that does not parse would otherwise be an unhandled error and the load would never finish.
+            loadFailed?.(error instanceof Error ? error : new Error(String(error)));
+        }
+    }, (error: unknown) => callback(error instanceof Error ? error : new Error(String(error))));
 };
+
+/** A bundled file's exact bytes. Read as base64 and decoded here: `fetch(...).arrayBuffer()` returns cut-off data for big files on some phones. */
+async function readBundled(module: number): Promise<ArrayBuffer> {
+    const asset = Asset.fromModule(module);
+    await asset.downloadAsync();
+    const uri = asset.localUri ?? asset.uri;
+    const bytes = fromBase64(await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 }));
+    return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+}
+
+let loadFailed: ((error: Error) => void) | null = null;
 
 let russian: Promise<Analyzer> | null = null;
 
 function loadRussian(): Promise<Analyzer> {
     return new Promise((resolve, reject) => {
-        Az.Morph.init("az", (error) => (error ? reject(error) : resolve(createRussianAnalyzer(Az.Morph))));
+        loadFailed = reject;
+        const timer = setTimeout(() => reject(new Error("The Russian dictionary took too long to load.")), 90_000);
+        Az.Morph.init("az", (error) => {
+            clearTimeout(timer);
+            if (error) reject(error);
+            else resolve(createRussianAnalyzer(Az.Morph));
+        });
     });
 }
 

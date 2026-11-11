@@ -1,6 +1,9 @@
 import { lemmaKey } from "./Vocabulary";
 import type { Analyzer } from "./language/types";
 
+/** Books counted with an older set of rules are counted again (the text is kept, so this is quick). */
+export const ANALYSIS_REVISION = 3;
+
 /** Languages written without spaces between words: a run of letters is a whole sentence, so words are not marked. */
 const NO_SPACES = new Set(["zh", "ja", "th", "km", "lo", "my"]);
 
@@ -9,7 +12,8 @@ export const marksWords = (language: string): boolean => !NO_SPACES.has(language
 /** Used where a language has no dictionary: a word is only itself (lower case), so it matches the same spelling on your cards. */
 export const plainAnalyzer = (language: string): Analyzer => ({
     language,
-    version: 1,
+    version: ANALYSIS_REVISION,
+    segmented: !marksWords(language),
     lemma: (surface) => ({ lemma: lemmaKey(surface), confident: false }),
 });
 
