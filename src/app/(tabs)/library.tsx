@@ -175,8 +175,8 @@ export default function LibraryScreen() {
                             </View>
                             {!job && item.totalTokens ? (
                                 <Pressable onPress={() => router.push({ pathname: "/book", params: { id: String(item.id) } })} hitSlop={8} accessibilityRole="button" accessibilityLabel={`${item.title} words`} style={s.coverage}>
-                                    <Text style={s.percent}>{coveragePercent(item.knownTokens, item.totalTokens)}%</Text>
-                                    <Text style={s.meta}>{item.knownTokens.toLocaleString("en-US")} / {item.totalTokens.toLocaleString("en-US")}</Text>
+                                    <Text style={s.percent}>{coveragePercent(item.knownTokens, item.totalTokens - item.ignoredTokens)}%</Text>
+                                    <Text style={s.meta}>{item.knownTokens.toLocaleString("en-US")} / {(item.totalTokens - item.ignoredTokens).toLocaleString("en-US")}</Text>
                                 </Pressable>
                             ) : null}
                             <Pressable onPress={() => removeText(item.id, item.title)} hitSlop={12} accessibilityRole="button" accessibilityLabel={`Delete ${item.title}`}>

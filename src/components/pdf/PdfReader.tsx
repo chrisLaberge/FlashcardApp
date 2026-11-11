@@ -2,7 +2,7 @@ import { router } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import type { WebViewMessageEvent } from "react-native-webview";
-import { getKnownLemmas, setLastPage, setMyTextBody, setWordKnown, type MyText } from "../../database/database";
+import { getBookNames, getKnownLemmas, setLastPage, setMyTextBody, setWordKnown, setWordName, type MyText } from "../../database/database";
 import { bookText, marksWords, unknownKeys } from "../../models/ReaderWords";
 import type { Analyzer } from "../../models/language/types";
 import { tokenize } from "../../models/Tokens";
@@ -58,10 +58,12 @@ export default function PdfReader({ book, languageName, onAnalyzed }: Props) {
                 // The words you marked yourself still work.
             }
             known.current = await getKnownLemmas(book.language);
+            // Names the book's own capitalisation gives away are left unmarked too.
+            for (const name of await getBookNames(book.id).catch(() => new Set<string>())) known.current.add(name);
             return analyzer;
         })();
         return prep.current;
-    }, [book.language]);
+    }, [book.language, book.id]);
 
     useEffect(() => {
         let active = true;
@@ -167,6 +169,18 @@ export default function PdfReader({ book, languageName, onAnalyzed }: Props) {
         onAnalyzed?.();
     };
 
+    const markName = async () => {
+        if (!lookup) return;
+        const analyzer = await ready();
+        const lemma = analyzer.lemma(lookup.text.trim()).lemma;
+        known.current.add(lemma);
+        setLookup(null);
+        send({ t: "clear" });
+        await setWordName(book.language, lemma, true);
+        send({ t: "reclassify" });
+        onAnalyzed?.();
+    };
+
     if (failure) return <View style={s.center}><Text style={s.error}>{failure}</Text></View>;
     if (!html) return <View style={s.center}><ActivityIndicator color={t.blue} /></View>;
 
@@ -197,6 +211,7 @@ export default function PdfReader({ book, languageName, onAnalyzed }: Props) {
                     languageName={languageName}
                     onClose={() => { setLookup(null); send({ t: "clear" }); }}
                     onKnown={single ? () => void markKnown() : undefined}
+                    onName={single ? () => void markName() : undefined}
                     onAdd={(entry) => {
                         const example = lookup.context !== lookup.text ? lookup.context : "";
                         setLookup(null);

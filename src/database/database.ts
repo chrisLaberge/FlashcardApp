@@ -144,7 +144,8 @@ async function openAndPrepareDatabase(): Promise<SQLite.SQLiteDatabase> {
                 added_at INTEGER NOT NULL
             );
             -- The words you know, per language, by dictionary form (lemma). Kept apart from card review
-            -- scheduling. known = 0 is a word you said you do not know (it beats what the cards say).
+            -- scheduling. known = 0 is a word you said you do not know (it beats what the cards say);
+            -- known = 2 is a name or place you told us to leave out of the unknown words.
             CREATE TABLE IF NOT EXISTS known_words (
                 language TEXT NOT NULL,
                 lemma TEXT NOT NULL,
@@ -196,6 +197,10 @@ async function openAndPrepareDatabase(): Promise<SQLite.SQLiteDatabase> {
             await db.execAsync("ALTER TABLE my_texts ADD COLUMN analyzer_version INTEGER");
         }
         // A PDF keeps its original file on the phone, and the page you stopped at (additive).
+        const vocabColumns = await db.getAllAsync<{ name: string }>("PRAGMA table_info(book_vocab)");
+        if (!vocabColumns.some((column) => column.name === "is_name")) {
+            await db.execAsync("ALTER TABLE book_vocab ADD COLUMN is_name INTEGER NOT NULL DEFAULT 0");
+        }
         if (!textColumns.some((column) => column.name === "pdf_path")) {
             await db.execAsync("ALTER TABLE my_texts ADD COLUMN pdf_path TEXT");
         }
@@ -962,16 +967,16 @@ export async function getPendingPdfs(): Promise<number[]> {
     return rows.map((r) => r.id);
 }
 
-/** Every word of the language you know (known by your cards or by your own choice), as lemma keys. */
+/** Every word of the language that needs no marking: the ones you know (by your cards or your own choice) and the names you set aside, as lemma keys. */
 export async function getKnownLemmas(language: string): Promise<Set<string>> {
     const database = await getDatabase();
-    const rows = await database.getAllAsync<{ lemma: string }>("SELECT lemma FROM known_words WHERE language = ? AND known = 1", language);
+    const rows = await database.getAllAsync<{ lemma: string }>("SELECT lemma FROM known_words WHERE language = ? AND known IN (1, 2)", language);
     return new Set(rows.map((r) => r.lemma));
 }
 
 /* ---------------------------- Known words and books ---------------------------- */
 
-export type BookSummary = { id: number; title: string; language: string; totalTokens: number | null; analyzerVersion: number | null; knownTokens: number };
+export type BookSummary = { id: number; title: string; language: string; totalTokens: number | null; analyzerVersion: number | null; knownTokens: number; /** Occurrences of names and places, which count for neither side of the coverage. */ ignoredTokens: number };
 
 /**
  * Sets what you say about a word: known, not known, or null to go back to what your cards say.
@@ -987,6 +992,30 @@ export async function setWordKnown(language: string, lemma: string, known: boole
         "INSERT INTO known_words (language, lemma, known, source) VALUES (?, ?, ?, 'manual') ON CONFLICT(language, lemma) DO UPDATE SET known = excluded.known, source = 'manual'",
         language, lemma, known ? 1 : 0,
     );
+}
+
+/** Sets a word aside as a name or place (it is no longer an unknown word), or takes it back. */
+export async function setWordName(language: string, lemma: string, on: boolean): Promise<void> {
+    const database = await getDatabase();
+    if (!on) {
+        await database.runAsync("DELETE FROM known_words WHERE language = ? AND lemma = ? AND known = 2", language, lemma);
+        return;
+    }
+    await database.runAsync(
+        "INSERT INTO known_words (language, lemma, known, source) VALUES (?, ?, 2, 'manual') ON CONFLICT(language, lemma) DO UPDATE SET known = 2, source = 'manual'",
+        language, lemma,
+    );
+}
+
+/** Names the reader found in this book by itself (always capitalised in the middle of sentences), unless you said otherwise. */
+export async function getBookNames(bookId: number): Promise<Set<string>> {
+    const database = await getDatabase();
+    const rows = await database.getAllAsync<{ lemma: string }>(`
+        SELECT v.lemma FROM book_vocab v JOIN my_texts t ON t.id = v.book_id
+        LEFT JOIN known_words k ON k.language = t.language AND k.lemma = v.lemma
+        WHERE v.book_id = ? AND v.is_name = 1 AND k.lemma IS NULL
+    `, bookId);
+    return new Set(rows.map((r) => r.lemma));
 }
 
 /** The words the cards say are known, as of now. Manual choices are left alone; card-based ones are replaced. */
@@ -1012,12 +1041,12 @@ export async function getCardsForVocabulary(language: string): Promise<{ text: s
 }
 
 /** Saves a book's analysis in one go: the old counts are replaced and the totals set, or nothing changes. */
-export async function saveBookAnalysis(bookId: number, version: number, total: number, lemmas: ReadonlyMap<string, { count: number; sample: string }>): Promise<void> {
+export async function saveBookAnalysis(bookId: number, version: number, total: number, lemmas: ReadonlyMap<string, { count: number; sample: string; name?: boolean }>): Promise<void> {
     const database = await getDatabase();
     await database.withTransactionAsync(async () => {
         await database.runAsync("DELETE FROM book_vocab WHERE book_id = ?", bookId);
         for (const [lemma, entry] of lemmas) {
-            await database.runAsync("INSERT INTO book_vocab (book_id, lemma, count, sample) VALUES (?, ?, ?, ?)", bookId, lemma, entry.count, entry.sample);
+            await database.runAsync("INSERT INTO book_vocab (book_id, lemma, count, sample, is_name) VALUES (?, ?, ?, ?, ?)", bookId, lemma, entry.count, entry.sample, entry.name ? 1 : 0);
         }
         await database.runAsync("UPDATE my_texts SET total_tokens = ?, analyzer_version = ? WHERE id = ?", total, version, bookId);
     });
@@ -1026,12 +1055,14 @@ export async function saveBookAnalysis(bookId: number, version: number, total: n
 /** Books of a language with how many of their word occurrences you know. Counted fresh from the known words every time. */
 export async function getBookSummaries(language: string): Promise<BookSummary[]> {
     const database = await getDatabase();
-    const rows = await database.getAllAsync<{ id: number; title: string; language: string; total_tokens: number | null; analyzer_version: number | null; known_tokens: number | null }>(`
+    const rows = await database.getAllAsync<{ id: number; title: string; language: string; total_tokens: number | null; analyzer_version: number | null; known_tokens: number | null; ignored_tokens: number | null }>(`
         SELECT t.id, t.title, t.language, t.total_tokens, t.analyzer_version,
-               (SELECT SUM(v.count) FROM book_vocab v JOIN known_words k ON k.language = t.language AND k.lemma = v.lemma AND k.known = 1 WHERE v.book_id = t.id) AS known_tokens
+               (SELECT SUM(v.count) FROM book_vocab v JOIN known_words k ON k.language = t.language AND k.lemma = v.lemma AND k.known = 1 WHERE v.book_id = t.id) AS known_tokens,
+               (SELECT SUM(v.count) FROM book_vocab v LEFT JOIN known_words k ON k.language = t.language AND k.lemma = v.lemma
+                 WHERE v.book_id = t.id AND (k.known = 2 OR (v.is_name = 1 AND k.lemma IS NULL))) AS ignored_tokens
         FROM my_texts t WHERE t.language = ? ORDER BY t.added_at DESC, t.id DESC
     `, language);
-    return rows.map((r) => ({ id: r.id, title: r.title, language: r.language, totalTokens: r.total_tokens, analyzerVersion: r.analyzer_version, knownTokens: r.known_tokens ?? 0 }));
+    return rows.map((r) => ({ id: r.id, title: r.title, language: r.language, totalTokens: r.total_tokens, analyzerVersion: r.analyzer_version, knownTokens: r.known_tokens ?? 0, ignoredTokens: r.ignored_tokens ?? 0 }));
 }
 
 export async function getBookSummary(id: number): Promise<BookSummary | null> {
@@ -1046,7 +1077,7 @@ export async function getTopUnknown(bookId: number, limit = 100): Promise<{ lemm
     return database.getAllAsync<{ lemma: string; count: number; sample: string }>(`
         SELECT v.lemma, v.count, v.sample FROM book_vocab v JOIN my_texts t ON t.id = v.book_id
         LEFT JOIN known_words k ON k.language = t.language AND k.lemma = v.lemma
-        WHERE v.book_id = ? AND COALESCE(k.known, 0) = 0
+        WHERE v.book_id = ? AND COALESCE(k.known, 0) = 0 AND NOT (v.is_name = 1 AND k.lemma IS NULL)
         ORDER BY v.count DESC, v.lemma LIMIT ?
     `, bookId, limit);
 }

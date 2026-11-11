@@ -2,7 +2,7 @@ import { router, Stack, useFocusEffect, useLocalSearchParams } from "expo-router
 import { useCallback, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, FlatList, StyleSheet, Text, View } from "react-native";
 import Pressable from "../components/Pressable";
-import { getBookSummary, getTopUnknown, setWordKnown, type BookSummary } from "../database/database";
+import { getBookSummary, getTopUnknown, setWordKnown, setWordName, type BookSummary } from "../database/database";
 import { coveragePercent } from "../models/Vocabulary";
 import { readerAnalyzerFor } from "../services/morphology";
 import { analyzeBook, syncKnownWords } from "../services/vocabulary";
@@ -47,12 +47,17 @@ export default function BookScreen() {
     if (book === undefined) return <View style={s.container}><ActivityIndicator color={t.blue} style={{ marginTop: 40 }} /></View>;
     if (book === null) return <View style={s.container}><Text style={s.empty}>Not found.</Text></View>;
 
-    const total = book.totalTokens ?? 0;
+    const total = (book.totalTokens ?? 0) - book.ignoredTokens;
     const percent = coveragePercent(book.knownTokens, total);
 
     const markKnown = async (lemma: string) => {
         await setWordKnown(book.language, lemma, true);
         await load(); // the percentage and the list both come from the database, so they stay in step
+    };
+
+    const markName = async (lemma: string) => {
+        await setWordName(book.language, lemma, true);
+        await load();
     };
 
     return (
@@ -80,6 +85,9 @@ export default function BookScreen() {
                         </View>
                         <Pressable style={s.small} onPress={() => markKnown(item.lemma)} accessibilityRole="button" accessibilityLabel={`I know ${item.lemma}`}>
                             <Text style={s.smallText}>Known</Text>
+                        </Pressable>
+                        <Pressable style={s.small} onPress={() => markName(item.lemma)} accessibilityRole="button" accessibilityLabel={`${item.lemma} is a name or place`}>
+                            <Text style={s.smallText}>Name</Text>
                         </Pressable>
                         <Pressable style={[s.small, s.primary]} onPress={() => router.push({ pathname: "/addCard", params: { text: item.lemma } })} accessibilityRole="button" accessibilityLabel={`Add ${item.lemma} as a card`}>
                             <Text style={[s.smallText, { color: t.bg }]}>+ Card</Text>

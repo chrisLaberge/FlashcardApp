@@ -33,7 +33,7 @@ export default function ReadingScreen() {
 
     const [coverage, setCoverage] = useState<number | null>(null);
     const refreshCoverage = useCallback(() => {
-        void getBookSummary(Number(id)).then((b) => setCoverage(b && b.totalTokens ? coveragePercent(b.knownTokens, b.totalTokens) : null)).catch(() => undefined);
+        void getBookSummary(Number(id)).then((b) => setCoverage(b && b.totalTokens ? coveragePercent(b.knownTokens, b.totalTokens - b.ignoredTokens) : null)).catch(() => undefined);
     }, [id]);
     useEffect(() => { refreshCoverage(); }, [refreshCoverage]);
 

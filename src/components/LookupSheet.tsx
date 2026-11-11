@@ -18,12 +18,14 @@ type Props = {
     onAdd: (lookup: Lookup) => void;
     /** When given, a "Known" button marks this word as known (shown for a single word). */
     onKnown?: () => void;
+    /** When given, a "Name" button sets this word aside as a name or place. */
+    onName?: () => void;
 };
 
 type State = { status: "loading" } | { status: "error"; message: string } | { status: "done"; lookup: Lookup };
 
 /** A sheet with the meaning of one tapped word or sentence, and a button to make it a card. Mount it fresh for each tap. */
-export default function LookupSheet({ onClose, text, context, languageName, onAdd, onKnown }: Props) {
+export default function LookupSheet({ onClose, text, context, languageName, onAdd, onKnown, onName }: Props) {
     const t = useTheme();
     const s = useMemo(() => makeS(t), [t]);
     const [state, setState] = useState<State>({ status: "loading" });
@@ -87,6 +89,11 @@ export default function LookupSheet({ onClose, text, context, languageName, onAd
                             <Text style={s.knownText}>Known</Text>
                         </Pressable>
                     ) : null}
+                    {onName ? (
+                        <Pressable style={s.name} onPress={onName} accessibilityRole="button" accessibilityLabel="This is a name or place">
+                            <Text style={s.nameText}>Name</Text>
+                        </Pressable>
+                    ) : null}
                     {state.status === "done" && (
                         <Pressable style={[s.add, { flex: 1 }]} onPress={() => onAdd(state.lookup)} accessibilityLabel="Add as a card">
                             <Ionicons name="add" size={22} color={t.bg} />
@@ -117,6 +124,8 @@ const makeS = (t: Palette) => StyleSheet.create({
     add: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: t.green, borderRadius: 12, paddingVertical: 12 },
     actions: { flexDirection: "row", gap: 10, marginTop: 6 },
     known: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 16, borderWidth: 1.5, borderColor: t.green },
+    name: { alignItems: "center", justifyContent: "center", borderRadius: 12, paddingVertical: 12, paddingHorizontal: 16, borderWidth: 1.5, borderColor: t.surfaceTop },
+    nameText: { color: t.muted, fontSize: 16, fontWeight: "600" },
     knownText: { color: t.green, fontSize: 16, fontWeight: "600" },
     addText: { color: t.bg, fontSize: 16, fontWeight: "600" },
 });

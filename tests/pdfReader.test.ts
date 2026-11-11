@@ -80,3 +80,36 @@ describe("languages written without spaces", () => {
         expect(spacedWords("你好 ， 世界 ！").map((w) => w.text)).toEqual(["你好", "世界"]);
     });
 });
+
+describe("names and places", () => {
+    const es = plainAnalyzer("es");
+    const text = "Ayer Pedro fue al mercado. Luego vio a Pedro con Marta. La casa de Marta es grande. Pedro dijo que la casa es bonita. Casa vieja.";
+
+    test("a word always capitalised in mid-sentence is taken for a name", async () => {
+        const stats = await analyzeText(text, es);
+        expect(stats.lemmas.get("pedro")?.name).toBe(true);
+        expect(stats.lemmas.get("marta")?.name).toBe(true);
+    });
+
+    test("a word that also appears in lower case, or only starts sentences, is not", async () => {
+        const stats = await analyzeText(text, es);
+        expect(stats.lemmas.get("casa")?.name).toBe(false); // 'Casa' starts a sentence, 'casa' is lower case elsewhere
+        expect(stats.lemmas.get("ayer")?.name).toBe(false);
+        expect(stats.lemmas.get("luego")?.name).toBe(false);
+    });
+
+    test("one mention is not enough, and 'I' or all-caps headings are never names", async () => {
+        const once = await analyzeText("Hoy vi a Juan en el parque.", es);
+        expect(once.lemmas.get("juan")?.name).toBe(false);
+        const english = await analyzeText("Then I went home. Later I ate. Now I sleep. I think I am done. THE END THE END", plainAnalyzer("en"));
+        expect(english.lemmas.get("i")?.name).toBe(false);
+        expect(english.lemmas.get("the")?.name).toBe(false);
+    });
+
+    test("German capitalises every noun, so capitals say nothing there; Chinese has none", async () => {
+        const german = await analyzeText("Heute sah ich den Hund. Der Hund lief. Ich mag den Hund und den Hund.", plainAnalyzer("de"));
+        expect([...german.lemmas.values()].some((l) => l.name)).toBe(false);
+        const chinese = await analyzeText("我 喜欢 猫 我 喜欢 狗", plainAnalyzer("zh"));
+        expect([...chinese.lemmas.values()].some((l) => l.name)).toBe(false);
+    });
+});
