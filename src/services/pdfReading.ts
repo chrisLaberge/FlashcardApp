@@ -1,4 +1,5 @@
 import * as DocumentPicker from "expo-document-picker";
+import { File as NewFile } from "expo-file-system";
 import * as FileSystem from "expo-file-system/legacy";
 import { addMyText } from "../database/database";
 import { splitBase64 } from "../models/Base64";
@@ -15,7 +16,7 @@ const detail = (error: unknown) => (error instanceof Error ? error.message : Str
 export async function addPdf(language: string): Promise<number | null> {
     let picked: DocumentPicker.DocumentPickerResult;
     try {
-        picked = await DocumentPicker.getDocumentAsync({ type: "*/*", copyToCacheDirectory: true, multiple: false });
+        picked = await DocumentPicker.getDocumentAsync({ type: "*/*", copyToCacheDirectory: false, multiple: false });
     } catch (error) {
         throw new PdfError(`Could not open the file picker. (${detail(error)})`);
     }
@@ -61,17 +62,38 @@ async function saveCopy(from: string): Promise<string> {
         const target = `${folder}${Date.now()}.pdf`;
         try {
             await FileSystem.makeDirectoryAsync(folder, { intermediates: true }).catch(() => undefined);
-            try {
-                await FileSystem.copyAsync({ from, to: target });
-            } catch (copyError) {
-                problems.push(`copy: ${detail(copyError)}`);
-                const data = await FileSystem.readAsStringAsync(from, { encoding: FileSystem.EncodingType.Base64 });
-                await FileSystem.writeAsStringAsync(target, data, { encoding: FileSystem.EncodingType.Base64 });
-            }
+            await copyBytes(from, target, problems);
             return target;
         } catch (error) {
             problems.push(detail(error));
         }
     }
-    throw new PdfError(`Could not save the PDF. ${problems.join(" | ")}`);
+    throw new PdfError(`Could not save the PDF [v3]. ${problems.join(" | ")}`);
+}
+
+/** Gets a file's bytes to `to` by whichever route this phone allows; the reasons for the ones that fail are added to `problems`. */
+async function copyBytes(from: string, to: string, problems: string[]): Promise<void> {
+    const routes: [string, () => Promise<void>][] = [
+        ["copy", () => FileSystem.copyAsync({ from, to })],
+        ["read", async () => {
+            const data = await FileSystem.readAsStringAsync(from, { encoding: FileSystem.EncodingType.Base64 });
+            await FileSystem.writeAsStringAsync(to, data, { encoding: FileSystem.EncodingType.Base64 });
+        }],
+        ["fetch", async () => {
+            const bytes = new Uint8Array(await (await fetch(from)).arrayBuffer());
+            if (bytes.length === 0) throw new Error("empty file");
+            const out = new NewFile(to);
+            out.create({ overwrite: true });
+            out.write(bytes);
+        }],
+    ];
+    for (const [name, run] of routes) {
+        try {
+            await run();
+            return;
+        } catch (error) {
+            problems.push(`${name}: ${detail(error)}`);
+        }
+    }
+    throw new Error("all routes failed");
 }
