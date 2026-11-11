@@ -1,5 +1,5 @@
 import { analyzeText, spacedWords } from "../src/models/BookAnalysis";
-import { splitBase64 } from "../src/models/Base64";
+import { fromBase64, splitBase64 } from "../src/models/Base64";
 import { bookText, marksWords, plainAnalyzer, unknownKeys } from "../src/models/ReaderWords";
 
 describe("base64 pieces", () => {
@@ -10,6 +10,26 @@ describe("base64 pieces", () => {
         for (const piece of pieces.slice(0, -1)) expect(piece.length % 4).toBe(0);
         expect(pieces.join("")).toBe(data);
         expect(splitBase64("")).toEqual([]);
+    });
+});
+
+describe("base64 decoding", () => {
+    test("matches Buffer for every length, with and without padding", () => {
+        for (let n = 0; n < 50; n++) {
+            const bytes = Uint8Array.from({ length: n }, (_, i) => (i * 53 + 7) % 256);
+            const text = Buffer.from(bytes).toString("base64");
+            expect(fromBase64(text)).toEqual(bytes);
+            expect(fromBase64(text.replace(/=+$/, ""))).toEqual(bytes);
+        }
+    });
+
+    test("a real binary dictionary file round-trips exactly", () => {
+        const file = require("fs").readFileSync("node_modules/az/dicts/prediction-suffixes-1.dawg") as Buffer;
+        expect(fromBase64(file.toString("base64"))).toEqual(new Uint8Array(file));
+    });
+
+    test("rejects text that is not base64", () => {
+        expect(() => fromBase64("ab$d")).toThrow();
     });
 });
 
