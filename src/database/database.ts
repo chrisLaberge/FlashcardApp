@@ -31,10 +31,10 @@ function getDatabase(): Promise<SQLite.SQLiteDatabase> {
 
 async function openAndPrepareDatabase(): Promise<SQLite.SQLiteDatabase> {
     const db = await SQLite.openDatabaseAsync("flashcards.db");
+    // Faster writes. Optional: if this phone refuses, the database simply stays in its default mode.
+    await db.execAsync("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;").catch(() => undefined);
     try {
         await db.execAsync(`
-            PRAGMA journal_mode = WAL;
-            PRAGMA synchronous = NORMAL;
             PRAGMA foreign_keys = ON;
             CREATE TABLE IF NOT EXISTS decks (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
