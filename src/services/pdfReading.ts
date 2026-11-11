@@ -6,7 +6,7 @@ import { titleFromFileName } from "../models/PdfText";
 
 export class PdfError extends Error {}
 
-const detail = (error: unknown) => (error instanceof Error ? error.message.slice(0, 140) : String(error).slice(0, 140));
+const detail = (error: unknown) => (error instanceof Error ? error.message : String(error)).replace(/\s+/g, " ").slice(0, 400);
 
 /**
  * Pick a PDF and keep a copy on the phone. No account and no internet needed: reading, selecting
@@ -23,16 +23,7 @@ export async function addPdf(language: string): Promise<number | null> {
     const asset = picked.assets[0];
     if (!/\.pdf$/i.test(asset.name) && asset.mimeType !== "application/pdf") throw new PdfError("Pick a PDF file.");
 
-    const base = FileSystem.documentDirectory;
-    if (!base) throw new PdfError("This device has no place to keep files.");
-    const folder = `${base}pdfs/`;
-    const target = `${folder}${Date.now()}.pdf`;
-    try {
-        await FileSystem.makeDirectoryAsync(folder, { intermediates: true });
-        await FileSystem.copyAsync({ from: asset.uri, to: target });
-    } catch (error) {
-        throw new PdfError(`Could not save the PDF. (${detail(error)})`);
-    }
+    const target = await saveCopy(asset.uri);
     try {
         return await addMyText(titleFromFileName(asset.name), language, "", Date.now(), target);
     } catch (error) {
@@ -55,4 +46,32 @@ export async function pdfChunks(path: string): Promise<string[]> {
 /** Removes a book's PDF file; one that is already gone is fine. */
 export function removePdfFile(path: string | null): void {
     if (path) void FileSystem.deleteAsync(path, { idempotent: true }).catch(() => undefined);
+}
+
+/**
+ * Keeps a copy of the picked file. Tries the permanent folder first and the cache folder if that is refused,
+ * and for each tries a straight copy, then reading and writing the bytes (which works where a copy is not allowed).
+ */
+async function saveCopy(from: string): Promise<string> {
+    const places = [FileSystem.documentDirectory, FileSystem.cacheDirectory].filter((p): p is string => !!p);
+    if (places.length === 0) throw new PdfError("This device has no place to keep files.");
+    const problems: string[] = [];
+    for (const base of places) {
+        const folder = `${base}pdfs/`;
+        const target = `${folder}${Date.now()}.pdf`;
+        try {
+            await FileSystem.makeDirectoryAsync(folder, { intermediates: true }).catch(() => undefined);
+            try {
+                await FileSystem.copyAsync({ from, to: target });
+            } catch (copyError) {
+                problems.push(`copy: ${detail(copyError)}`);
+                const data = await FileSystem.readAsStringAsync(from, { encoding: FileSystem.EncodingType.Base64 });
+                await FileSystem.writeAsStringAsync(target, data, { encoding: FileSystem.EncodingType.Base64 });
+            }
+            return target;
+        } catch (error) {
+            problems.push(detail(error));
+        }
+    }
+    throw new PdfError(`Could not save the PDF. ${problems.join(" | ")}`);
 }
