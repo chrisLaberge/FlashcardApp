@@ -1,6 +1,6 @@
 import { analyzeText, spacedWords } from "../src/models/BookAnalysis";
 import { fromBase64, splitBase64 } from "../src/models/Base64";
-import { bookText, marksWords, plainAnalyzer, unknownKeys } from "../src/models/ReaderWords";
+import { bookText, learningKeys, marksWords, plainAnalyzer, unknownKeys } from "../src/models/ReaderWords";
 
 describe("base64 pieces", () => {
     test("pieces are multiples of 4 and join back to the original", () => {
@@ -111,5 +111,13 @@ describe("names and places", () => {
         expect([...german.lemmas.values()].some((l) => l.ignored)).toBe(false);
         const chinese = await analyzeText("我 喜欢 猫 我 喜欢 狗", plainAnalyzer("zh"));
         expect([...chinese.lemmas.values()].some((l) => l.ignored)).toBe(false);
+    });
+});
+
+describe("learningKeys", () => {
+    test("picks the page's words that have a card you are still learning", () => {
+        const analyzer = plainAnalyzer("es");
+        expect(learningKeys(["hola", "perro", "12"], analyzer, new Set(["perro"]))).toEqual(["perro"]);
+        expect(learningKeys(["hola"], analyzer, new Set())).toEqual([]);
     });
 });

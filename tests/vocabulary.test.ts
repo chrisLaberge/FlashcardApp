@@ -157,6 +157,23 @@ describe("the known-word bank and book coverage", () => {
         expect((await coverage(a)).knownTokens).toBe(0);
     });
 
+    test("the library refresh only does the work when the cards changed", async () => {
+        const { db } = await setup();
+        const d = await db.addDeck("One", "ru");
+        const c = await db.addCard("книга", "book", "", "", d);
+        let loads = 0;
+        const load = async () => { loads++; return russian; };
+
+        expect(await service().syncIfCardsChanged("ru", load)).toBe(true); // first time
+        expect(await service().syncIfCardsChanged("ru", load)).toBe(false); // nothing changed: no dictionary load
+        expect(loads).toBe(1);
+
+        rawDb().prepare("UPDATE card_progress SET level = 6 WHERE card_id = ?").run(c);
+        expect(await service().syncIfCardsChanged("ru", load)).toBe(true);
+        expect(loads).toBe(2);
+        expect([...(await db.getKnownLemmas("ru"))]).toContain("книга");
+    });
+
     test("what you set yourself beats the cards, both ways", async () => {
         const { db, a, coverage } = await setup();
         const deck = await db.addDeck("One", "ru");

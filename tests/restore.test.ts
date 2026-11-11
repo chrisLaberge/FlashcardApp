@@ -46,13 +46,40 @@ describe("restoreFromBackup", () => {
             const db = startApp(); // a new, empty app
             const result = await db.restoreFromBackup(asSource(new DatabaseSync(file, { readOnly: true })));
 
-            expect(result).toEqual({ decks: 1, cards: 2, images: 1, reviews: 3 });
+            expect(result).toEqual({ decks: 1, cards: 2, images: 1, reviews: 3, books: 0 });
             expect((await db.getDecks())[0]).toMatchObject({ id: before.deckId, name: "Russian", language: "ru" });
             expect(await db.getCard(before.a)).toEqual(before.cardA);
             expect(await db.getCardProgress(before.a)).toEqual(before.progressA);
             expect(await db.getCardProgress(before.b)).toEqual(before.progressB);
             expect(await db.getReviewLog()).toEqual(before.log);
             expect((await db.getCardImage(before.a))?.provider_id).toBe("99");
+        } finally {
+            stopApp();
+            tmp.cleanup();
+        }
+    });
+
+    test("brings back books, known and ignored words and word counts, but forgets PDF file paths", async () => {
+        const tmp = makeTempDir();
+        try {
+            const file = tmp.path("vocab.db");
+            const first = startApp(file);
+            const id = await first.addMyText("Book", "ru", "", Date.now(), "file:///old/phone/book.pdf");
+            await first.setMyTextBody(id, "привет мир");
+            await first.saveBookAnalysis(id, 1, 2, new Map([["привет", { count: 3, sample: "привет" }]]));
+            await first.setWordKnown("ru", "мир", true);
+            await first.setWordIgnored("ru", "иван", true);
+            await first.addDeck("Russian", "ru");
+            stopApp();
+
+            const db = startApp();
+            const result = await db.restoreFromBackup(asSource(new DatabaseSync(file, { readOnly: true })));
+            expect(result.books).toBe(1);
+            const book = await db.getMyText(id);
+            expect(book?.pdfPath).toBeNull();
+            expect(book?.body).toBe("привет мир");
+            expect(await db.getTopUnknown(id, 10)).toEqual([expect.objectContaining({ lemma: "привет", count: 3 })]);
+            expect([...(await db.getKnownLemmas("ru"))].sort()).toEqual(["иван", "мир"]);
         } finally {
             stopApp();
             tmp.cleanup();
@@ -150,7 +177,7 @@ describe("restoreFromBackup", () => {
         const db = startApp();
         const result = await db.restoreFromBackup(asSource(old));
 
-        expect(result).toEqual({ decks: 1, cards: 2, images: 0, reviews: 0 });
+        expect(result).toEqual({ decks: 1, cards: 2, images: 0, reviews: 0, books: 0 });
         const known = (await db.getCardProgress(1))!;
         expect(known).toMatchObject({ reviewCount: 12, mastered: true, level: 4 });
         expect(known.fsrsCard).toBeUndefined(); // converted on its first review, like any old card

@@ -1,4 +1,5 @@
-import { getCardsForVocabulary, getMyText, getMyTexts, replaceCardKnownWords, saveBookAnalysis } from "../database/database";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { getCardFingerprint, getCardsForVocabulary, getMyText, getMyTexts, replaceCardKnownWords, saveBookAnalysis } from "../database/database";
 import { analyzeText, spacedWords } from "../models/BookAnalysis";
 import type { Analyzer } from "../models/language/types";
 import { tokenize } from "../models/Tokens";
@@ -21,6 +22,20 @@ function inOrder<T>(job: () => Promise<T>): Promise<T> {
  * to run whenever the library opens, which keeps coverage right without hooks in every card edit.
  */
 export const syncKnownWords = (language: string, analyzer: Analyzer): Promise<void> => inOrder(() => syncNow(language, analyzer));
+
+/**
+ * Like syncKnownWords, but only does the work when the cards or their progress changed since the last time
+ * (so opening the library costs one small query). The analyzer is loaded only when it is needed, because for
+ * some languages that is the slow part. Resolves to true when the known words were updated.
+ */
+export async function syncIfCardsChanged(language: string, loadAnalyzer: () => Promise<Analyzer>): Promise<boolean> {
+    const key = `vocab-sync:${language}`;
+    const now = await getCardFingerprint(language);
+    if ((await AsyncStorage.getItem(key)) === now) return false;
+    await syncKnownWords(language, await loadAnalyzer());
+    await AsyncStorage.setItem(key, now);
+    return true;
+}
 
 async function syncNow(language: string, analyzer: Analyzer): Promise<void> {
     const cards = await getCardsForVocabulary(language);

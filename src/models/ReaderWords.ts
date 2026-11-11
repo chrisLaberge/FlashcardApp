@@ -27,5 +27,16 @@ export function unknownKeys(keys: readonly string[], analyzer: Analyzer, known: 
     return out;
 }
 
+/** Which of the page's words have a card you are still learning (they get a fainter mark). */
+export function learningKeys(keys: readonly string[], analyzer: Analyzer, inDeck: ReadonlySet<string>): string[] {
+    if (inDeck.size === 0) return [];
+    const out: string[] = [];
+    for (const key of keys) {
+        if (!/\p{L}/u.test(key)) continue;
+        if (inDeck.has(analyzer.lemma(key).lemma)) out.push(key);
+    }
+    return out;
+}
+
 /** Joins the pages read out of the PDF into the book's text (blank line between pages). */
 export const bookText = (pages: readonly string[]): string => pages.map((p) => p.trim()).filter(Boolean).join("\n\n");

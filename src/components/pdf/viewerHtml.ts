@@ -20,6 +20,7 @@ canvas { display:block; }
 #text > span { position:absolute; white-space:pre; color:transparent; transform-origin:0 0; cursor:text; }
 #text ::selection { background:rgba(0,110,255,0.35); }
 .u { background:var(--hl); border-bottom:2px solid var(--accent); border-radius:3px; }
+.l { background:rgba(79,157,255,0.10); border-radius:3px; }
 #bar { position:absolute; left:0; right:0; bottom:0; height:60px; background:var(--bar); display:flex; align-items:center; gap:4px; padding:0 8px; box-sizing:border-box; }
 .btn { flex:none; width:40px; height:40px; border:0; border-radius:10px; background:transparent; color:var(--fg); font-size:22px; line-height:40px; text-align:center; padding:0; }
 .btn:active { background:rgba(255,255,255,0.12); }
@@ -168,7 +169,7 @@ const SCRIPT = String.raw`
       var raw = textDivs[i].getAttribute("data-raw") || "", html = "", last = 0, rs = ranges[i];
       if (!rs.length) { if (textDivs[i].children.length) textDivs[i].textContent = raw; continue; }
       for (var q = 0; q < rs.length; q++) {
-        html += esc(raw.slice(last, rs[q][0])) + '<span class="u" data-w="' + esc(rs[q][2]) + '">' + esc(raw.slice(rs[q][0], rs[q][1])) + "</span>";
+        html += esc(raw.slice(last, rs[q][0])) + '<span class="' + (unknown[key(rs[q][2])] === 2 ? "l" : "u") + '" data-w="' + esc(rs[q][2]) + '">' + esc(raw.slice(rs[q][0], rs[q][1])) + "</span>";
         last = rs[q][1];
       }
       textDivs[i].innerHTML = html + esc(raw.slice(last));
@@ -184,7 +185,7 @@ const SCRIPT = String.raw`
       for (var j = 0; j < ws.length; j++) {
         var w = ws[j];
         if (w.text.length >= minLen() && unknown[key(w.text)]) {
-          html += esc(raw.slice(last, w.index)) + '<span class="u">' + esc(w.text) + "</span>";
+          html += esc(raw.slice(last, w.index)) + '<span class="' + (unknown[key(w.text)] === 2 ? "l" : "u") + '">' + esc(w.text) + "</span>";
           last = w.index + w.text.length;
           any = true;
         }
@@ -253,7 +254,7 @@ const SCRIPT = String.raw`
     if (sel && !sel.isCollapsed) return;
     if (pinched) { pinched = false; return; }
     var t = e.target;
-    if (t && t.className === "u") { post({ type: "select", text: t.getAttribute("data-w") || t.textContent, context: contextFor(t) }); return; }
+    if (t && (t.className === "u" || t.className === "l")) { post({ type: "select", text: t.getAttribute("data-w") || t.textContent, context: contextFor(t) }); return; }
     if (selectedAtStart) return; // this tap only dropped a selection
     var f = e.clientX / window.innerWidth;
     if (f > 0.65) goto(pageNo + 1);
@@ -273,6 +274,15 @@ const SCRIPT = String.raw`
   nextBtn.onclick = function () { goto(pageNo + 1); };
   document.getElementById("zout").onclick = function () { setZoom(zoom / 1.25); };
   document.getElementById("zin").onclick = function () { setZoom(zoom * 1.25); };
+  // Sends the words marked as unknown on this page (not the faint ones) so the app can mark them all known.
+  document.getElementById("all").onclick = function () {
+    var spans = textEl.querySelectorAll("span.u"), seen = {}, keys = [];
+    for (var i = 0; i < spans.length; i++) {
+      var k = key(spans[i].getAttribute("data-w") || spans[i].textContent);
+      if (!seen[k]) { seen[k] = 1; keys.push(k); }
+    }
+    post({ type: "markPage", keys: keys });
+  };
   document.getElementById("night").onclick = function () { sheet.classList.toggle("night"); post({ type: "night", on: sheet.classList.contains("night") }); };
   function setZoom(z) { zoom = Math.max(0.6, Math.min(4, z)); render(true); }
 
@@ -441,6 +451,7 @@ const SCRIPT = String.raw`
     } else if (m.t === "unknown") {
       if (m.replace) unknown = {};
       for (var i = 0; i < m.keys.length; i++) unknown[m.keys[i]] = 1;
+      if (m.learning) for (var q2 = 0; q2 < m.learning.length; q2++) unknown[m.learning[q2]] = 2;
       highlight();
     } else if (m.t === "reclassify") {
       announceWords(true);
@@ -471,6 +482,7 @@ const BODY = `
   <button class="btn" id="next" aria-label="Next page">&#8250;</button>
   <button class="btn" id="zout" aria-label="Zoom out">&#8722;</button>
   <button class="btn" id="zin" aria-label="Zoom in">+</button>
+  <button class="btn" id="all" aria-label="Mark this page's words as known">&#10003;</button>
   <button class="btn" id="night" aria-label="Dark pages">&#9680;</button>
 </div>`;
 

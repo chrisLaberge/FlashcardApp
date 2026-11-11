@@ -768,11 +768,19 @@ export type RestoreResult = {
     cards: number;
     images: number;
     reviews: number;
+    /** Books and PDFs brought back. Their text and word counts return; PDF files need adding again. */
+    books: number;
 };
 
 export class RestoreError extends Error {}
 
-const RESTORE_TABLES = ["decks", "images", "cards", "card_progress", "review_log", "card_add_log", "achievement_unlocks"] as const;
+const RESTORE_TABLES = [
+    "decks", "images", "cards", "card_progress", "review_log", "card_add_log", "achievement_unlocks",
+    "my_texts", "known_words", "book_vocab",
+] as const;
+
+/** Columns that point at files on the old phone. The files are not in a backup, so they are forgotten. */
+const RESTORE_SKIP_COLUMNS: Record<string, string[]> = { images: ["local_path"], my_texts: ["pdf_path"] };
 
 async function columnNames(db: RestoreSource, table: string): Promise<string[]> {
     const rows = await db.getAllAsync<{ name: string }>(`PRAGMA table_info(${table})`);
@@ -810,7 +818,7 @@ export async function restoreFromBackup(source: RestoreSource): Promise<RestoreR
     const sourceHadLevels = tables.includes("card_progress")
         && (await columnNames(source, "card_progress")).includes("level");
 
-    const result: RestoreResult = { decks: 0, cards: 0, images: 0, reviews: 0 };
+    const result: RestoreResult = { decks: 0, cards: 0, images: 0, reviews: 0, books: 0 };
 
     await database.withTransactionAsync(async () => {
         // Rows are copied table by table; references are checked once everything is in.
@@ -820,9 +828,9 @@ export async function restoreFromBackup(source: RestoreSource): Promise<RestoreR
             if (!tables.includes(table)) continue;
 
             const targetColumns = await columnNames(database, table);
-            // The old copy of the picture file lives in another app's storage: forget it, it is downloaded again.
+            const skip = RESTORE_SKIP_COLUMNS[table] ?? [];
             const columns = (await columnNames(source, table)).filter(
-                (name) => targetColumns.includes(name) && !(table === "images" && name === "local_path"),
+                (name) => targetColumns.includes(name) && !skip.includes(name),
             );
             if (columns.length === 0) continue;
 
@@ -838,6 +846,7 @@ export async function restoreFromBackup(source: RestoreSource): Promise<RestoreR
             if (table === "cards") result.cards = rows.length;
             if (table === "images") result.images = rows.length;
             if (table === "review_log") result.reviews = rows.length;
+            if (table === "my_texts") result.books = rows.length;
         }
 
         // Tidy references that point at something the backup did not contain.
@@ -845,6 +854,7 @@ export async function restoreFromBackup(source: RestoreSource): Promise<RestoreR
             DELETE FROM card_progress WHERE card_id NOT IN (SELECT id FROM cards);
             UPDATE cards SET image_id = NULL WHERE image_id IS NOT NULL AND image_id NOT IN (SELECT id FROM images);
             INSERT OR IGNORE INTO card_progress (card_id) SELECT id FROM cards;
+            DELETE FROM book_vocab WHERE book_id NOT IN (SELECT id FROM my_texts);
         `);
         const orphanCards = await database.getFirstAsync<{ n: number }>(
             "SELECT COUNT(*) AS n FROM cards WHERE deck_id NOT IN (SELECT id FROM decks)",
@@ -975,6 +985,13 @@ export async function getKnownLemmas(language: string): Promise<Set<string>> {
     return new Set(rows.map((r) => r.lemma));
 }
 
+/** Words that have a card but are not learned yet. */
+export async function getInDeckLemmas(language: string): Promise<Set<string>> {
+    const database = await getDatabase();
+    const rows = await database.getAllAsync<{ lemma: string }>("SELECT lemma FROM known_words WHERE language = ? AND known = 3", language);
+    return new Set(rows.map((r) => r.lemma));
+}
+
 /* ---------------------------- Known words and books ---------------------------- */
 
 export type BookSummary = { id: number; title: string; language: string; totalTokens: number | null; analyzerVersion: number | null; knownTokens: number; /** Occurrences of names and places, which count for neither side of the coverage. */ ignoredTokens: number };
@@ -1042,6 +1059,17 @@ export async function getCardsForVocabulary(language: string): Promise<{ text: s
         WHERE d.language = ?
     `, language);
     return rows.map((r) => ({ text: r.learning_text, level: r.level ?? 0, mastered: r.mastered === 1 }));
+}
+
+/** A short fingerprint of a language's cards and their progress; it changes whenever a card is added, edited or studied. */
+export async function getCardFingerprint(language: string): Promise<string> {
+    const database = await getDatabase();
+    const row = await database.getFirstAsync<{ n: number; text: number | null; lvl: number | null; done: number | null }>(`
+        SELECT COUNT(*) AS n, SUM(LENGTH(c.learning_text)) AS text, SUM(p.level) AS lvl, SUM(p.mastered) AS done
+        FROM cards c JOIN decks d ON d.id = c.deck_id LEFT JOIN card_progress p ON p.card_id = c.id
+        WHERE d.language = ?
+    `, language);
+    return `${row?.n ?? 0}:${row?.text ?? 0}:${row?.lvl ?? 0}:${row?.done ?? 0}`;
 }
 
 /** Saves a book's analysis in one go: the old counts are replaced and the totals set, or nothing changes. */

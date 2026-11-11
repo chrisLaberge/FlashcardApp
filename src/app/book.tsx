@@ -12,6 +12,8 @@ import type { Palette } from "../theme/themes";
 
 type Word = { lemma: string; count: number; sample: string };
 
+const PAGE = 50;
+
 /** How much of a book you know, and the words you meet most that you do not know yet. */
 export default function BookScreen() {
     const t = useTheme();
@@ -22,12 +24,16 @@ export default function BookScreen() {
     const [words, setWords] = useState<Word[]>([]);
 
     const syncing = useRef(false);
+    // How many words are listed. One more is asked for, to know whether "Show more" is needed.
+    const limit = useRef(PAGE);
+    const [more, setMore] = useState(false);
 
     // Reads the numbers and the list straight from the database.
     const show = useCallback(async () => {
-        const [summary, unknown] = await Promise.all([getBookSummary(bookId), getTopUnknown(bookId, 100)]);
+        const [summary, unknown] = await Promise.all([getBookSummary(bookId), getTopUnknown(bookId, limit.current + 1)]);
         setBook(summary);
-        setWords(unknown);
+        setMore(unknown.length > limit.current);
+        setWords(unknown.slice(0, limit.current));
         return summary;
     }, [bookId]);
 
@@ -50,6 +56,11 @@ export default function BookScreen() {
     }, [bookId, show]);
 
     useFocusEffect(useCallback(() => { void load(); }, [load]));
+
+    const showMore = async () => {
+        limit.current += PAGE;
+        await show();
+    };
 
     if (book === undefined) return <View style={s.container}><ActivityIndicator color={t.blue} style={{ marginTop: 40 }} /></View>;
     if (book === null) return <View style={s.container}><Text style={s.empty}>Not found.</Text></View>;
@@ -83,6 +94,11 @@ export default function BookScreen() {
                         </Pressable>
                     </View>
                 }
+                ListFooterComponent={more ? (
+                    <Pressable style={s.more} onPress={showMore} accessibilityRole="button">
+                        <Text style={s.smallText}>Show more</Text>
+                    </Pressable>
+                ) : undefined}
                 ListEmptyComponent={<Text style={s.empty}>{total === 0 ? "No words found." : "You know every word."}</Text>}
                 renderItem={({ item }) => (
                     <View style={s.row}>
@@ -120,5 +136,6 @@ const makeS = (t: Palette) => StyleSheet.create({
     small: { backgroundColor: t.surfaceHigh, borderRadius: 10, paddingVertical: 9, paddingHorizontal: 12 },
     primary: { backgroundColor: t.green },
     smallText: { color: t.text, fontWeight: "600", fontSize: 13 },
+    more: { alignSelf: "center", backgroundColor: t.surfaceHigh, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 28, marginTop: 8 },
     empty: { color: t.muted, textAlign: "center", marginTop: 40 },
 });
