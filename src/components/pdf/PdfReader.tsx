@@ -1,9 +1,7 @@
-import { Asset } from "expo-asset";
-import { File } from "expo-file-system";
 import { router } from "expo-router";
-import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type Ref } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
-import { WebView as NativeWebView, type WebViewMessageEvent, type WebViewProps } from "react-native-webview";
+import type { WebViewMessageEvent } from "react-native-webview";
 import { getKnownLemmas, setLastPage, setMyTextBody, setWordKnown, type MyText } from "../../database/database";
 import { bookText, marksWords, unknownKeys } from "../../models/ReaderWords";
 import type { Analyzer } from "../../models/language/types";
@@ -14,7 +12,7 @@ import { analyzeBook, syncKnownWords } from "../../services/vocabulary";
 import { useTheme } from "../../theme/ThemeProvider";
 import type { Palette } from "../../theme/themes";
 import LookupSheet from "../LookupSheet";
-import { viewerHtml } from "./viewerHtml";
+import { loadViewerHtml, WebView, type WebHandle } from "./viewerSource";
 
 type Props = {
     book: MyText;
@@ -22,30 +20,6 @@ type Props = {
     /** Called once the words of the whole book have been counted, so coverage can be shown again. */
     onAnalyzed?: () => void;
 };
-
-type WebHandle = { injectJavaScript: (script: string) => void };
-// The package types its class so that it cannot be used in JSX as written; this is the shape it really has.
-const WebView = NativeWebView as unknown as ComponentType<WebViewProps & { ref?: Ref<WebHandle> }>;
-
-let page: Promise<string> | null = null;
-
-/** The reader page, built once: pdf.js comes from files bundled with the app. */
-function loadViewerHtml(): Promise<string> {
-    page ??= (async () => {
-        const text = async (module: number) => {
-            const asset = Asset.fromModule(module);
-            await asset.downloadAsync();
-            return new File(asset.localUri ?? asset.uri).text();
-        };
-        // eslint-disable-next-line @typescript-eslint/no-require-imports -- Metro needs these written as plain require() calls
-        const [lib, worker] = await Promise.all([text(require("../../../assets/pdfviewer/pdf.min.pdfjs")), text(require("../../../assets/pdfviewer/pdf.worker.min.pdfjs"))]);
-        return viewerHtml(lib, worker);
-    })().catch((error: unknown) => {
-        page = null;
-        throw error;
-    });
-    return page;
-}
 
 type Incoming =
     | { type: "ready" }
@@ -107,14 +81,14 @@ export default function PdfReader({ book, languageName, onAnalyzed }: Props) {
         try {
             const chunks = await pdfChunks(book.pdfPath);
             send({
-                t: "open", chunks: chunks.length, page: book.lastPage ?? 1, needText,
+                t: "open", chunks: chunks.length, page: book.lastPage ?? 1, needText, lang: book.language, segment: !marksWords(book.language),
                 theme: { bg: t.bg, bar: t.surface, fg: t.text, muted: t.muted, accent: t.blue },
             });
             chunks.forEach((d, i) => send({ t: "chunk", i, d }));
         } catch (error) {
             setFailure(error instanceof Error ? error.message : String(error));
         }
-    }, [book.pdfPath, book.lastPage, needText, send, t]);
+    }, [book.pdfPath, book.lastPage, book.language, needText, send, t]);
 
     const finishText = useCallback(async () => {
         const body = bookText(pagesText.current);
@@ -157,7 +131,6 @@ export default function PdfReader({ book, languageName, onAnalyzed }: Props) {
                 break;
             }
             case "words": {
-                if (!marksWords(book.language)) break;
                 const analyzer = await ready();
                 send({ t: "unknown", keys: unknownKeys(message.words, analyzer, known.current), replace: !!message.replace });
                 break;
@@ -180,7 +153,7 @@ export default function PdfReader({ book, languageName, onAnalyzed }: Props) {
     }, [book.id, book.language, open, ready, send, finishText]);
 
     // A single word can be marked known; a phrase cannot.
-    const single = lookup ? tokenize(lookup.text).filter((x) => x.word).length === 1 : false;
+    const single = lookup ? (marksWords(book.language) ? tokenize(lookup.text).filter((x) => x.word).length === 1 : !/\s/.test(lookup.text.trim())) : false;
 
     const markKnown = async () => {
         if (!lookup) return;

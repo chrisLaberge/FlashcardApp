@@ -548,6 +548,17 @@ describe("words added", () => {
         expect(await db.deleteMyText(id)).toBeNull();
     });
 
+    test("pending PDFs: added but not yet counted", async () => {
+        const db = startApp();
+        const pending = await db.addMyText("A", "es", "", 1, "file:///a.pdf");
+        const counted = await db.addMyText("B", "es", "Hola", 2, "file:///b.pdf");
+        await db.addMyText("Plain text", "es", "sin pdf", 3);
+        await db.saveBookAnalysis(counted, 1, 1, new Map([["hola", { count: 1, sample: "hola" }]]));
+        expect(await db.getPendingPdfs()).toEqual([pending]);
+        await db.saveBookAnalysis(pending, 1, 0, new Map()); // a PDF with no text is finished too
+        expect(await db.getPendingPdfs()).toEqual([]);
+    });
+
     test("known lemmas: only words marked known, per language", async () => {
         const db = startApp();
         await db.setWordKnown("es", "perro", true);

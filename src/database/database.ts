@@ -955,6 +955,13 @@ export async function deleteMyText(id: number): Promise<string | null> {
     return row?.pdf_path ?? null;
 }
 
+/** PDFs that were added but not yet read and counted (the app was closed part way, or reading failed). */
+export async function getPendingPdfs(): Promise<number[]> {
+    const database = await getDatabase();
+    const rows = await database.getAllAsync<{ id: number }>("SELECT id FROM my_texts WHERE pdf_path IS NOT NULL AND analyzer_version IS NULL ORDER BY id");
+    return rows.map((r) => r.id);
+}
+
 /** Every word of the language you know (known by your cards or by your own choice), as lemma keys. */
 export async function getKnownLemmas(language: string): Promise<Set<string>> {
     const database = await getDatabase();

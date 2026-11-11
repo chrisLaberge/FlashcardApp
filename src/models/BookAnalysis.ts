@@ -11,6 +11,11 @@ export type BookStats = {
 };
 
 const hasLetter = /\p{L}/u;
+
+/** The words of a text whose words are already separated by spaces (what the PDF reader produces for Chinese and the like). */
+export function spacedWords(text: string): { text: string; word: boolean }[] {
+    return (text.match(/[\p{L}\p{M}\p{N}]+/gu) ?? []).filter((w) => hasLetter.test(w)).map((w) => ({ text: w, word: true }));
+}
 const BATCH = 2000;
 
 /** Lets the screen redraw between batches so a long book does not freeze the app. */
@@ -21,7 +26,7 @@ const nextTick = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
  * repeated forms are looked up once. Returns a total of 0 when the text has no words.
  */
 export async function analyzeText(text: string, analyzer: Analyzer, onProgress?: (done: number, total: number) => void): Promise<BookStats> {
-    const words = tokenize(text).filter((t) => t.word && hasLetter.test(t.text));
+    const words = analyzer.segmented ? spacedWords(text) : tokenize(text).filter((t) => t.word && hasLetter.test(t.text));
     const cache = new Map<string, string>();
     const forms = new Map<string, Map<string, number>>();
     const lemmas = new Map<string, BookLemma>();

@@ -9,7 +9,8 @@ export const marksWords = (language: string): boolean => !NO_SPACES.has(language
 /** Used where a language has no dictionary: a word is only itself (lower case), so it matches the same spelling on your cards. */
 export const plainAnalyzer = (language: string): Analyzer => ({
     language,
-    version: 1,
+    version: 2,
+    segmented: !marksWords(language),
     lemma: (surface) => ({ lemma: lemmaKey(surface), confident: false }),
 });
 

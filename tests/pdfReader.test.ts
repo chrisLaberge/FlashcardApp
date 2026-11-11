@@ -1,3 +1,4 @@
+import { analyzeText, spacedWords } from "../src/models/BookAnalysis";
 import { splitBase64 } from "../src/models/Base64";
 import { bookText, marksWords, plainAnalyzer, unknownKeys } from "../src/models/ReaderWords";
 
@@ -37,5 +38,25 @@ describe("marking unknown words", () => {
     test("pages join with a blank line, empty pages are dropped", () => {
         expect(bookText([" Uno ", "", "Dos\n"])).toBe("Uno\n\nDos");
         expect(bookText(["", " "])).toBe("");
+    });
+});
+
+describe("languages written without spaces", () => {
+    const zh = plainAnalyzer("zh");
+
+    test("the plain analyser is segmented for Chinese, not for Spanish", () => {
+        expect(zh.segmented).toBe(true);
+        expect(plainAnalyzer("es").segmented).toBeFalsy();
+    });
+
+    test("a text cut into words by spaces counts whole words, not characters", async () => {
+        const stats = await analyzeText("我 喜欢 学习 中文 。 我 喜欢 猫", zh);
+        expect(stats.total).toBe(7);
+        expect(stats.lemmas.get("喜欢")?.count).toBe(2);
+        expect(stats.lemmas.get("我")?.count).toBe(2);
+    });
+
+    test("spacedWords drops punctuation and keeps whole words", () => {
+        expect(spacedWords("你好 ， 世界 ！").map((w) => w.text)).toEqual(["你好", "世界"]);
     });
 });

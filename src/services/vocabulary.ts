@@ -1,5 +1,5 @@
 import { getCardsForVocabulary, getMyText, getMyTexts, replaceCardKnownWords, saveBookAnalysis } from "../database/database";
-import { analyzeText } from "../models/BookAnalysis";
+import { analyzeText, spacedWords } from "../models/BookAnalysis";
 import type { Analyzer } from "../models/language/types";
 import { tokenize } from "../models/Tokens";
 import { knownFromCards } from "../models/Vocabulary";
@@ -25,7 +25,7 @@ export const syncKnownWords = (language: string, analyzer: Analyzer): Promise<vo
 async function syncNow(language: string, analyzer: Analyzer): Promise<void> {
     const cards = await getCardsForVocabulary(language);
     const known = knownFromCards(cards.map((card) => {
-        const words = tokenize(card.text).filter((t) => t.word && hasLetter.test(t.text));
+        const words = analyzer.segmented ? spacedWords(card.text) : tokenize(card.text).filter((t) => t.word && hasLetter.test(t.text));
         // A phrase is not one word, so it says nothing about any single word.
         return { lemma: words.length === 1 ? analyzer.lemma(words[0].text).lemma : null, level: card.level, mastered: card.mastered };
     }));
