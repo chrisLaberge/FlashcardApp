@@ -1,13 +1,15 @@
-import { router } from "expo-router";
+import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import type { WebViewMessageEvent } from "react-native-webview";
-import { getBookNames, getKnownLemmas, setLastPage, setMyTextBody, setWordKnown, setWordName, type MyText } from "../../database/database";
+import { getBookIgnored, getKnownLemmas, setLastPage, setMyTextBody, setWordKnown, setWordIgnored, type MyText } from "../../database/database";
 import { bookText, marksWords, unknownKeys } from "../../models/ReaderWords";
 import type { Analyzer } from "../../models/language/types";
 import { tokenize } from "../../models/Tokens";
 import { readerAnalyzerFor } from "../../services/morphology";
-import { pdfChunks } from "../../services/pdfReading";
+import { openAddCard } from "../../services/openAddCard";
+import { friendlyPdfError } from "../../models/PdfErrors";
+import { sendPdf } from "../../services/pdfReading";
 import { analyzeBook, syncKnownWords } from "../../services/vocabulary";
 import { useTheme } from "../../theme/ThemeProvider";
 import type { Palette } from "../../theme/themes";
@@ -28,7 +30,7 @@ type Incoming =
     | { type: "select"; text: string; context: string }
     | { type: "text"; from: number; pages: string[] }
     | { type: "textDone" }
-    | { type: "error"; message: string };
+    | { type: "error"; message: string; code?: string };
 
 /** The original PDF, page by page. Select text to see what it means; words you do not know yet are marked. */
 export default function PdfReader({ book, languageName, onAnalyzed }: Props) {
@@ -46,6 +48,13 @@ export default function PdfReader({ book, languageName, onAnalyzed }: Props) {
     const pagesText = useRef<string[]>([]);
     const needText = book.body.trim() === "";
     const started = useRef(false);
+    const mounted = useRef(true);
+    useEffect(() => {
+        mounted.current = true;
+        return () => {
+            mounted.current = false;
+        };
+    }, []);
     const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // The analyser and the words you know, loaded once while the page opens.
@@ -59,7 +68,7 @@ export default function PdfReader({ book, languageName, onAnalyzed }: Props) {
             }
             known.current = await getKnownLemmas(book.language);
             // Names the book's own capitalisation gives away are left unmarked too.
-            for (const name of await getBookNames(book.id).catch(() => new Set<string>())) known.current.add(name);
+            for (const name of await getBookIgnored(book.id).catch(() => new Set<string>())) known.current.add(name);
             return analyzer;
         })();
         return prep.current;
@@ -78,15 +87,42 @@ export default function PdfReader({ book, languageName, onAnalyzed }: Props) {
         web.current?.injectJavaScript(`window.onRN(${JSON.stringify(message)});true;`);
     }, []);
 
+    // Coming back from adding a card: re-read what you know, so the word you just added stops being marked.
+    const firstFocus = useRef(true);
+    useFocusEffect(useCallback(() => {
+        if (firstFocus.current) {
+            firstFocus.current = false;
+            return;
+        }
+        if (!prep.current) return;
+        void (async () => {
+            try {
+                const analyzer = await ready();
+                await syncKnownWords(book.language, analyzer);
+                const fresh = await getKnownLemmas(book.language);
+                for (const name of await getBookIgnored(book.id).catch(() => new Set<string>())) fresh.add(name);
+                known.current = fresh;
+                send({ t: "reclassify" });
+                onAnalyzed?.();
+            } catch {
+                // The marks stay as they were.
+            }
+        })();
+    }, [ready, send, book.language, book.id, onAnalyzed]));
+
     const open = useCallback(async () => {
         if (!book.pdfPath) return;
         try {
-            const chunks = await pdfChunks(book.pdfPath);
-            send({
-                t: "open", chunks: chunks.length, page: book.lastPage ?? 1, needText, lang: book.language, segment: !marksWords(book.language),
-                theme: { bg: t.bg, bar: t.surface, fg: t.text, muted: t.muted, accent: t.blue },
-            });
-            chunks.forEach((d, i) => send({ t: "chunk", i, d }));
+            await sendPdf(
+                book.pdfPath,
+                {
+                    t: "open", page: book.lastPage ?? 1, needText, lang: book.language, segment: !marksWords(book.language),
+                    theme: { bg: t.bg, bar: t.surface, fg: t.text, muted: t.muted, accent: t.blue },
+                },
+                send,
+                undefined,
+                () => !mounted.current,
+            );
         } catch (error) {
             setFailure(error instanceof Error ? error.message : String(error));
         }
@@ -149,10 +185,10 @@ export default function PdfReader({ book, languageName, onAnalyzed }: Props) {
                 break;
             case "error":
                 // pdf.js falls back to running on the page itself when its helper thread cannot start; that is fine.
-                if (!/worker|importScripts/i.test(message.message)) setFailure(message.message);
+                if (!/worker|importScripts/i.test(message.message)) setFailure(friendlyPdfError(message.code, message.message));
                 break;
         }
-    }, [book.id, book.language, open, ready, send, finishText]);
+    }, [book.id, open, ready, send, finishText]);
 
     // A single word can be marked known; a phrase cannot.
     const single = lookup ? (marksWords(book.language) ? tokenize(lookup.text).filter((x) => x.word).length === 1 : !/\s/.test(lookup.text.trim())) : false;
@@ -169,14 +205,14 @@ export default function PdfReader({ book, languageName, onAnalyzed }: Props) {
         onAnalyzed?.();
     };
 
-    const markName = async () => {
+    const markIgnored = async () => {
         if (!lookup) return;
         const analyzer = await ready();
         const lemma = analyzer.lemma(lookup.text.trim()).lemma;
         known.current.add(lemma);
         setLookup(null);
         send({ t: "clear" });
-        await setWordName(book.language, lemma, true);
+        await setWordIgnored(book.language, lemma, true);
         send({ t: "reclassify" });
         onAnalyzed?.();
     };
@@ -199,6 +235,8 @@ export default function PdfReader({ book, languageName, onAnalyzed }: Props) {
                 style={s.web}
                 containerStyle={s.web}
                 onError={() => setFailure("Could not show the PDF.")}
+                onRenderProcessGone={() => setFailure("The PDF reader stopped. Go back and open it again.")}
+                onContentProcessDidTerminate={() => setFailure("The PDF reader stopped. Go back and open it again.")}
             />
             {working ? <View style={s.badge} pointerEvents="none"><ActivityIndicator size="small" color={t.blue} /><Text style={s.badgeText}>Counting words…</Text></View> : null}
             {noText ? <View style={s.badge} pointerEvents="none"><Text style={s.badgeText}>No text found (scanned PDF)</Text></View> : null}
@@ -211,12 +249,12 @@ export default function PdfReader({ book, languageName, onAnalyzed }: Props) {
                     languageName={languageName}
                     onClose={() => { setLookup(null); send({ t: "clear" }); }}
                     onKnown={single ? () => void markKnown() : undefined}
-                    onName={single ? () => void markName() : undefined}
+                    onIgnore={single ? () => void markIgnored() : undefined}
                     onAdd={(entry) => {
                         const example = lookup.context !== lookup.text ? lookup.context : "";
                         setLookup(null);
                         send({ t: "clear" });
-                        router.push({ pathname: "/addCard", params: { text: entry.word, meaning: entry.translation, example } });
+                        void openAddCard(book.language, { text: entry.word, meaning: entry.translation, example });
                     }}
                 />
             )}

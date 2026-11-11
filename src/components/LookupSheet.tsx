@@ -18,14 +18,14 @@ type Props = {
     onAdd: (lookup: Lookup) => void;
     /** When given, a "Known" button marks this word as known (shown for a single word). */
     onKnown?: () => void;
-    /** When given, a "Name" button sets this word aside as a name or place. */
-    onName?: () => void;
+    /** When given, an "Ignore" button sets this word aside (a name, a place, or a word of another language). */
+    onIgnore?: () => void;
 };
 
 type State = { status: "loading" } | { status: "error"; message: string } | { status: "done"; lookup: Lookup };
 
 /** A sheet with the meaning of one tapped word or sentence, and a button to make it a card. Mount it fresh for each tap. */
-export default function LookupSheet({ onClose, text, context, languageName, onAdd, onKnown, onName }: Props) {
+export default function LookupSheet({ onClose, text, context, languageName, onAdd, onKnown, onIgnore }: Props) {
     const t = useTheme();
     const s = useMemo(() => makeS(t), [t]);
     const [state, setState] = useState<State>({ status: "loading" });
@@ -89,9 +89,9 @@ export default function LookupSheet({ onClose, text, context, languageName, onAd
                             <Text style={s.knownText}>Known</Text>
                         </Pressable>
                     ) : null}
-                    {onName ? (
-                        <Pressable style={s.name} onPress={onName} accessibilityRole="button" accessibilityLabel="This is a name or place">
-                            <Text style={s.nameText}>Name</Text>
+                    {onIgnore ? (
+                        <Pressable style={s.name} onPress={onIgnore} accessibilityRole="button" accessibilityLabel="Ignore this word (a name, place or another language)">
+                            <Text style={s.nameText}>Ignore</Text>
                         </Pressable>
                     ) : null}
                     {state.status === "done" && (

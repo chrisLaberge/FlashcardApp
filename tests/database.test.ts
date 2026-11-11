@@ -553,27 +553,27 @@ describe("words added", () => {
         const id = await db.addMyText("Libro", "es", "x", 1, "file:///a.pdf");
         await db.saveBookAnalysis(id, 1, 10, new Map([
             ["casa", { count: 4, sample: "casa" }],
-            ["pedro", { count: 3, sample: "Pedro", name: true }],
+            ["pedro", { count: 3, sample: "Pedro", ignored: true }],
             ["marta", { count: 2, sample: "Marta" }],
             ["luz", { count: 1, sample: "luz" }],
         ]));
         await db.setWordKnown("es", "casa", true);
         // Pedro is a name the reader guessed; Marta is one you set aside by hand.
-        await db.setWordName("es", "marta", true);
+        await db.setWordIgnored("es", "marta", true);
         const summary = await db.getBookSummary(id);
         expect(summary).toMatchObject({ totalTokens: 10, knownTokens: 4, ignoredTokens: 5 });
         expect((await db.getTopUnknown(id)).map((w) => w.lemma)).toEqual(["luz"]);
-        expect(await db.getBookNames(id)).toEqual(new Set(["pedro"]));
+        expect(await db.getBookIgnored(id)).toEqual(new Set(["pedro"]));
         expect(await db.getKnownLemmas("es")).toEqual(new Set(["casa", "marta"]));
     });
 
     test("names: saying a guessed name is not one brings it back, and a set-aside name can be taken back", async () => {
         const db = startApp();
         const id = await db.addMyText("Libro", "es", "x", 1, "file:///a.pdf");
-        await db.saveBookAnalysis(id, 1, 5, new Map([["pedro", { count: 3, sample: "Pedro", name: true }], ["marta", { count: 2, sample: "Marta" }]]));
+        await db.saveBookAnalysis(id, 1, 5, new Map([["pedro", { count: 3, sample: "Pedro", ignored: true }], ["marta", { count: 2, sample: "Marta" }]]));
         await db.setWordKnown("es", "pedro", false);
-        await db.setWordName("es", "marta", true);
-        await db.setWordName("es", "marta", false);
+        await db.setWordIgnored("es", "marta", true);
+        await db.setWordIgnored("es", "marta", false);
         expect((await db.getTopUnknown(id)).map((w) => w.lemma).sort()).toEqual(["marta", "pedro"]);
         expect((await db.getBookSummary(id))?.ignoredTokens).toBe(0);
     });

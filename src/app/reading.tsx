@@ -9,6 +9,7 @@ import { getLanguage } from "../constants/languages";
 import { getBookSummary, getMyText, type MyText } from "../database/database";
 import { coveragePercent } from "../models/Vocabulary";
 import { pdfLines } from "../models/PdfText";
+import { openAddCard } from "../services/openAddCard";
 import { textOfWords } from "../models/Selection";
 import { useTheme } from "../theme/ThemeProvider";
 import type { Palette } from "../theme/themes";
@@ -96,7 +97,7 @@ export default function ReadingScreen() {
                     onAdd={(entry) => {
                         const example = lookup.context !== lookup.text ? lookup.context : "";
                         setLookup(null);
-                        router.push({ pathname: "/addCard", params: { text: entry.word, meaning: entry.translation, example } });
+                        void openAddCard(text.language, { text: entry.word, meaning: entry.translation, example });
                     }}
                 />
             )}

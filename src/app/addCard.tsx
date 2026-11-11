@@ -191,7 +191,7 @@ export default function AddCardScreen() {
     useFocusEffect(
         useCallback(() => {
             const loadDeck = async () => {
-                const lastDeckId = await AsyncStorage.getItem("lastDeckId");
+                const lastDeckId = (deckId ?? (await AsyncStorage.getItem("lastDeckId")));
 
                 if (!lastDeckId) {
                     setLearningLanguageCode("en");
@@ -336,7 +336,7 @@ export default function AddCardScreen() {
         example: string,
         replaceCardId?: number
     ) => {
-        const lastDeckId = await AsyncStorage.getItem("lastDeckId");
+        const lastDeckId = (deckId ?? (await AsyncStorage.getItem("lastDeckId")));
 
         if (!lastDeckId) {
             console.error("No selected deck");
@@ -444,7 +444,7 @@ export default function AddCardScreen() {
             return;
         }
 
-        const lastDeckId = await AsyncStorage.getItem("lastDeckId");
+        const lastDeckId = (deckId ?? (await AsyncStorage.getItem("lastDeckId")));
 
         if (!lastDeckId) {
             console.error("No selected deck");

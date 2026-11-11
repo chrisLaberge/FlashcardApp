@@ -166,6 +166,7 @@ export default function LibraryScreen() {
                         >
                             <View style={{ flex: 1 }}>
                                 <Text style={s.name} numberOfLines={2}>{item.title}</Text>
+                                {!job && item.analyzerVersion !== null && item.totalTokens === 0 ? <Text style={s.meta}>No text found (a scan?)</Text> : null}
                                 {job ? (
                                     <>
                                         <View style={s.track}><View style={[s.fill, { width: `${Math.round(fractionOf(job) * 100)}%` }, job.phase === "failed" && s.fillFailed]} /></View>

@@ -1,7 +1,7 @@
 import { lemmaKey } from "../Vocabulary";
 import type { Analyzer } from "./types";
 
-export const RUSSIAN_VERSION = 1;
+export const RUSSIAN_VERSION = 3; // 3: names and words of other languages are set aside
 
 /** The part of the `az` library that is used (it is untyped). */
 export type AzMorph = (word: string) => { normalize(): { word: string }; score: number; parser: string }[];

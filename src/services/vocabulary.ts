@@ -2,7 +2,7 @@ import { getCardsForVocabulary, getMyText, getMyTexts, replaceCardKnownWords, sa
 import { analyzeText, spacedWords } from "../models/BookAnalysis";
 import type { Analyzer } from "../models/language/types";
 import { tokenize } from "../models/Tokens";
-import { knownFromCards } from "../models/Vocabulary";
+import { inDeckFromCards, knownFromCards } from "../models/Vocabulary";
 
 const hasLetter = /\p{L}/u;
 
@@ -24,12 +24,12 @@ export const syncKnownWords = (language: string, analyzer: Analyzer): Promise<vo
 
 async function syncNow(language: string, analyzer: Analyzer): Promise<void> {
     const cards = await getCardsForVocabulary(language);
-    const known = knownFromCards(cards.map((card) => {
+    const rows = cards.map((card) => {
         const words = analyzer.segmented ? spacedWords(card.text) : tokenize(card.text).filter((t) => t.word && hasLetter.test(t.text));
         // A phrase is not one word, so it says nothing about any single word.
         return { lemma: words.length === 1 ? analyzer.lemma(words[0].text).lemma : null, level: card.level, mastered: card.mastered };
-    }));
-    await replaceCardKnownWords(language, known);
+    });
+    await replaceCardKnownWords(language, knownFromCards(rows), inDeckFromCards(rows));
 }
 
 /** Reads a book once and stores how often each word occurs. Returns the number of words found. */

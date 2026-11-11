@@ -55,7 +55,7 @@ describe("counting a book", () => {
 
     test("the sample is the form seen most often", async () => {
         const stats = await analyzeText("книги книги книгу", russian);
-        expect(stats.lemmas.get("книга")).toEqual({ count: 3, sample: "книги", name: false });
+        expect(stats.lemmas.get("книга")).toEqual({ count: 3, sample: "книги", ignored: false });
     });
 
     test("text with no words gives a total of zero", async () => {

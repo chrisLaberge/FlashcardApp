@@ -1,3 +1,4 @@
+import { isForeignSentence, isForeignWord } from "./ForeignText";
 import { tokenize } from "./Tokens";
 import type { Analyzer } from "./language/types";
 import { lemmaKey } from "./Vocabulary";
@@ -6,8 +7,8 @@ export type BookLemma = {
     count: number;
     /** The form seen most often in the text, for showing. */
     sample: string;
-    /** Looks like a name or place: capitalised in the middle of sentences every time, never written in lower case. */
-    name: boolean;
+    /** Left out of the unknown words and the coverage: a name or place (capitalised in the middle of sentences every time) or a word of another language. */
+    ignored: boolean;
 };
 
 export type BookStats = {
@@ -42,17 +43,29 @@ export async function analyzeText(text: string, analyzer: Analyzer, onProgress?:
     const upperMid = new Map<string, number>();
     const writtenLower = new Set<string>();
     let words: { text: string; word: boolean }[];
+    const foreignAt: boolean[] = []; // parallel to `words`: this occurrence is in another language
     if (analyzer.segmented) {
         words = spacedWords(text);
+        for (const w of words) foreignAt.push(isForeignWord(w.text, analyzer.language));
     } else {
         words = [];
         let afterBreak = true;
+        let sentence: number[] = [];
+        const closeSentence = () => {
+            if (sentence.length >= 5 && isForeignSentence(sentence.map((i) => words[i].text), analyzer.language)) {
+                for (const i of sentence) foreignAt[i] = true;
+            }
+            sentence = [];
+        };
         for (const token of tokenize(text)) {
             if (!token.word) {
                 if (SENTENCE_BREAK.test(token.text)) afterBreak = true;
+                if (/[.!?…]|\n\s*\n/.test(token.text)) closeSentence();
                 continue;
             }
             if (!hasLetter.test(token.text)) continue;
+            sentence.push(words.length);
+            foreignAt.push(isForeignWord(token.text, analyzer.language));
             words.push(token);
             if (names) {
                 const key = lemmaKey(token.text);
@@ -63,7 +76,9 @@ export async function analyzeText(text: string, analyzer: Analyzer, onProgress?:
             }
             afterBreak = false;
         }
+        closeSentence();
     }
+    const foreignCount = new Map<string, number>();
     const cache = new Map<string, string>();
     const forms = new Map<string, Map<string, number>>();
     const lemmas = new Map<string, BookLemma>();
@@ -80,9 +95,10 @@ export async function analyzeText(text: string, analyzer: Analyzer, onProgress?:
         seen.set(surface, (seen.get(surface) ?? 0) + 1);
         forms.set(lemma, seen);
 
+        if (foreignAt[i]) foreignCount.set(lemma, (foreignCount.get(lemma) ?? 0) + 1);
         const entry = lemmas.get(lemma);
         if (entry) entry.count += 1;
-        else lemmas.set(lemma, { count: 1, sample: surface, name: false });
+        else lemmas.set(lemma, { count: 1, sample: surface, ignored: false });
 
         if ((i + 1) % BATCH === 0) {
             onProgress?.(i + 1, words.length);
@@ -94,10 +110,12 @@ export async function analyzeText(text: string, analyzer: Analyzer, onProgress?:
         const entry = lemmas.get(lemma);
         if (!entry) continue;
         entry.sample = [...seen.entries()].sort((a, b) => b[1] - a[1])[0][0];
-        if (names) {
+        // A word that is nearly always found in another language's passages is not this language's vocabulary.
+        if ((foreignCount.get(lemma) ?? 0) >= entry.count * 0.8) entry.ignored = true;
+        if (names && !entry.ignored) {
             const surfaces = [...seen.keys()];
             const capitalised = surfaces.reduce((n, f) => n + (upperMid.get(f) ?? 0), 0);
-            entry.name = capitalised >= 2 && surfaces.every((f) => !writtenLower.has(f) && f.length > 1 && !f.includes("'") && !f.includes("\u2019"));
+            entry.ignored = capitalised >= 2 && surfaces.every((f) => !writtenLower.has(f) && f.length > 1 && !f.includes("'") && !f.includes("\u2019"));
         }
     }
     onProgress?.(words.length, words.length);

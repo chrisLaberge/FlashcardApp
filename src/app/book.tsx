@@ -2,9 +2,10 @@ import { router, Stack, useFocusEffect, useLocalSearchParams } from "expo-router
 import { useCallback, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, FlatList, StyleSheet, Text, View } from "react-native";
 import Pressable from "../components/Pressable";
-import { getBookSummary, getTopUnknown, setWordKnown, setWordName, type BookSummary } from "../database/database";
+import { getBookSummary, getTopUnknown, setWordKnown, setWordIgnored, type BookSummary } from "../database/database";
 import { coveragePercent } from "../models/Vocabulary";
 import { readerAnalyzerFor } from "../services/morphology";
+import { openAddCard } from "../services/openAddCard";
 import { analyzeBook, syncKnownWords } from "../services/vocabulary";
 import { useTheme } from "../theme/ThemeProvider";
 import type { Palette } from "../theme/themes";
@@ -20,27 +21,33 @@ export default function BookScreen() {
     const [book, setBook] = useState<BookSummary | null | undefined>(undefined);
     const [words, setWords] = useState<Word[]>([]);
 
-    const tried = useRef(false);
+    const syncing = useRef(false);
 
-    const load = useCallback(async () => {
+    // Reads the numbers and the list straight from the database.
+    const show = useCallback(async () => {
         const [summary, unknown] = await Promise.all([getBookSummary(bookId), getTopUnknown(bookId, 100)]);
         setBook(summary);
         setWords(unknown);
-        // A book that has text but was never counted (an older book) is counted now, after the screen is up.
-        if (summary && summary.analyzerVersion === null && !tried.current) {
-            tried.current = true; // once per visit, so a failure cannot loop
-            try {
-                const analyzer = await readerAnalyzerFor(summary.language);
-                await syncKnownWords(summary.language, analyzer);
-                await analyzeBook(bookId, analyzer);
-                const [again, list] = await Promise.all([getBookSummary(bookId), getTopUnknown(bookId, 100)]);
-                setBook(again);
-                setWords(list);
-            } catch {
-                // Nothing to show yet; it is tried again next time.
-            }
-        }
+        return summary;
     }, [bookId]);
+
+    // Shows the saved numbers at once, then brings the words your cards say are known up to date (so a word you
+    // just added a card for leaves the list) and counts a book that was never counted.
+    const load = useCallback(async () => {
+        const summary = await show();
+        if (!summary || syncing.current) return;
+        syncing.current = true;
+        try {
+            const analyzer = await readerAnalyzerFor(summary.language);
+            await syncKnownWords(summary.language, analyzer);
+            if (summary.analyzerVersion !== analyzer.version) await analyzeBook(bookId, analyzer);
+            await show();
+        } catch {
+            // The saved numbers stay on screen; this runs again next time.
+        } finally {
+            syncing.current = false;
+        }
+    }, [bookId, show]);
 
     useFocusEffect(useCallback(() => { void load(); }, [load]));
 
@@ -52,12 +59,12 @@ export default function BookScreen() {
 
     const markKnown = async (lemma: string) => {
         await setWordKnown(book.language, lemma, true);
-        await load(); // the percentage and the list both come from the database, so they stay in step
+        await show(); // the percentage and the list both come from the database, so they stay in step
     };
 
-    const markName = async (lemma: string) => {
-        await setWordName(book.language, lemma, true);
-        await load();
+    const markIgnored = async (lemma: string) => {
+        await setWordIgnored(book.language, lemma, true);
+        await show();
     };
 
     return (
@@ -86,10 +93,10 @@ export default function BookScreen() {
                         <Pressable style={s.small} onPress={() => markKnown(item.lemma)} accessibilityRole="button" accessibilityLabel={`I know ${item.lemma}`}>
                             <Text style={s.smallText}>Known</Text>
                         </Pressable>
-                        <Pressable style={s.small} onPress={() => markName(item.lemma)} accessibilityRole="button" accessibilityLabel={`${item.lemma} is a name or place`}>
-                            <Text style={s.smallText}>Name</Text>
+                        <Pressable style={s.small} onPress={() => markIgnored(item.lemma)} accessibilityRole="button" accessibilityLabel={`${item.lemma} is ignored`}>
+                            <Text style={s.smallText}>Ignore</Text>
                         </Pressable>
-                        <Pressable style={[s.small, s.primary]} onPress={() => router.push({ pathname: "/addCard", params: { text: item.lemma } })} accessibilityRole="button" accessibilityLabel={`Add ${item.lemma} as a card`}>
+                        <Pressable style={[s.small, s.primary]} onPress={() => void openAddCard(book.language, { text: item.lemma })} accessibilityRole="button" accessibilityLabel={`Add ${item.lemma} as a card`}>
                             <Text style={[s.smallText, { color: t.bg }]}>+ Card</Text>
                         </Pressable>
                     </View>

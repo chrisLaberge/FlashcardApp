@@ -51,7 +51,7 @@ const SCRIPT = String.raw`
 
   var doc = null, pages = 0, pageNo = 1, zoom = 1, token = 0, needText = false, headless = false;
   var unknown = {}, asked = {}, textDivs = [], lang = "en", segment = false, segmenter = null, pendingScroll = null;
-  var chunks = [], expected = 0;
+  var chunks = [], expected = 0, received = 0;
   var WORD = /[\p{L}\p{M}][\p{L}\p{M}'’\-]*/gu;
 
   var key = function (w) { return w.normalize("NFC").toLowerCase().replace(/ё/g, "е"); };
@@ -384,19 +384,30 @@ const SCRIPT = String.raw`
   }
 
   /* ---------- the app talking to this page ---------- */
+  function decode(b64) {
+    var bin = atob(b64);
+    var arr = new Uint8Array(bin.length);
+    for (var j = 0; j < bin.length; j++) arr[j] = bin.charCodeAt(j);
+    return arr;
+  }
   function openFromChunks() {
-    var parts = [], total = 0, i;
-    for (i = 0; i < chunks.length; i++) {
-      var bin = atob(chunks[i]);
-      var arr = new Uint8Array(bin.length);
-      for (var j = 0; j < bin.length; j++) arr[j] = bin.charCodeAt(j);
-      parts.push(arr); total += arr.length;
-    }
-    chunks = [];
+    var total = 0, i;
+    for (i = 0; i < chunks.length; i++) total += chunks[i].length;
     var data = new Uint8Array(total), off = 0;
-    for (i = 0; i < parts.length; i++) { data.set(parts[i], off); off += parts[i].length; }
-    pdfjs.getDocument({ data: data }).promise.then(function (d) {
+    for (i = 0; i < chunks.length; i++) { data.set(chunks[i], off); off += chunks[i].length; chunks[i] = null; }
+    chunks = [];
+    var task = pdfjs.getDocument({
+      data: data,
+      verbosity: 0,
+      isEvalSupported: false,
+      // Chinese, Japanese and Korean PDFs sometimes need these; without a connection they are simply skipped.
+      cMapUrl: "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/cmaps/",
+      cMapPacked: true,
+      standardFontDataUrl: "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/standard_fonts/"
+    });
+    task.promise.then(function (d) {
       doc = d; pages = d.numPages;
+      if (!pages) { post({ type: "error", code: "InvalidPDFException", message: "no pages" }); return; }
       pageNo = Math.max(1, Math.min(pages, pageNo));
       setMsg("");
       if (headless) { post({ type: "opened", pages: pages }); extractAll(); return; }
@@ -404,21 +415,29 @@ const SCRIPT = String.raw`
       if (needText) setTimeout(extractAll, 400);
     }, function (err) {
       setMsg("Could not open this PDF.");
-      post({ type: "error", message: String(err && err.message || err) });
+      post({ type: "error", code: String(err && err.name || ""), message: String(err && err.message || err) });
     });
   }
 
   window.onRN = function (m) {
     if (m.t === "open") {
+      // A fresh start: forget the previous book completely.
+      token++;
+      if (doc) { try { doc.destroy(); } catch (e) {} }
+      doc = null; pages = 0; unknown = {}; asked = {}; textDivs = []; textEl.innerHTML = "";
       if (m.theme) setTheme(m.theme);
-      if (m.night) sheet.classList.add("night");
+      sheet.classList.toggle("night", !!m.night);
       lang = m.lang || "en"; segment = !!m.segment; segmenter = null;
       if (segment && window.Intl && Intl.Segmenter) { try { segmenter = new Intl.Segmenter(lang, { granularity: "word" }); } catch (e) { segmenter = null; } }
-      pageNo = m.page || 1; needText = !!m.needText; headless = !!m.headless; expected = m.chunks; chunks = [];
+      pageNo = m.page || 1; needText = !!m.needText; headless = !!m.headless;
+      expected = m.chunks; chunks = []; received = 0;
       setMsg("Opening…");
+      updateBar();
     } else if (m.t === "chunk") {
-      chunks[m.i] = m.d;
-      if (chunks.length === expected && chunks.every(function (c) { return typeof c === "string"; })) openFromChunks();
+      if (typeof m.i !== "number" || chunks[m.i]) return; // a repeated piece is ignored
+      try { chunks[m.i] = decode(m.d); } catch (e) { post({ type: "error", code: "", message: "bad data" }); return; }
+      received++;
+      if (received === expected) openFromChunks();
     } else if (m.t === "unknown") {
       if (m.replace) unknown = {};
       for (var i = 0; i < m.keys.length; i++) unknown[m.keys[i]] = 1;

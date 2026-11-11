@@ -145,7 +145,8 @@ async function openAndPrepareDatabase(): Promise<SQLite.SQLiteDatabase> {
             );
             -- The words you know, per language, by dictionary form (lemma). Kept apart from card review
             -- scheduling. known = 0 is a word you said you do not know (it beats what the cards say);
-            -- known = 2 is a name or place you told us to leave out of the unknown words.
+            -- known = 2 is a name or place you told us to leave out of the unknown words;
+            -- known = 3 is a word that has a card but is not learned yet (in your deck).
             CREATE TABLE IF NOT EXISTS known_words (
                 language TEXT NOT NULL,
                 lemma TEXT NOT NULL,
@@ -960,17 +961,17 @@ export async function deleteMyText(id: number): Promise<string | null> {
     return row?.pdf_path ?? null;
 }
 
-/** PDFs that were added but not yet read and counted (the app was closed part way, or reading failed). */
-export async function getPendingPdfs(): Promise<number[]> {
+/** PDFs that were added but not yet read and counted (the app was closed part way, or reading failed), or counted with rules older than `minVersion`. */
+export async function getPendingPdfs(minVersion = 0): Promise<number[]> {
     const database = await getDatabase();
-    const rows = await database.getAllAsync<{ id: number }>("SELECT id FROM my_texts WHERE pdf_path IS NOT NULL AND analyzer_version IS NULL ORDER BY id");
+    const rows = await database.getAllAsync<{ id: number }>("SELECT id FROM my_texts WHERE pdf_path IS NOT NULL AND (analyzer_version IS NULL OR analyzer_version < ?) ORDER BY id", minVersion);
     return rows.map((r) => r.id);
 }
 
-/** Every word of the language that needs no marking: the ones you know (by your cards or your own choice) and the names you set aside, as lemma keys. */
+/** Every word of the language that needs no marking: the ones you know (by your cards or your own choice), the ones already in your deck and the names you set aside, as lemma keys. */
 export async function getKnownLemmas(language: string): Promise<Set<string>> {
     const database = await getDatabase();
-    const rows = await database.getAllAsync<{ lemma: string }>("SELECT lemma FROM known_words WHERE language = ? AND known IN (1, 2)", language);
+    const rows = await database.getAllAsync<{ lemma: string }>("SELECT lemma FROM known_words WHERE language = ? AND known IN (1, 2, 3)", language);
     return new Set(rows.map((r) => r.lemma));
 }
 
@@ -995,7 +996,7 @@ export async function setWordKnown(language: string, lemma: string, known: boole
 }
 
 /** Sets a word aside as a name or place (it is no longer an unknown word), or takes it back. */
-export async function setWordName(language: string, lemma: string, on: boolean): Promise<void> {
+export async function setWordIgnored(language: string, lemma: string, on: boolean): Promise<void> {
     const database = await getDatabase();
     if (!on) {
         await database.runAsync("DELETE FROM known_words WHERE language = ? AND lemma = ? AND known = 2", language, lemma);
@@ -1008,7 +1009,7 @@ export async function setWordName(language: string, lemma: string, on: boolean):
 }
 
 /** Names the reader found in this book by itself (always capitalised in the middle of sentences), unless you said otherwise. */
-export async function getBookNames(bookId: number): Promise<Set<string>> {
+export async function getBookIgnored(bookId: number): Promise<Set<string>> {
     const database = await getDatabase();
     const rows = await database.getAllAsync<{ lemma: string }>(`
         SELECT v.lemma FROM book_vocab v JOIN my_texts t ON t.id = v.book_id
@@ -1019,12 +1020,15 @@ export async function getBookNames(bookId: number): Promise<Set<string>> {
 }
 
 /** The words the cards say are known, as of now. Manual choices are left alone; card-based ones are replaced. */
-export async function replaceCardKnownWords(language: string, lemmas: ReadonlySet<string>): Promise<void> {
+export async function replaceCardKnownWords(language: string, lemmas: ReadonlySet<string>, inDeck: ReadonlySet<string> = new Set()): Promise<void> {
     const database = await getDatabase();
     await database.withTransactionAsync(async () => {
         await database.runAsync("DELETE FROM known_words WHERE language = ? AND source = 'card'", language);
         for (const lemma of lemmas) {
             await database.runAsync("INSERT OR IGNORE INTO known_words (language, lemma, known, source) VALUES (?, ?, 1, 'card')", language, lemma);
+        }
+        for (const lemma of inDeck) {
+            if (!lemmas.has(lemma)) await database.runAsync("INSERT OR IGNORE INTO known_words (language, lemma, known, source) VALUES (?, ?, 3, 'card')", language, lemma);
         }
     });
 }
@@ -1041,12 +1045,12 @@ export async function getCardsForVocabulary(language: string): Promise<{ text: s
 }
 
 /** Saves a book's analysis in one go: the old counts are replaced and the totals set, or nothing changes. */
-export async function saveBookAnalysis(bookId: number, version: number, total: number, lemmas: ReadonlyMap<string, { count: number; sample: string; name?: boolean }>): Promise<void> {
+export async function saveBookAnalysis(bookId: number, version: number, total: number, lemmas: ReadonlyMap<string, { count: number; sample: string; ignored?: boolean }>): Promise<void> {
     const database = await getDatabase();
     await database.withTransactionAsync(async () => {
         await database.runAsync("DELETE FROM book_vocab WHERE book_id = ?", bookId);
         for (const [lemma, entry] of lemmas) {
-            await database.runAsync("INSERT INTO book_vocab (book_id, lemma, count, sample, is_name) VALUES (?, ?, ?, ?, ?)", bookId, lemma, entry.count, entry.sample, entry.name ? 1 : 0);
+            await database.runAsync("INSERT INTO book_vocab (book_id, lemma, count, sample, is_name) VALUES (?, ?, ?, ?, ?)", bookId, lemma, entry.count, entry.sample, entry.ignored ? 1 : 0);
         }
         await database.runAsync("UPDATE my_texts SET total_tokens = ?, analyzer_version = ? WHERE id = ?", total, version, bookId);
     });

@@ -2,11 +2,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { StyleSheet } from "react-native";
 import type { WebViewMessageEvent } from "react-native-webview";
 import { getMyText, getPendingPdfs, setMyTextBody } from "../../database/database";
-import { bookText, marksWords } from "../../models/ReaderWords";
+import { ANALYSIS_REVISION, bookText, marksWords } from "../../models/ReaderWords";
 import { useImportJobs } from "../../hooks/useImportJobs";
 import { readerAnalyzerFor } from "../../services/morphology";
 import { drop, enqueue, fail, update } from "../../services/pdfImport";
-import { pdfChunks } from "../../services/pdfReading";
+import { sendPdf } from "../../services/pdfReading";
+import { friendlyPdfError } from "../../models/PdfErrors";
 import { analyzeBook, syncKnownWords } from "../../services/vocabulary";
 import { loadViewerHtml, WebView, type WebHandle } from "./viewerSource";
 
@@ -16,7 +17,7 @@ type Incoming =
     | { type: "progress"; page: number; pages: number }
     | { type: "text"; from: number; pages: string[] }
     | { type: "textDone" }
-    | { type: "error"; message: string };
+    | { type: "error"; message: string; code?: string };
 
 /** No sign of life from a PDF for this long and the job is marked failed, so one bad file cannot block the rest. */
 const STALL_MS = 120_000;
@@ -30,6 +31,10 @@ export default function PdfImporter() {
     const jobs = useImportJobs();
     const job = jobs.find((j) => j.phase !== "failed");
     const jobId = job?.id ?? null;
+    const currentRef = useRef<number | null>(null);
+    useEffect(() => {
+        currentRef.current = jobId;
+    }, [jobId]);
     const [html, setHtml] = useState<string | null>(null);
     const web = useRef<WebHandle>(null);
     const pages = useRef<string[]>([]);
@@ -37,7 +42,7 @@ export default function PdfImporter() {
 
     // Unfinished PDFs from last time go back in line.
     useEffect(() => {
-        void getPendingPdfs().then((ids) => ids.forEach(enqueue)).catch(() => undefined);
+        void getPendingPdfs(ANALYSIS_REVISION).then((ids) => ids.forEach(enqueue)).catch(() => undefined);
     }, []);
 
     useEffect(() => {
@@ -66,25 +71,12 @@ export default function PdfImporter() {
 
     const send = useCallback((message: object) => web.current?.injectJavaScript(`window.onRN(${JSON.stringify(message)});true;`), []);
 
-    const start = useCallback(async (id: number) => {
-        try {
-            const book = await getMyText(id);
-            if (!book?.pdfPath) return drop(id);
-            update(id, { phase: "reading", done: 0, total: 0 });
-            const chunks = await pdfChunks(book.pdfPath);
-            send({ t: "open", chunks: chunks.length, page: 1, needText: true, headless: true, lang: book.language, segment: !marksWords(book.language) });
-            chunks.forEach((d, i) => send({ t: "chunk", i, d }));
-        } catch (error) {
-            fail(id, error instanceof Error ? error.message : "Could not read the PDF.");
-        }
-    }, [send]);
-
-    const finish = useCallback(async (id: number) => {
+    const finish = useCallback(async (id: number, read: string[] | null = pages.current) => {
         update(id, { phase: "counting", done: 0, total: 1 });
         try {
             const book = await getMyText(id);
             if (!book) return drop(id);
-            await setMyTextBody(id, bookText(pages.current));
+            if (read) await setMyTextBody(id, bookText(read));
             const analyzer = await readerAnalyzerFor(book.language);
             try {
                 await syncKnownWords(book.language, analyzer);
@@ -97,6 +89,25 @@ export default function PdfImporter() {
             fail(id, error instanceof Error ? error.message : "Could not count the words.");
         }
     }, [kick]);
+
+    const start = useCallback(async (id: number) => {
+        try {
+            const book = await getMyText(id);
+            if (!book?.pdfPath) return drop(id);
+            // Already read (only the counting rules changed): count again without reading the pages.
+            if (book.body.trim()) return void finish(id, null);
+            update(id, { phase: "reading", done: 0, total: 0 });
+            await sendPdf(
+                book.pdfPath,
+                { t: "open", page: 1, needText: true, headless: true, lang: book.language, segment: !marksWords(book.language) },
+                send,
+                () => kick(id), // reading a big file is slow but not stuck
+                () => currentRef.current !== id, // deleted or replaced: stop feeding the page
+            );
+        } catch (error) {
+            fail(id, error instanceof Error ? error.message : "Could not read the PDF.");
+        }
+    }, [send, kick, finish]);
 
     const onMessage = useCallback((event: WebViewMessageEvent) => {
         if (jobId === null) return;
@@ -126,7 +137,7 @@ export default function PdfImporter() {
                 break;
             case "error":
                 // pdf.js falls back to running on the page itself when its helper thread cannot start; that is fine.
-                if (!/worker|importScripts/i.test(message.message)) fail(jobId, "Could not read this PDF.");
+                if (!/worker|importScripts/i.test(message.message)) fail(jobId, friendlyPdfError(message.code, message.message));
                 break;
         }
     }, [jobId, kick, start, finish]);
@@ -145,6 +156,8 @@ export default function PdfImporter() {
             containerStyle={s.hidden}
             pointerEvents="none"
             onError={() => fail(jobId, "Could not start the PDF reader.")}
+            onRenderProcessGone={() => fail(jobId, "The PDF reader stopped. Tap to try again.")}
+            onContentProcessDidTerminate={() => fail(jobId, "The PDF reader stopped. Tap to try again.")}
         />
     );
 }

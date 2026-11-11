@@ -33,6 +33,15 @@ export function knownFromCards(cards: readonly { lemma: string | null; level: nu
     return known;
 }
 
+/** Words that have a card (single-word cards only), learned or not. These are "in your deck": no need to add them again. */
+export function inDeckFromCards(cards: readonly { lemma: string | null }[]): Set<string> {
+    const words = new Set<string>();
+    for (const card of cards) {
+        if (card.lemma) words.add(lemmaKey(card.lemma));
+    }
+    return words;
+}
+
 /** Share of word occurrences you know, 0 to 100, to one decimal. A book with no words is 0, never NaN. */
 export function coveragePercent(knownOccurrences: number, totalOccurrences: number): number {
     if (totalOccurrences <= 0) return 0;
