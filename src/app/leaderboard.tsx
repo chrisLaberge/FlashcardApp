@@ -1,6 +1,7 @@
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState, useMemo } from "react";
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, FlatList, StyleSheet, Text, View } from "react-native";
+import Pressable from "../components/Pressable";
 import Avatar from "../components/Avatar";
 import { PersonPet, RowBanner } from "../components/pet/PersonPet";
 import { useUser } from "../hooks/useUser";
@@ -58,7 +59,7 @@ export default function LeaderboardScreen() {
             <View style={s.toggle}>
                 {(["friends", "global"] as const).map((w) => (
                     <Pressable key={w} style={[s.tab, scope === w && s.tabOn]} onPress={() => { setEntries(null); setGlobal(null); setScope(w); }}>
-                        <Text style={[s.tabText, scope === w && s.tabTextOn]}>{w === "friends" ? "Friends" : "🌍 Global"}</Text>
+                        <Text style={[s.tabText, scope === w && s.tabTextOn]}>{w === "friends" ? "Friends" : "Global"}</Text>
                     </Pressable>
                 ))}
             </View>
@@ -90,11 +91,11 @@ export default function LeaderboardScreen() {
                         renderItem={({ item }) => (
                             <View style={[s.row, item.isMe && s.me]}>
 <RowBanner banner={item.banner} />
-                                <Text style={s.rank}>{item.rank === 1 ? "🥇" : item.rank === 2 ? "🥈" : item.rank === 3 ? "🥉" : item.rank}</Text>
+                                <Text style={s.rank}>{item.rank}</Text>
                                 <Avatar avatar={item.avatar} name={item.username} size={38} />
                                 <View style={{ flex: 1 }}>
                                     <Text style={s.name} numberOfLines={1}>{item.username}{item.isMe ? " (you)" : ""}</Text>
-                                    <Text style={s.muted}>Level {item.level} · {item.currentStreak} 🔥</Text>
+                                    <Text style={s.muted}>Level {item.level} · {item.currentStreak} day streak</Text>
                                 </View>
                                 <PersonPet pet={item.pet} level={item.level} />
                                 <Text style={s.xp}>{item.xp.toLocaleString("en-US")} XP</Text>
@@ -120,11 +121,11 @@ export default function LeaderboardScreen() {
                     renderItem={({ item }) => (
                         <View style={[s.row, item.isMe && s.me]}>
 <RowBanner banner={item.banner} />
-                            <Text style={s.rank}>{item.rank === 1 ? "🥇" : item.rank === 2 ? "🥈" : item.rank === 3 ? "🥉" : item.rank}</Text>
+                            <Text style={s.rank}>{item.rank}</Text>
                             <Avatar avatar={item.avatar} name={item.username} size={38} />
                             <View style={{ flex: 1 }}>
                                 <Text style={s.name} numberOfLines={1}>{item.username}{item.isMe ? " (you)" : ""}</Text>
-                                <Text style={s.muted}>Level {item.level} · {item.currentStreak} 🔥</Text>
+                                <Text style={s.muted}>Level {item.level} · {item.currentStreak} day streak</Text>
                             </View>
                             <PersonPet pet={item.pet} level={item.level} />
                             <Text style={s.xp}>{item.xp.toLocaleString("en-US")} XP</Text>
@@ -142,19 +143,19 @@ const makeS = (t: Palette) => StyleSheet.create({
     container: { flex: 1, backgroundColor: t.bg, padding: 20 },
     center: { alignItems: "center", justifyContent: "center", gap: 14 },
     heading: { color: t.text, fontSize: 18, fontWeight: "600" },
-    toggle: { flexDirection: "row", backgroundColor: t.surface, borderRadius: 12, padding: 4, marginBottom: 10 },
+    toggle: { flexDirection: "row", backgroundColor: t.surface, borderRadius: 12, padding: 4, marginBottom: 10, borderWidth: StyleSheet.hairlineWidth, borderColor: t.surfaceHigh },
     tab: { flex: 1, paddingVertical: 10, borderRadius: 9, alignItems: "center" },
     tabOn: { backgroundColor: t.surfaceHigh },
     tabText: { color: t.muted, fontWeight: "600" },
     tabTextOn: { color: t.text },
-    row: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: t.surface, borderRadius: 12, padding: 14, overflow: "hidden" },
+    row: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: t.surface, borderRadius: 12, padding: 14, overflow: "hidden", borderWidth: StyleSheet.hairlineWidth, borderColor: t.surfaceHigh },
     me: { borderWidth: 1, borderColor: t.yellow },
     rank: { color: t.text, fontSize: 20, width: 34, textAlign: "center" },
     name: { color: t.text, fontSize: 16, fontWeight: "600" },
     muted: { color: t.muted, fontSize: 13, textAlign: "center" },
-    xp: { color: t.green, fontSize: 16, fontWeight: "bold" },
+    xp: { color: t.green, fontSize: 16, fontWeight: "600" },
     link: { color: t.blue, textAlign: "center", fontSize: 14, paddingVertical: 10 },
     error: { color: t.red, textAlign: "center", marginBottom: 10 },
     button: { backgroundColor: t.green, borderRadius: 10, paddingVertical: 14, paddingHorizontal: 24 },
-    buttonText: { color: t.bg, fontSize: 16, fontWeight: "bold" },
+    buttonText: { color: t.bg, fontSize: 16, fontWeight: "600" },
 });

@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, View } from "react-native";
+import Pressable from "./Pressable";
 import type { Lookup } from "../models/Lookup";
 import { lookupText } from "../services/lookup";
 import { useTheme } from "../theme/ThemeProvider";
@@ -41,7 +42,7 @@ export default function LookupSheet({ onClose, text, context, languageName, onAd
 
     return (
         <Modal visible transparent animationType="slide" statusBarTranslucent onRequestClose={onClose}>
-            <Pressable style={s.backdrop} onPress={onClose} accessibilityLabel="Close" />
+            <Pressable style={s.backdrop} dim={false} onPress={onClose} accessibilityLabel="Close" />
             <View style={s.sheet}>
                 <View style={s.header}>
                     <View style={{ flex: 1 }}>
@@ -102,7 +103,7 @@ const makeS = (t: Palette) => StyleSheet.create({
     backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)" },
     sheet: { maxHeight: "70%", backgroundColor: t.bg, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 18, borderTopWidth: 1, borderColor: t.surfaceHigh },
     header: { flexDirection: "row", alignItems: "flex-start", gap: 12, marginBottom: 8 },
-    word: { color: t.text, fontSize: 26, fontWeight: "bold" },
+    word: { color: t.text, fontSize: 26, fontWeight: "600" },
     translation: { color: t.yellow, fontSize: 17, fontWeight: "600", marginTop: 2 },
     close: { color: t.muted, fontSize: 20, padding: 4 },
     content: { paddingBottom: 12, gap: 8 },
@@ -111,11 +112,11 @@ const makeS = (t: Palette) => StyleSheet.create({
     center: { alignItems: "center", gap: 12, paddingVertical: 16 },
     error: { color: t.red, textAlign: "center" },
     retry: { backgroundColor: t.green, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 20 },
-    retryText: { color: t.bg, fontWeight: "bold" },
+    retryText: { color: t.bg, fontWeight: "600" },
     note: { color: t.muted, fontSize: 12, textAlign: "center", marginTop: 8 },
     add: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: t.green, borderRadius: 12, paddingVertical: 12 },
     actions: { flexDirection: "row", gap: 10, marginTop: 6 },
     known: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 16, borderWidth: 1.5, borderColor: t.green },
-    knownText: { color: t.green, fontSize: 16, fontWeight: "bold" },
-    addText: { color: t.bg, fontSize: 16, fontWeight: "bold" },
+    knownText: { color: t.green, fontSize: 16, fontWeight: "600" },
+    addText: { color: t.bg, fontSize: 16, fontWeight: "600" },
 });

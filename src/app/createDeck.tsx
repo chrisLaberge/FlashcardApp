@@ -1,14 +1,7 @@
 import { router } from "expo-router";
 import { useEffect, useState, useMemo } from "react";
-import {
-    FlatList,
-    Modal,
-    Pressable,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
-} from "react-native";
+import { FlatList, Modal, StyleSheet, Text, TextInput, View } from "react-native";
+import Pressable from "../components/Pressable";
 import KeyboardInsetView from "../components/KeyboardInsetView";
 import { languages } from "../constants/languages";
 import { addDeck, getDecks } from "../database/database";
@@ -209,14 +202,14 @@ const makeStyles = (t: Palette) => StyleSheet.create({
     smallTitle: {
         color: t.gold,
         fontSize: 13,
-        fontWeight: "bold",
+        fontWeight: "600",
         letterSpacing: 2,
     },
 
     title: {
         color: t.text,
         fontSize: 34,
-        fontWeight: "bold",
+        fontWeight: "600",
         marginTop: 8,
     },
 
@@ -229,7 +222,7 @@ const makeStyles = (t: Palette) => StyleSheet.create({
 
     card: {
         backgroundColor: t.surface,
-        borderRadius: 14,
+        borderRadius: 12,
         borderWidth: 1,
         borderColor: t.surfaceHigh,
         padding: 20,
@@ -238,7 +231,7 @@ const makeStyles = (t: Palette) => StyleSheet.create({
     label: {
         color: t.gold,
         fontSize: 12,
-        fontWeight: "bold",
+        fontWeight: "600",
         letterSpacing: 1,
         marginBottom: 8,
         marginTop: 5,
@@ -279,7 +272,7 @@ const makeStyles = (t: Palette) => StyleSheet.create({
     languageName: {
         color: t.text,
         fontSize: 16,
-        fontWeight: "bold",
+        fontWeight: "600",
     },
 
     nativeName: {
@@ -308,7 +301,7 @@ const makeStyles = (t: Palette) => StyleSheet.create({
     createText: {
         color: t.bg,
         fontSize: 17,
-        fontWeight: "bold",
+        fontWeight: "600",
     },
 
     cancelText: {
@@ -345,7 +338,7 @@ const makeStyles = (t: Palette) => StyleSheet.create({
     modalTitle: {
         color: t.text,
         fontSize: 23,
-        fontWeight: "bold",
+        fontWeight: "600",
     },
 
     modalSubtitle: {
@@ -357,7 +350,7 @@ const makeStyles = (t: Palette) => StyleSheet.create({
     closeButton: {
         width: 38,
         height: 38,
-        borderRadius: 19,
+        borderRadius: 12,
         backgroundColor: t.surface,
         alignItems: "center",
         justifyContent: "center",
@@ -412,7 +405,7 @@ const makeStyles = (t: Palette) => StyleSheet.create({
     optionName: {
         color: t.text,
         fontSize: 16,
-        fontWeight: "bold",
+        fontWeight: "600",
     },
 
     optionNative: {
@@ -424,7 +417,7 @@ const makeStyles = (t: Palette) => StyleSheet.create({
     check: {
         color: t.green,
         fontSize: 20,
-        fontWeight: "bold",
+        fontWeight: "600",
         marginRight: 8,
     },
 

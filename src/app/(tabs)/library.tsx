@@ -1,14 +1,13 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useMemo, useRef, useState } from "react";
-import { Alert, FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, FlatList, Modal, ScrollView, StyleSheet, Text, View } from "react-native";
+import Pressable from "../../components/Pressable";
 import { getLanguage } from "../../constants/languages";
 import { deleteMyText, getBookSummaries, getCards, getDecks, type BookSummary } from "../../database/database";
 import { cardKey, premadeDecksFor, presentIndexes } from "../../models/PremadeDecks";
 import { coveragePercent } from "../../models/Vocabulary";
-import { analyzerFor } from "../../services/morphology";
 import { addPdf, removePdfFile } from "../../services/pdfReading";
-import { analyzeBook, analyzeNewBooks, syncKnownWords } from "../../services/vocabulary";
 import { useTheme } from "../../theme/ThemeProvider";
 import type { Palette } from "../../theme/themes";
 
@@ -26,7 +25,6 @@ export default function LibraryScreen() {
     const [tab, setTab] = useState<"decks" | "pdfs">("decks");
     const [texts, setTexts] = useState<BookSummary[]>([]);
     const [busy, setBusy] = useState<string | null>(null);
-    const working = useRef(false);
 
     // The deck whose resources are shown: the one you picked, else the one you last studied, else the first.
     const deck = myDecks?.find((d) => d.id === (chosenId ?? lastId)) ?? myDecks?.[0] ?? null;
@@ -50,26 +48,8 @@ export default function LibraryScreen() {
 
     const loadTexts = useCallback(async () => setTexts(language ? await getBookSummaries(language) : []), [language]);
 
-    // Shows the books at once, then brings known words and book analysis up to date (shown as "Analyzing…").
-    const refreshBooks = useCallback(async () => {
-        await loadTexts();
-        if (!language || working.current) return;
-        working.current = true;
-        try {
-            const analyzer = await analyzerFor(language).catch(() => null);
-            if (analyzer) {
-                setBusy("Analyzing…");
-                await syncKnownWords(language, analyzer);
-                await analyzeNewBooks(language, analyzer);
-                await loadTexts();
-            }
-        } catch {
-            // Coverage is a bonus: the PDFs still open and read without it.
-        } finally {
-            working.current = false;
-            setBusy(null);
-        }
-    }, [language, loadTexts]);
+    // Only reads saved numbers, so the tab opens at once. Words are counted when a book is opened.
+    const refreshBooks = loadTexts;
     useFocusEffect(useCallback(() => { void refreshBooks(); }, [refreshBooks]));
 
     const pickPdf = async () => {
@@ -106,7 +86,7 @@ export default function LibraryScreen() {
             </View>
 
             <Modal visible={picking} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setPicking(false)}>
-                <Pressable style={s.backdrop} onPress={() => setPicking(false)}>
+                <Pressable style={s.backdrop} dim={false} onPress={() => setPicking(false)}>
                     <ScrollView style={s.menu} showsVerticalScrollIndicator>
                         {(myDecks ?? []).map((d) => (
                             <Pressable key={d.id} style={[s.menuRow, d.id === deckId && s.menuRowOn]} onPress={() => { setChosenId(d.id); setPicking(false); }} accessibilityRole="button">
@@ -194,11 +174,11 @@ const makeS = (t: Palette) => StyleSheet.create({
     dropFlag: { fontSize: 16 },
     dropArrow: { color: t.muted, fontSize: 9, marginLeft: 6 },
     backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", padding: 28 },
-    menu: { maxHeight: "75%", backgroundColor: t.surface, borderRadius: 14, borderWidth: 1, borderColor: t.surfaceHigh, paddingVertical: 6 },
+    menu: { maxHeight: "75%", backgroundColor: t.surface, borderRadius: 12, borderWidth: 1, borderColor: t.surfaceHigh, paddingVertical: 6 },
     menuRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 14, paddingHorizontal: 16 },
     menuRowOn: { backgroundColor: t.surfaceHigh },
     menuText: { color: t.text, fontSize: 16, fontWeight: "600" },
-    toggle: { flexDirection: "row", backgroundColor: t.surface, borderRadius: 12, padding: 4, marginTop: 12, marginBottom: 8 },
+    toggle: { flexDirection: "row", backgroundColor: t.surface, borderRadius: 12, padding: 4, marginTop: 12, marginBottom: 8, borderWidth: StyleSheet.hairlineWidth, borderColor: t.surfaceHigh },
     tab: { flex: 1, alignItems: "center", paddingVertical: 8, borderRadius: 9 },
     tabOn: { backgroundColor: t.surfaceHigh },
     tabText: { color: t.muted, fontWeight: "600" },
@@ -206,11 +186,11 @@ const makeS = (t: Palette) => StyleSheet.create({
     list: { paddingTop: 6, paddingBottom: 40 },
     hint: { color: t.muted, fontSize: 13, marginBottom: 12 },
     empty: { color: t.muted, textAlign: "center", marginTop: 40 },
-    card: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: t.surface, borderRadius: 14, padding: 14, marginBottom: 10 },
+    card: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: t.surface, borderRadius: 12, padding: 14, marginBottom: 10, borderWidth: StyleSheet.hairlineWidth, borderColor: t.surfaceHigh },
     flag: { fontSize: 30 },
     name: { color: t.text, fontSize: 16, fontWeight: "600" },
     addButton: { backgroundColor: t.green, borderRadius: 12, paddingVertical: 14, alignItems: "center", marginBottom: 12 },
-    addText: { color: t.bg, fontWeight: "bold", fontSize: 16 },
+    addText: { color: t.bg, fontWeight: "600", fontSize: 16 },
     coverage: { alignItems: "flex-end", paddingHorizontal: 6 },
     percent: { color: t.green, fontSize: 18, fontWeight: "800" },
     remove: { color: t.muted, fontSize: 18, paddingHorizontal: 4 },

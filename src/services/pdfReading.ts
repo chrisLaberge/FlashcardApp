@@ -1,53 +1,58 @@
 import * as DocumentPicker from "expo-document-picker";
-import { Directory, File, Paths } from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import { addMyText } from "../database/database";
-import { base64Chunks } from "../models/Base64";
+import { splitBase64 } from "../models/Base64";
 import { titleFromFileName } from "../models/PdfText";
 
 export class PdfError extends Error {}
 
-const folder = () => new Directory(Paths.document, "pdfs");
+const detail = (error: unknown) => (error instanceof Error ? error.message.slice(0, 140) : String(error).slice(0, 140));
 
-/** Lets the person pick a PDF and keeps a copy on the phone. Everything after that happens on the phone too. Null if they cancelled. */
+/**
+ * Pick a PDF and keep a copy on the phone. No account and no internet needed: reading, selecting
+ * and counting words all happen on the phone. Returns the new book's id, or null if cancelled.
+ */
 export async function addPdf(language: string): Promise<number | null> {
-    const picked = await DocumentPicker.getDocumentAsync({ type: "application/pdf", copyToCacheDirectory: true });
+    let picked: DocumentPicker.DocumentPickerResult;
+    try {
+        picked = await DocumentPicker.getDocumentAsync({ type: "*/*", copyToCacheDirectory: true, multiple: false });
+    } catch (error) {
+        throw new PdfError(`Could not open the file picker. (${detail(error)})`);
+    }
     if (picked.canceled || !picked.assets?.[0]) return null;
     const asset = picked.assets[0];
+    if (!/\.pdf$/i.test(asset.name) && asset.mimeType !== "application/pdf") throw new PdfError("Pick a PDF file.");
 
-    const source = new File(asset.uri);
-    let header = "";
+    const base = FileSystem.documentDirectory;
+    if (!base) throw new PdfError("This device has no place to keep files.");
+    const folder = `${base}pdfs/`;
+    const target = `${folder}${Date.now()}.pdf`;
     try {
-        header = await source.slice(0, 5).text();
-    } catch {
-        throw new PdfError("Could not open that file.");
-    }
-    if (header !== "%PDF-") throw new PdfError("That is not a PDF.");
-
-    try {
-        const directory = folder();
-        if (!directory.exists) directory.create({ intermediates: true });
-        const target = new File(directory, `${Date.now()}.pdf`);
-        source.copy(target);
-        return await addMyText(titleFromFileName(asset.name), language, "", Date.now(), target.uri);
+        await FileSystem.makeDirectoryAsync(folder, { intermediates: true });
+        await FileSystem.copyAsync({ from: asset.uri, to: target });
     } catch (error) {
-        throw new PdfError(`Could not save the PDF.${error instanceof Error ? ` (${error.message.slice(0, 100)})` : ""}`);
+        throw new PdfError(`Could not save the PDF. (${detail(error)})`);
     }
-}
-
-/** The PDF's bytes as base64 pieces, ready to hand to the reader page. */
-export async function pdfChunks(path: string): Promise<string[]> {
-    const file = new File(path);
-    if (!file.exists) throw new PdfError("The PDF file is missing. Add it again.");
-    return base64Chunks(new Uint8Array(await file.arrayBuffer()));
-}
-
-/** Removes a book's PDF file; a file that is already gone is fine. */
-export function removePdfFile(path: string | null): void {
-    if (!path) return;
     try {
-        const file = new File(path);
-        if (file.exists) file.delete();
-    } catch {
-        // Nothing more to do; the book is already gone.
+        return await addMyText(titleFromFileName(asset.name), language, "", Date.now(), target);
+    } catch (error) {
+        await FileSystem.deleteAsync(target, { idempotent: true }).catch(() => undefined);
+        throw new PdfError(`Could not add the PDF. (${detail(error)})`);
     }
+}
+
+/** The PDF as base64 pieces, ready to hand to the reader page. */
+export async function pdfChunks(path: string): Promise<string[]> {
+    const info = await FileSystem.getInfoAsync(path).catch(() => null);
+    if (!info?.exists) throw new PdfError("The PDF file is missing. Add it again.");
+    try {
+        return splitBase64(await FileSystem.readAsStringAsync(path, { encoding: FileSystem.EncodingType.Base64 }));
+    } catch (error) {
+        throw new PdfError(`Could not read the PDF. (${detail(error)})`);
+    }
+}
+
+/** Removes a book's PDF file; one that is already gone is fine. */
+export function removePdfFile(path: string | null): void {
+    if (path) void FileSystem.deleteAsync(path, { idempotent: true }).catch(() => undefined);
 }

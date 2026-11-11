@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
-import { ActivityIndicator, Alert, Pressable, StyleSheet } from "react-native";
+import { ActivityIndicator, Alert, StyleSheet } from "react-native";
+import Pressable from "./Pressable";
 import { ExplainError, explainCard } from "../services/explain";
 import { useTheme } from "../theme/ThemeProvider";
 
@@ -61,7 +62,7 @@ const s = StyleSheet.create({
         top: 9,
         width: 36,
         height: 36,
-        borderRadius: 18,
+        borderRadius: 12,
         alignItems: "center",
         justifyContent: "center",
         borderWidth: 1,

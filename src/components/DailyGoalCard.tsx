@@ -29,7 +29,7 @@ export default function DailyGoalCard() {
     const reached = state.done >= state.goal;
     return (
         <View style={s.chip} accessibilityLabel={`Daily goal: ${state.done} of ${state.goal} cards`}>
-            <Text style={s.count}>{reached ? "🎉" : "🎯"} {state.done}/{state.goal}</Text>
+            <Text style={s.count}>{state.done}/{state.goal}{reached ? " ✓" : ""}</Text>
             <View style={s.track}>
                 <View style={[s.fill, { width: `${Math.round(goalFraction(state.done, state.goal) * 100)}%`, backgroundColor: reached ? t.yellow : t.green }]} />
             </View>

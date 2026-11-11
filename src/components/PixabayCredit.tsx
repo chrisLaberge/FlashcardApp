@@ -1,4 +1,5 @@
-import { Linking, Pressable, StyleSheet, Text } from "react-native";
+import { Linking, StyleSheet, Text } from "react-native";
+import Pressable from "./Pressable";
 import { useMemo } from "react";
 import { useTheme } from "../theme/ThemeProvider";
 import type { Palette } from "../theme/themes";

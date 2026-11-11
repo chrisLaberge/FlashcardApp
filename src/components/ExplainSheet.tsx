@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, View } from "react-native";
+import Pressable from "./Pressable";
 import type { Explanation } from "../models/Explanation";
 import { explainCard } from "../services/explain";
 import { useTheme } from "../theme/ThemeProvider";
@@ -36,7 +37,7 @@ export default function ExplainSheet({ visible, onClose, card, languageName }: P
 
     return (
         <Modal visible={visible} transparent animationType="slide" statusBarTranslucent onRequestClose={onClose}>
-            <Pressable style={s.backdrop} onPress={onClose} accessibilityLabel="Close" />
+            <Pressable style={s.backdrop} dim={false} onPress={onClose} accessibilityLabel="Close" />
             <View style={s.sheet}>
                 <View style={s.header}>
                     <View style={{ flex: 1 }}>
@@ -92,18 +93,18 @@ const makeS = (t: Palette) => StyleSheet.create({
     backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)" },
     sheet: { maxHeight: "75%", backgroundColor: t.bg, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 18, borderTopWidth: 1, borderColor: t.surfaceHigh },
     header: { flexDirection: "row", alignItems: "flex-start", gap: 12, marginBottom: 8 },
-    word: { color: t.text, fontSize: 26, fontWeight: "bold" },
+    word: { color: t.text, fontSize: 26, fontWeight: "600" },
     close: { color: t.muted, fontSize: 20, padding: 4 },
     content: { paddingBottom: 30, gap: 6 },
     label: { color: t.yellow, fontSize: 13, fontWeight: "700", textTransform: "uppercase", marginTop: 12 },
     body: { color: t.text, fontSize: 15, lineHeight: 22 },
     muted: { color: t.muted, fontSize: 14 },
-    example: { backgroundColor: t.surface, borderRadius: 10, padding: 12, gap: 2 },
+    example: { backgroundColor: t.surface, borderRadius: 10, padding: 12, gap: 2, borderWidth: StyleSheet.hairlineWidth, borderColor: t.surfaceHigh },
     exampleText: { color: t.text, fontSize: 16, fontWeight: "600" },
     center: { alignItems: "center", gap: 12, paddingVertical: 20 },
     error: { color: t.red, textAlign: "center" },
     button: { backgroundColor: t.green, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 20 },
-    buttonText: { color: t.bg, fontWeight: "bold" },
+    buttonText: { color: t.bg, fontWeight: "600" },
     note: { color: t.muted, fontSize: 12, textAlign: "center", marginTop: 14 },
     link: { color: t.blue, textAlign: "center", paddingVertical: 8 },
 });

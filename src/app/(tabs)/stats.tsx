@@ -1,6 +1,7 @@
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState, useMemo } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
+import Pressable from "../../components/Pressable";
 import ActivityCalendar from "../../components/ActivityCalendar";
 import { getCardsAdded, getReviewLog, type CardsAdded } from "../../database/database";
 import { achievements, TIERS, tierSummary, type Achievement } from "../../models/Achievements";
@@ -90,7 +91,7 @@ export default function StatsScreen() {
             </View>
 
             <View style={s.grid}>
-                <Tile label="Streak" value={`${summary.current} 🔥`} note={`${summary.studiedToday ? "done today" : "study today"} · ${summary.freezes} ❄️`} />
+                <Tile label="Streak" value={`${summary.current}`} note={`${summary.studiedToday ? "done today" : "study today"} · ${summary.freezes} savers`} />
                 <Tile label="Best streak" value={String(summary.longest)} note="days" />
                 <Tile label="Reviews" value={summary.reviews.toLocaleString("en-US")} note={`${summary.accuracy}% correct`} />
                 <Tile label="Time" value={formatTime(summary.timeMs)} note="in reviews" />
@@ -114,10 +115,10 @@ export default function StatsScreen() {
 
             <View style={s.links}>
                 <Pressable style={s.linkButton} onPress={() => router.push("/leaderboard")}>
-                    <Text style={s.linkText}>🏆 Leaderboard</Text>
+                    <Text style={s.linkText}>Leaderboard</Text>
                 </Pressable>
                 <Pressable style={s.linkButton} onPress={() => router.push("/friends")}>
-                    <Text style={s.linkText}>👥 Friends</Text>
+                    <Text style={s.linkText}>Friends</Text>
                 </Pressable>
             </View>
         </ScrollView>
@@ -139,15 +140,15 @@ function Tile({ label, value, note }: { label: string; value: string; note: stri
 const makeS = (t: Palette) => StyleSheet.create({
     container: { flex: 1, backgroundColor: t.bg },
     content: { padding: 20, paddingBottom: 60, gap: 14 },
-    card: { backgroundColor: t.surface, borderRadius: 14, padding: 16, gap: 10 },
-    levelLabel: { color: t.yellow, fontSize: 26, fontWeight: "bold" },
+    card: { backgroundColor: t.surface, borderRadius: 12, padding: 16, gap: 10, borderWidth: StyleSheet.hairlineWidth, borderColor: t.surfaceHigh },
+    levelLabel: { color: t.yellow, fontSize: 26, fontWeight: "600" },
     heading: { color: t.text, fontSize: 17, fontWeight: "600" },
     muted: { color: t.muted, fontSize: 13 },
     track: { height: 10, borderRadius: 5, backgroundColor: t.surfaceHigh, overflow: "hidden" },
     fill: { height: "100%", backgroundColor: t.green },
     grid: { flexDirection: "row", flexWrap: "wrap", gap: 14 },
-    tile: { flexGrow: 1, flexBasis: "45%", backgroundColor: t.surface, borderRadius: 14, padding: 14 },
-    tileValue: { color: t.text, fontSize: 24, fontWeight: "bold", marginTop: 2 },
+    tile: { flexGrow: 1, flexBasis: "45%", backgroundColor: t.surface, borderRadius: 12, padding: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: t.surfaceHigh },
+    tileValue: { color: t.text, fontSize: 24, fontWeight: "600", marginTop: 2 },
     tileNote: { color: t.subtle, fontSize: 12, marginTop: 2 },
     goalRow: { flexDirection: "row", justifyContent: "space-between" },
     medals: { flexDirection: "row", flexWrap: "wrap", gap: 8 },

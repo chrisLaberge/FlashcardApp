@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import KeyboardInsetView from "@/components/KeyboardInsetView";
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import Pressable from "../../components/Pressable";
 import { deleteAccount } from "../../services/account";
 import { useUser } from "../../hooks/useUser";
 import { resetPassword, signInWithEmail, signInWithGoogle, signOut, signUpWithEmail } from "../../services/auth";
@@ -145,19 +146,19 @@ const makeS = (t: Palette) => StyleSheet.create({
     scrollContent: { padding: 20, paddingBottom: 80, gap: 14 },
     content: { gap: 14, alignItems: "stretch" },
     center: { alignItems: "center", justifyContent: "center" },
-    title: { color: t.text, fontSize: 24, fontWeight: "bold", textAlign: "center", marginTop: 10 },
+    title: { color: t.text, fontSize: 24, fontWeight: "600", textAlign: "center", marginTop: 10 },
     heading: { color: t.text, fontSize: 18, fontWeight: "600" },
     email: { color: t.blue, fontSize: 17 },
     muted: { color: t.muted, fontSize: 13, textAlign: "center" },
-    card: { backgroundColor: t.surface, borderRadius: 14, padding: 16, gap: 8, marginBottom: 16 },
-    input: { backgroundColor: t.surface, color: t.text, borderRadius: 10, padding: 14, fontSize: 16 },
+    card: { backgroundColor: t.surface, borderRadius: 12, padding: 16, gap: 8, marginBottom: 16, borderWidth: StyleSheet.hairlineWidth, borderColor: t.surfaceHigh },
+    input: { backgroundColor: t.surface, color: t.text, borderRadius: 10, padding: 14, fontSize: 16, borderWidth: StyleSheet.hairlineWidth, borderColor: t.surfaceHigh },
     button: { borderRadius: 10, paddingVertical: 14, alignItems: "center" },
     primary: { backgroundColor: t.green },
-    primaryText: { color: t.bg, fontSize: 16, fontWeight: "bold" },
+    primaryText: { color: t.bg, fontSize: 16, fontWeight: "600" },
     secondary: { backgroundColor: t.surfaceHigh },
     secondaryText: { color: t.text, fontSize: 16, fontWeight: "600" },
     google: { backgroundColor: t.text },
-    googleText: { color: t.bg, fontSize: 16, fontWeight: "bold" },
+    googleText: { color: t.bg, fontSize: 16, fontWeight: "600" },
     or: { color: t.subtle, textAlign: "center", fontSize: 13 },
     link: { color: t.blue, textAlign: "center", fontSize: 14, paddingVertical: 4 },
     danger: { color: t.red, textAlign: "center", fontSize: 14, paddingVertical: 12 },

@@ -1,7 +1,8 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState, useMemo } from "react";
-import { ActivityIndicator, Alert, FlatList, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, FlatList, Modal, StyleSheet, Text, View } from "react-native";
+import Pressable from "../components/Pressable";
 import { getLanguage } from "../constants/languages";
 import { deleteDeck, getDecks } from "../database/database";
 import { backfillLocalImages } from "../services/localImages";
@@ -158,7 +159,7 @@ export default function DecksScreen() {
                 animationType="fade"
                 onRequestClose={() => setDeckToDelete(null)}
             >
-                <Pressable style={s.backdrop} onPress={() => setDeckToDelete(null)}>
+                <Pressable style={s.backdrop} dim={false} onPress={() => setDeckToDelete(null)}>
                     <Pressable style={s.dialog} onPress={() => { }}>
                         <Text style={s.dialogFlag}>
                             {deckToDelete ? getLanguage(deckToDelete.language)?.flag ?? "🌐" : ""}
@@ -212,16 +213,16 @@ const makeS = (t: Palette) => StyleSheet.create({
         flexDirection: "row",
         alignItems: "center",
         backgroundColor: t.surface,
-        borderRadius: 14,
+        borderRadius: 12,
         padding: 18,
         marginBottom: 12,
     },
     cardSelected: { backgroundColor: t.gold },
     flag: { fontSize: 32, marginRight: 14 },
-    name: { color: t.text, fontSize: 19, fontWeight: "bold" },
+    name: { color: t.text, fontSize: 19, fontWeight: "600" },
     language: { color: t.muted, fontSize: 14, marginTop: 3 },
     countBox: { alignItems: "center", marginLeft: 12 },
-    count: { color: t.blue, fontSize: 28, fontWeight: "bold" },
+    count: { color: t.blue, fontSize: 28, fontWeight: "600" },
     countLabel: { color: t.muted, fontSize: 12 },
     due: { color: t.yellow, fontSize: 13, fontWeight: "700", marginTop: 3 },
     caughtUp: { color: t.green, fontSize: 13, marginTop: 3 },
@@ -231,7 +232,7 @@ const makeS = (t: Palette) => StyleSheet.create({
         borderWidth: 1,
         borderColor: t.surfaceHigh,
         borderStyle: "dashed",
-        borderRadius: 14,
+        borderRadius: 12,
         padding: 18,
         marginBottom: 16,
         alignItems: "center",
@@ -250,7 +251,7 @@ const makeS = (t: Palette) => StyleSheet.create({
         alignItems: "center",
         justifyContent: "center",
     },
-    fabText: { color: t.bg, fontSize: 32, lineHeight: 34, fontWeight: "bold" },
+    fabText: { color: t.bg, fontSize: 32, lineHeight: 34, fontWeight: "600" },
 
     // Delete dialog
     backdrop: {
@@ -266,19 +267,19 @@ const makeS = (t: Palette) => StyleSheet.create({
         backgroundColor: t.surface,
         borderWidth: 1,
         borderColor: t.surfaceHigh,
-        borderRadius: 18,
+        borderRadius: 12,
         padding: 24,
         alignItems: "center",
     },
     dialogFlag: { fontSize: 40, marginBottom: 10 },
-    dialogTitle: { color: t.text, fontSize: 20, fontWeight: "bold", marginBottom: 10 },
+    dialogTitle: { color: t.text, fontSize: 20, fontWeight: "600", marginBottom: 10 },
     dialogBody: { color: t.muted, fontSize: 15, lineHeight: 22, textAlign: "center" },
-    dialogDeck: { color: t.text, fontWeight: "bold" },
+    dialogDeck: { color: t.text, fontWeight: "600" },
     dialogButtons: { flexDirection: "row", gap: 10, marginTop: 24 },
     btn: { flex: 1, paddingVertical: 13, borderRadius: 10, alignItems: "center" },
     cancelBtn: { backgroundColor: t.surfaceHigh },
     cancelText: { color: t.text, fontSize: 16, fontWeight: "600" },
     deleteBtn: { backgroundColor: t.bg, borderWidth: 1, borderColor: t.red },
-    deleteText: { color: t.red, fontSize: 16, fontWeight: "bold" },
+    deleteText: { color: t.red, fontSize: 16, fontWeight: "600" },
     pressed: { opacity: 0.7 },
 });

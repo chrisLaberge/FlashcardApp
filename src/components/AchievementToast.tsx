@@ -1,6 +1,7 @@
 import { router } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
+import { Animated, StyleSheet, Text, View } from "react-native";
+import Pressable from "./Pressable";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { onGoalReached } from "../services/dailyGoal";
 import { onAchievementsUnlocked, type UnlockEvent, type UnlockItem } from "../services/achievementUnlocks";
@@ -76,9 +77,9 @@ export default function AchievementToast() {
 
 const makeS = (t: Palette) => StyleSheet.create({
     wrap: { position: "absolute", left: 12, right: 12, zIndex: 100 },
-    banner: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: t.surface, borderWidth: 2, borderRadius: 14, padding: 12, elevation: 8 },
+    banner: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: t.surface, borderWidth: 2, borderRadius: 12, padding: 12, elevation: 8 },
     icon: { fontSize: 28 },
     title: { color: t.text, fontSize: 16, fontWeight: "700" },
     subtitle: { fontSize: 13, fontWeight: "600" },
-    xp: { color: t.green, fontSize: 16, fontWeight: "bold" },
+    xp: { color: t.green, fontSize: 16, fontWeight: "600" },
 });
