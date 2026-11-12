@@ -1,7 +1,7 @@
 import { TIERS } from "../src/models/Achievements";
 import { cleanPetName, isMaxed, MAX_PET_LEVEL, petLevel, petStage, PET_STAGES, stageProgress } from "../src/models/Pet";
 import {
-    ACCESSORIES, BANNERS, CASE_POOL, freeCasesEarned, gemsEarned, GEMS_PER_TIER, getAccessory, getBanner, openCase,
+    ACCESSORIES, BANNERS, CASE_POOL, freeCasesEarned, gemsForStreak, streakGemsEarned, gemsEarned, GEMS_PER_TIER, getAccessory, getBanner, openCase,
     RARITIES, RARITY_ODDS, rarityForRoll, TIER_COUNT,
 } from "../src/models/Shop";
 import { streakWithFreezes } from "../src/models/StreakFreeze";
@@ -77,11 +77,11 @@ describe("catalogue and cases", () => {
             expect(getAccessory(item.id)).toBe(item);
         }
     });
-    test("a free case at every 10 levels", () => {
-        expect(freeCasesEarned(9)).toBe(0);
-        expect(freeCasesEarned(10)).toBe(1);
-        expect(freeCasesEarned(100)).toBe(10);
-        expect(freeCasesEarned(250)).toBe(10);
+    test("a free case every time the level goes up", () => {
+        expect(freeCasesEarned(1)).toBe(0);
+        expect(freeCasesEarned(2)).toBe(1);
+        expect(freeCasesEarned(10)).toBe(9);
+        expect(freeCasesEarned(250)).toBe(249);
     });
     test("an unknown banner falls back to the plain one", () => {
         expect(getBanner("nope").id).toBe("mist");
@@ -117,5 +117,18 @@ describe("streak savers", () => {
     });
     test("unused savers are counted", () => {
         expect(streakWithFreezes(days, "2026-11-03", ["2026-11-01", "2026-11-02"]).savers).toBe(2);
+    });
+    test("streak gems grow every week", () => {
+        expect(gemsForStreak(6)).toBe(0);
+        expect(gemsForStreak(7)).toBe(10);
+        expect(gemsForStreak(14)).toBe(30);
+        expect(gemsForStreak(21)).toBe(60);
+    });
+    test("each run of days is paid once, and a gap starts a new run", () => {
+        const week = (from: number) => Array.from({ length: 7 }, (_, i) => `2026-03-${String(from + i).padStart(2, "0")}`);
+        expect(streakGemsEarned(week(1))).toBe(10);
+        expect(streakGemsEarned([...week(1), ...week(10)])).toBe(20); // a gap on the 8th and 9th
+        expect(streakGemsEarned([...week(1), ...week(8)])).toBe(30); // no gap: one 14-day streak
+        expect(streakGemsEarned([...week(1), ...week(1)])).toBe(10);
     });
 });

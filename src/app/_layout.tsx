@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import PdfImporter from "../components/pdf/PdfImporter";
 import SessionSummaryPopup from "../components/SessionSummaryPopup";
 import AchievementToast from "../components/AchievementToast";
+import LevelUpPopup from "../components/LevelUpPopup";
 import { scheduleAchievementCheck } from "../services/achievementUnlocks";
 import { refreshReminders } from "../services/dailyGoal";
 import { API_URL } from "../services/imageApi";
@@ -34,6 +35,7 @@ function Navigator() {
       </Stack>
       <AchievementToast />
       <SessionSummaryPopup />
+      <LevelUpPopup />
       <PdfImporter />
     </>
   );

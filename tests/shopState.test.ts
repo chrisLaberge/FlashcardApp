@@ -25,9 +25,10 @@ describe("shopState", () => {
         expect(state.gems).toBe(85);
     });
 
-    test("a free case for every 10 levels, minus the ones opened", () => {
-        expect(shopState(base()).freeCasesLeft).toBe(2);
-        expect(shopState(base({ ledger: [{ itemId: "case", gems: 0, kind: "free_case", at: 1 }] })).freeCasesLeft).toBe(1);
+    test("a free case for every level gained, minus the ones opened", () => {
+        const level = shopState(base()).level;
+        expect(shopState(base()).freeCasesLeft).toBe(level - 1);
+        expect(shopState(base({ ledger: [{ itemId: "case", gems: 0, kind: "free_case", at: 1 }] })).freeCasesLeft).toBe(level - 2);
     });
 
     test("only owned things are worn; the plain banner is always owned", () => {

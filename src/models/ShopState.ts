@@ -6,7 +6,7 @@
 import { levelProgress } from "./Progression";
 import { petLevel } from "./Pet";
 import {
-    BANNERS, CASE_PRICE, DUPLICATE_REFUND, MAX_STREAK_SAVERS_HELD, STREAK_SAVER_PRICE, freeCasesEarned, gemsEarned, getAccessory, getBanner,
+    BANNERS, CASE_PRICE, DUPLICATE_REFUND, MAX_STREAK_SAVERS_HELD, STREAK_SAVER_PRICE, freeCasesEarned, gemsEarned, streakGemsEarned, getAccessory, getBanner,
     openCase, type Accessory, type Slot,
 } from "./Shop";
 import { localDay } from "./Stats";
@@ -61,7 +61,7 @@ export function shopState(input: ShopInput): ShopState {
     const owned = new Set([...input.inventory, "mist"]);
     const saverDays = input.ledger.filter((l) => l.kind === "saver").map((l) => localDay(l.at));
     const spent = input.ledger.reduce((sum, l) => sum + l.gems, 0);
-    const earned = gemsEarned(level, input.unlocks);
+    const earned = gemsEarned(level, input.unlocks) + streakGemsEarned(input.studiedDays);
     const freeUsed = input.ledger.filter((l) => l.kind === "free_case").length;
 
     // Only wear what is owned (an item could not be un-owned, but the saved value could be stale).
@@ -111,7 +111,7 @@ export type CasePlan = Plan & { item?: Accessory; duplicate?: boolean; refund?: 
 
 /** Opens a case: a free one if `free`, otherwise for gems. A duplicate gives some gems back. */
 export function planCase(state: ShopState, free: boolean, random: () => number = Math.random): CasePlan {
-    if (free && state.freeCasesLeft <= 0) return { ok: false, error: "No free cases left. Every 10 levels gives you one." };
+    if (free && state.freeCasesLeft <= 0) return { ok: false, error: "No free spins left. Every new level gives you one." };
     if (!free && state.gems < CASE_PRICE) return { ok: false, error: `You need ${CASE_PRICE - state.gems} more gems.` };
 
     const item = openCase(random);

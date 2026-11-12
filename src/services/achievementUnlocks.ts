@@ -1,5 +1,7 @@
 import { getAchievementUnlocks, getCardsAdded, getReviewLog, recordAchievementUnlocks } from "../database/database";
 import { achievements, bonusXpFor, newlyEarned, TIER_BONUS_XP, TIERS } from "../models/Achievements";
+import { levelProgress, totalXp } from "../models/Progression";
+import { checkLevelUp } from "./levelUp";
 import { syncStats } from "./syncStats";
 
 /** One newly earned tier, ready to show. */
@@ -34,9 +36,10 @@ export function checkAchievements(): Promise<UnlockEvent | null> {
         const [log, added, recorded] = await Promise.all([getReviewLog(), getCardsAdded(), getAchievementUnlocks()]);
         const list = achievements({ reviews: log, cardsAdded: added.addedAt.length + added.undated, nowMs: Date.now() });
         const fresh = newlyEarned(list, recorded);
+        if (fresh.length > 0) await recordAchievementUnlocks(fresh);
+        // The level counts the bonus XP of the tiers just recorded.
+        await checkLevelUp(levelProgress(totalXp(log) + bonusXpFor(fresh.length > 0 ? await getAchievementUnlocks() : recorded)).level);
         if (fresh.length === 0) return null;
-
-        await recordAchievementUnlocks(fresh);
 
         const items: UnlockItem[] = fresh.flatMap((e) => {
             const a = list.find((x) => x.id === e.track);
