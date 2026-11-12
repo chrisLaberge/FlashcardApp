@@ -2,7 +2,7 @@ import { lemmaKey } from "./Vocabulary";
 import type { Analyzer } from "./language/types";
 
 /** Books counted with an older set of rules are counted again (the text is kept, so this is quick). */
-export const ANALYSIS_REVISION = 3;
+export const ANALYSIS_REVISION = 4;
 
 /** Languages written without spaces between words: a run of letters is a whole sentence, so words are not marked. */
 const NO_SPACES = new Set(["zh", "ja", "th", "km", "lo", "my"]);

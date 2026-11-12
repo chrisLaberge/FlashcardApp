@@ -68,6 +68,29 @@ const SCRIPT = String.raw`
     while ((m = WORD.exec(raw))) out.push({ text: m[0], index: m.index });
     return out;
   }
+  // A word cut by the end of a line ("inter-" then "national") is one word. Each piece gets the whole word as
+  // its .whole, so both pieces are marked and counted together. Only used for languages with spaces.
+  function endsCut(ws, raw) {
+    var w = ws.length ? ws[ws.length - 1] : null;
+    return w && /[-\u00AD\u2010]$/.test(w.text) && w.index + w.text.length >= raw.replace(/\s+$/, "").length ? w : null;
+  }
+  function wordsAt(i) {
+    var raw = textDivs[i].getAttribute("data-raw") || "", ws = wordsOf(raw), j;
+    for (j = 0; j < ws.length; j++) ws[j].whole = ws[j].text.replace(/[-\u00AD\u2010]+$/, "");
+    var tail = endsCut(ws, raw);
+    if (tail && i + 1 < textDivs.length) {
+      var nraw = textDivs[i + 1].getAttribute("data-raw") || "", nws = wordsOf(nraw);
+      if (nws.length && nws[0].index === nraw.search(/\S/) && /^\p{Ll}/u.test(nws[0].text)) tail.whole = tail.whole + nws[0].text;
+    }
+    if (ws.length && i > 0) {
+      var praw = textDivs[i - 1].getAttribute("data-raw") || "", pws = wordsOf(praw), pt = endsCut(pws, praw);
+      if (pt && ws[0].index === raw.search(/\S/) && /^\p{Ll}/u.test(ws[0].text)) {
+        pt.whole = pt.text.replace(/[-\u00AD\u2010]+$/, "") + ws[0].text;
+        ws[0].whole = pt.whole;
+      }
+    }
+    return ws;
+  }
   var minLen = function () { return segment ? 1 : 2; };
   var setMsg = function (t) { msg.textContent = t || ""; msg.style.display = t ? "block" : "none"; };
 
@@ -181,11 +204,11 @@ const SCRIPT = String.raw`
       var div = textDivs[i];
       var raw = div.getAttribute("data-raw");
       if (raw === null || raw === "") continue;
-      var html = "", last = 0, any = false, ws = wordsOf(raw);
+      var html = "", last = 0, any = false, ws = wordsAt(i);
       for (var j = 0; j < ws.length; j++) {
-        var w = ws[j];
-        if (w.text.length >= minLen() && unknown[key(w.text)]) {
-          html += esc(raw.slice(last, w.index)) + '<span class="' + (unknown[key(w.text)] === 2 ? "l" : "u") + '">' + esc(w.text) + "</span>";
+        var w = ws[j], wk = key(w.whole);
+        if (w.whole.length >= minLen() && unknown[wk]) {
+          html += esc(raw.slice(last, w.index)) + '<span class="' + (unknown[wk] === 2 ? "l" : "u") + '" data-w="' + esc(w.whole) + '">' + esc(w.text) + "</span>";
           last = w.index + w.text.length;
           any = true;
         }
@@ -210,10 +233,10 @@ const SCRIPT = String.raw`
     }
     for (var i = 0; i < (segment ? 0 : textDivs.length); i++) {
       var raw = textDivs[i].getAttribute("data-raw") || "";
-      var ws = wordsOf(raw);
+      var ws = wordsAt(i);
       for (var j = 0; j < ws.length; j++) {
-        if (ws[j].text.length < minLen()) continue;
-        var k = key(ws[j].text);
+        if (ws[j].whole.length < minLen()) continue;
+        var k = key(ws[j].whole);
         if (seen[k]) continue;
         seen[k] = 1;
         if (all || !asked[k]) { asked[k] = 1; fresh.push(k); }
@@ -366,6 +389,7 @@ const SCRIPT = String.raw`
       if (it.str.length) prev = it;
     }
     out = out.replace(/[ \t]+/g, " ").trim();
+    if (!segment) out = out.replace(/(\p{L})[-\u00AD\u2010] ?\n+ ?(\p{Ll})/gu, "$1$2").replace(/\u00AD/g, "");
     if (segment) out = out.normalize("NFKC");
     if (segment && segmenter) {
       var spaced = "", it = segmenter.segment(out)[Symbol.iterator](), r;
