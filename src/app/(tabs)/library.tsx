@@ -9,6 +9,7 @@ import { useImportJobs } from "../../hooks/useImportJobs";
 import { cardKey, premadeDecksFor, presentIndexes } from "../../models/PremadeDecks";
 import { coveragePercent } from "../../models/Vocabulary";
 import { drop, enqueue, fractionOf, type ImportJob } from "../../services/pdfImport";
+import { SYNC_SALT } from "../../models/ReaderWords";
 import { readerAnalyzerFor } from "../../services/morphology";
 import { addPdf, removePdfFile } from "../../services/pdfReading";
 import { syncIfCardsChanged } from "../../services/vocabulary";
@@ -71,7 +72,7 @@ export default function LibraryScreen() {
         // Waits until the screen has been drawn and has settled before doing any work.
         const timer = setTimeout(async () => {
             try {
-                if (live && texts.length > 0 && await syncIfCardsChanged(language, () => readerAnalyzerFor(language))) {
+                if (live && texts.length > 0 && await syncIfCardsChanged(language, () => readerAnalyzerFor(language), SYNC_SALT)) {
                     if (live) await loadTexts();
                 }
             } catch {

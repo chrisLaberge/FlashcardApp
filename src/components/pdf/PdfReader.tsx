@@ -2,15 +2,15 @@ import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Alert, StyleSheet, Text, View } from "react-native";
 import type { WebViewMessageEvent } from "react-native-webview";
-import { getBookIgnored, getInDeckLemmas, getKnownLemmas, setLastPage, setMyTextBody, setWordKnown, setWordIgnored, type MyText } from "../../database/database";
-import { bookText, learningKeys, marksWords, unknownKeys } from "../../models/ReaderWords";
+import { getBookIgnored, getBookSummary, getInDeckLemmas, getKnownLemmas, setLastPage, setMyTextBody, setWordKnown, setWordIgnored, type MyText } from "../../database/database";
+import { bookText, learningKeys, marksWords, SYNC_SALT, unknownKeys } from "../../models/ReaderWords";
 import type { Analyzer } from "../../models/language/types";
 import { tokenize } from "../../models/Tokens";
 import { readerAnalyzerFor } from "../../services/morphology";
 import { openAddCard } from "../../services/openAddCard";
 import { friendlyPdfError } from "../../models/PdfErrors";
 import { sendPdf } from "../../services/pdfReading";
-import { analyzeBook, syncKnownWords } from "../../services/vocabulary";
+import { analyzeBook, syncIfCardsChanged, syncKnownWords } from "../../services/vocabulary";
 import { useTheme } from "../../theme/ThemeProvider";
 import type { Palette } from "../../theme/themes";
 import LookupSheet from "../LookupSheet";
@@ -64,7 +64,8 @@ export default function PdfReader({ book, languageName, onAnalyzed }: Props) {
         prep.current ??= (async () => {
             const analyzer = await readerAnalyzerFor(book.language);
             try {
-                await syncKnownWords(book.language, analyzer);
+                // Only does the work when the cards changed since the last time.
+                await syncIfCardsChanged(book.language, () => Promise.resolve(analyzer), SYNC_SALT);
             } catch {
                 // The words you marked yourself still work.
             }
@@ -85,6 +86,9 @@ export default function PdfReader({ book, languageName, onAnalyzed }: Props) {
             if (saveTimer.current) clearTimeout(saveTimer.current);
         };
     }, [ready]);
+
+    // Starts loading the word dictionary right away, while the PDF itself is still opening.
+    useEffect(() => { void ready(); }, [ready]);
 
     const send = useCallback((message: object) => {
         web.current?.injectJavaScript(`window.onRN(${JSON.stringify(message)});true;`);
@@ -178,6 +182,25 @@ export default function PdfReader({ book, languageName, onAnalyzed }: Props) {
         );
     }, [book.language, ready, send, onAnalyzed]);
 
+    // After the first words are marked: if the book was counted with older rules, count it again, then tell the
+    // header. Until then the percentage is not shown, so it does not jump while the book opens.
+    const settled = useRef(false);
+    const settle = useCallback((analyzer: Analyzer) => {
+        if (settled.current) return;
+        settled.current = true;
+        setTimeout(() => void (async () => {
+            try {
+                const saved = await getBookSummary(book.id);
+                if (saved && saved.analyzerVersion !== analyzer.version && analyzer.language === book.language) {
+                    await analyzeBook(book.id, analyzer);
+                }
+            } catch {
+                // The old counts stay.
+            }
+            if (mounted.current) onAnalyzed?.();
+        })(), 800);
+    }, [book.id, book.language, onAnalyzed]);
+
     const onMessage = useCallback(async (event: WebViewMessageEvent) => {
         let message: Incoming;
         try {
@@ -193,7 +216,7 @@ export default function PdfReader({ book, languageName, onAnalyzed }: Props) {
                 // The page is on screen; only now load the word dictionary, so opening is never held up by it.
                 if (!started.current) {
                     started.current = true;
-                    setTimeout(() => void ready(), 500);
+                    void ready();
                 }
                 if (saveTimer.current) clearTimeout(saveTimer.current);
                 const n = message.page;
@@ -208,6 +231,7 @@ export default function PdfReader({ book, languageName, onAnalyzed }: Props) {
                     learning: learningKeys(message.words, analyzer, deck.current),
                     replace: !!message.replace,
                 });
+                settle(analyzer);
                 break;
             }
             case "markPage":
@@ -228,7 +252,7 @@ export default function PdfReader({ book, languageName, onAnalyzed }: Props) {
                 if (!/worker|importScripts/i.test(message.message)) setFailure(friendlyPdfError(message.code, message.message));
                 break;
         }
-    }, [book.id, open, ready, send, finishText, askMarkPage]);
+    }, [book.id, open, ready, send, finishText, askMarkPage, settle]);
 
     // A single word can be marked known; a phrase cannot.
     const single = lookup ? (marksWords(book.language) ? tokenize(lookup.text).filter((x) => x.word).length === 1 : !/\s/.test(lookup.text.trim())) : false;

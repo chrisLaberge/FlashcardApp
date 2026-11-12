@@ -28,9 +28,9 @@ export const syncKnownWords = (language: string, analyzer: Analyzer): Promise<vo
  * (so opening the library costs one small query). The analyzer is loaded only when it is needed, because for
  * some languages that is the slow part. Resolves to true when the known words were updated.
  */
-export async function syncIfCardsChanged(language: string, loadAnalyzer: () => Promise<Analyzer>): Promise<boolean> {
+export async function syncIfCardsChanged(language: string, loadAnalyzer: () => Promise<Analyzer>, salt = ""): Promise<boolean> {
     const key = `vocab-sync:${language}`;
-    const now = await getCardFingerprint(language);
+    const now = `${await getCardFingerprint(language)}|${salt}`;
     if ((await AsyncStorage.getItem(key)) === now) return false;
     await syncKnownWords(language, await loadAnalyzer());
     await AsyncStorage.setItem(key, now);

@@ -3,6 +3,7 @@ import { DatabaseSync } from "node:sqlite";
 import { analyzeText } from "@/models/BookAnalysis";
 import { createRussianAnalyzer, type AzMorph } from "@/models/language/russian";
 import type { Analyzer } from "@/models/language/types";
+import { unknownKeys } from "@/models/ReaderWords";
 import { coveragePercent, isLearned, KNOWN_MIN_LEVEL, knownFromCards, lemmaKey } from "@/models/Vocabulary";
 import { freezeTime, makeTempDir, rawDb, startApp, stopApp, T0, unfreezeTime } from "./helpers/testDb";
 
@@ -155,6 +156,20 @@ describe("the known-word bank and book coverage", () => {
         raw.prepare("UPDATE card_progress SET level = 0 WHERE card_id = ?").run(c1);
         await service().syncKnownWords("ru", russian);
         expect((await coverage(a)).knownTokens).toBe(0);
+    });
+
+    test("forms of a word the dictionary lacks still match (чиновый, чинового)", () => {
+        const base = russian.lemma("чиновый").lemma;
+        for (const form of ["чинового", "чиновому", "чиновые", "чиновых"]) expect(russian.lemma(form).lemma).toBe(base);
+        // loose guesses are not trusted: a made-up word stays itself
+        expect(russian.lemma("ъъъъ").lemma).toBe("ъъъъ");
+        // the same answer comes back the second time (remembered)
+        expect(russian.lemma("чинового")).toBe(russian.lemma("чинового"));
+    });
+
+    test("a word on a card removes its other forms from the unknown words", () => {
+        const known = new Set([russian.lemma("чиновый").lemma]);
+        expect(unknownKeys(["чинового", "книга"], russian, known)).toEqual(["книга"]);
     });
 
     test("the library refresh only does the work when the cards changed", async () => {
