@@ -1,6 +1,9 @@
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
+import { ActivityIndicator, View } from "react-native";
+import SignInScreen from "../components/SignInScreen";
+import { useUser } from "../hooks/useUser";
 import PdfImporter from "../components/pdf/PdfImporter";
 import SessionSummaryPopup from "../components/SessionSummaryPopup";
 import AchievementToast from "../components/AchievementToast";
@@ -15,6 +18,23 @@ import { ThemeProvider, useTheme, useThemeControls } from "../theme/ThemeProvide
 function Navigator() {
   const t = useTheme();
   const { theme } = useThemeControls();
+  const user = useUser();
+  // Nothing in the app is reachable without an account. `undefined` is the moment before the saved sign-in is found.
+  if (user === undefined) {
+    return (
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: t.bg }}>
+        <ActivityIndicator color={t.blue} />
+      </View>
+    );
+  }
+  if (user === null) {
+    return (
+      <>
+        <StatusBar style={theme.isDark ? "light" : "dark"} />
+        <SignInScreen />
+      </>
+    );
+  }
   return (
     <>
       <StatusBar style={theme.isDark ? "light" : "dark"} />
