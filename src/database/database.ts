@@ -776,8 +776,10 @@ export class RestoreError extends Error {}
 
 const RESTORE_TABLES = [
     "decks", "images", "cards", "card_progress", "review_log", "card_add_log", "achievement_unlocks",
-    "my_texts", "known_words", "book_vocab",
+    "my_texts", "known_words", "book_vocab", "pet_state", "shop_inventory", "shop_ledger",
 ] as const;
+
+const PET_TABLES: readonly string[] = ["pet_state", "shop_inventory", "shop_ledger"];
 
 /** Books that have a PDF file on this phone. */
 export async function getPdfBooks(): Promise<{ id: number; pdfPath: string }[]> {
@@ -850,7 +852,8 @@ export async function restoreFromBackup(source: RestoreSource): Promise<RestoreR
             const rows = await source.getAllAsync<Record<string, SQLite.SQLiteBindValue>>(
                 `SELECT ${columns.join(", ")} FROM ${table}`,
             );
-            const insert = `INSERT INTO ${table} (${columns.join(", ")}) VALUES (${columns.map(() => "?").join(", ")})`;
+            // The pet tables may already hold a default row; everything else must not conflict, or the restore fails.
+            const insert = `INSERT ${PET_TABLES.includes(table) ? "OR REPLACE " : ""}INTO ${table} (${columns.join(", ")}) VALUES (${columns.map(() => "?").join(", ")})`;
             for (const row of rows) {
                 await database.runAsync(insert, ...columns.map((name) => row[name] ?? null));
             }

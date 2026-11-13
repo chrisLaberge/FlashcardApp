@@ -219,4 +219,26 @@ describe("restoreFromBackup", () => {
         expect((await db.getCards(1)).map((c) => c.learningText)).toEqual(["ok"]);
         expect(await db.getCardProgress(2)).toBeUndefined();
     });
+
+    test("brings back the pet and the shop too", async () => {
+        const tmp = makeTempDir();
+        try {
+            const file = tmp.path("pet.db");
+            const raw = startApp(file);
+            const deck = await raw.addDeck("Russian", "ru");
+            await raw.addCard("вода", "water", "", "voda", deck);
+            await raw.setPetState("name", "Stompa");
+            await raw.recordShopAction({ ledger: [{ itemId: "chef", gems: 0, kind: "case" }], addItem: "chef" }, 5);
+            stopApp();
+
+            const db = startApp();
+            await db.restoreFromBackup(asSource(new DatabaseSync(file, { readOnly: true })));
+            expect((await db.getPetState()).name).toBe("Stompa");
+            expect(await db.getInventory()).toEqual(["chef"]);
+            expect(await db.getLedger()).toEqual([{ itemId: "chef", gems: 0, kind: "case", at: 5 }]);
+        } finally {
+            stopApp();
+            tmp.cleanup();
+        }
+    });
 });

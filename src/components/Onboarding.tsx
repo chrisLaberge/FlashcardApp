@@ -1,12 +1,14 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useMemo, useState } from "react";
-import { FlatList, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, FlatList, StyleSheet, Text, TextInput, View } from "react-native";
 import KeyboardInsetView from "./KeyboardInsetView";
 import LangBadge from "./LangBadge";
 import Pressable from "./Pressable";
 import { languages, type Language } from "../constants/languages";
 import { addCard, addDeck } from "../database/database";
+import { backfillLocalImages } from "../services/localImages";
+import { pickAndRestoreBackup } from "../utils/restoreBackup";
 import { useTheme } from "../theme/ThemeProvider";
 import type { Palette } from "../theme/themes";
 
@@ -45,6 +47,28 @@ export default function Onboarding({ mode, onDone }: Props) {
         await AsyncStorage.setItem(ONBOARDED_KEY, "1").catch(() => undefined);
         onDone();
     };
+
+    // For someone moving to a new install: bring the old decks and progress back instead of starting again.
+    const restore = async () => {
+        if (busy) return;
+        setBusy(true);
+        try {
+            const result = await pickAndRestoreBackup();
+            if (!result) return;
+            void backfillLocalImages();
+            Alert.alert("Backup restored", `${result.decks} deck${result.decks === 1 ? "" : "s"}, ${result.cards} cards and your progress are back.`);
+            await finish();
+        } catch (error) {
+            Alert.alert("Could not restore", error instanceof Error ? error.message : String(error));
+        } finally {
+            setBusy(false);
+        }
+    };
+    const restoreLink = mode === "first" ? (
+        <Pressable onPress={() => void restore()} disabled={busy} accessibilityRole="button">
+            <Text style={s.skip}>I have a backup file</Text>
+        </Pressable>
+    ) : null;
 
     const lastSlide = () => (mode === "first" ? setStep(deckStep) : void finish());
 
@@ -92,6 +116,7 @@ export default function Onboarding({ mode, onDone }: Props) {
                 <Pressable style={({ pressed }) => [s.button, pressed && s.pressed]} onPress={() => (step === deckStep - 1 ? lastSlide() : setStep(step + 1))} accessibilityRole="button">
                     <Text style={s.buttonText}>{step === deckStep - 1 ? (mode === "first" ? "Make my first deck" : "Done") : "Next"}</Text>
                 </Pressable>
+                {restoreLink}
             </View>
         );
     }
@@ -120,6 +145,7 @@ export default function Onboarding({ mode, onDone }: Props) {
                 <Pressable style={({ pressed }) => [s.button, !language && s.disabled, pressed && s.pressed]} onPress={() => void makeDeck()} disabled={!language || busy} accessibilityRole="button">
                     <Text style={s.buttonText}>Continue</Text>
                 </Pressable>
+                {restoreLink}
             </KeyboardInsetView>
         );
     }
