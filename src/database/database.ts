@@ -857,6 +857,9 @@ export async function restoreFromBackup(source: RestoreSource): Promise<RestoreR
             const rows = await source.getAllAsync<Record<string, SQLite.SQLiteBindValue>>(
                 `SELECT ${columns.join(", ")} FROM ${table}`,
             );
+            // The app has no decks or cards here, but it may already hold small things made on its own (an achievement
+            // unlocked, a word marked). The backup's version replaces them, so the two never collide.
+            await database.execAsync(`DELETE FROM ${table}`);
             // The pet tables may already hold a default row; everything else must not conflict, or the restore fails.
             const insert = `INSERT ${PET_TABLES.includes(table) ? "OR REPLACE " : ""}INTO ${table} (${columns.join(", ")}) VALUES (${columns.map(() => "?").join(", ")})`;
             for (const row of rows) {
