@@ -14,7 +14,7 @@ import { drop, enqueue, fractionOf, type ImportJob } from "../../services/pdfImp
 import { SYNC_SALT } from "../../models/ReaderWords";
 import { readerAnalyzerFor } from "../../services/morphology";
 import { addPdf, removePdfFile } from "../../services/pdfReading";
-import { syncIfCardsChanged } from "../../services/vocabulary";
+import { analyzeNewBooks, syncIfCardsChanged } from "../../services/vocabulary";
 import { useTheme } from "../../theme/ThemeProvider";
 import type { Palette } from "../../theme/themes";
 
@@ -74,9 +74,15 @@ export default function LibraryScreen() {
         // Waits until the screen has been drawn and has settled before doing any work.
         const timer = setTimeout(async () => {
             try {
-                if (live && texts.length > 0 && await syncIfCardsChanged(language, () => readerAnalyzerFor(language), SYNC_SALT)) {
-                    if (live) await loadTexts();
+                if (!live || texts.length === 0) return;
+                let changed = await syncIfCardsChanged(language, () => readerAnalyzerFor(language), SYNC_SALT);
+                // Books counted with older word rules are counted again, one at a time, so the percentages stay right.
+                const analyzer = await readerAnalyzerFor(language);
+                if (live && texts.some((b) => b.analyzerVersion !== analyzer.version)) {
+                    await analyzeNewBooks(language, analyzer);
+                    changed = true;
                 }
+                if (live && changed) await loadTexts();
             } catch {
                 // The saved numbers stay; this runs again next time.
             }

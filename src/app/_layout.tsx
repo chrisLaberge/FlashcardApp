@@ -8,6 +8,7 @@ import LevelUpPopup from "../components/LevelUpPopup";
 import { scheduleAchievementCheck } from "../services/achievementUnlocks";
 import { refreshReminders } from "../services/dailyGoal";
 import { API_URL } from "../services/imageApi";
+import { prewarmAnalyzers } from "../services/morphology";
 import { backfillLocalImages } from "../services/localImages";
 import { ThemeProvider, useTheme, useThemeControls } from "../theme/ThemeProvider";
 
@@ -48,8 +49,10 @@ export default function RootLayout() {
     // Award anything already earned (e.g. right after updating); a no-op once recorded.
     scheduleAchievementCheck(4000);
     void refreshReminders();
+    const warm = setTimeout(() => void prewarmAnalyzers(), 3000);
     // Wake the server now so the first word lookup or spoken card is not waiting on a cold start.
     fetch(`${API_URL}/`).catch(() => undefined);
+    return () => clearTimeout(warm);
   }, []);
 
   return (

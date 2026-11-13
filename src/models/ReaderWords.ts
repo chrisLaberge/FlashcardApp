@@ -1,12 +1,13 @@
 import { lemmaKey } from "./Vocabulary";
 import type { Analyzer } from "./language/types";
 import { RUSSIAN_VERSION } from "./language/russian";
+import { STEMMER_VERSION } from "./language/stemmed";
 
 /** Books counted with an older set of rules are counted again (the text is kept, so this is quick). */
 export const ANALYSIS_REVISION = 4;
 
 /** Changes whenever the rules that turn words into lemmas change, so the saved known words are made again. */
-export const SYNC_SALT = `${ANALYSIS_REVISION}.${RUSSIAN_VERSION}`;
+export const SYNC_SALT = `${ANALYSIS_REVISION}.${RUSSIAN_VERSION}.${STEMMER_VERSION}`;
 
 /** Languages written without spaces between words: a run of letters is a whole sentence, so words are not marked. */
 const NO_SPACES = new Set(["zh", "ja", "th", "km", "lo", "my"]);

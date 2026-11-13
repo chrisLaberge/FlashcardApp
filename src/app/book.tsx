@@ -4,6 +4,7 @@ import { ActivityIndicator, FlatList, StyleSheet, Text, View } from "react-nativ
 import Pressable from "../components/Pressable";
 import { getBookSummary, getTopUnknown, setWordKnown, setWordIgnored, type BookSummary } from "../database/database";
 import { coveragePercent } from "../models/Vocabulary";
+import { hasStemmer } from "../models/language/stemmed";
 import { readerAnalyzerFor } from "../services/morphology";
 import { openAddCard } from "../services/openAddCard";
 import { analyzeBook, syncKnownWords } from "../services/vocabulary";
@@ -68,6 +69,8 @@ export default function BookScreen() {
     const total = (book.totalTokens ?? 0) - book.ignoredTokens;
     const percent = coveragePercent(book.knownTokens, total);
 
+    // Stemmed languages keep a word stem as the key, which is not a word; show the form seen most in the book.
+    const shown = (w: Word) => (hasStemmer(book.language) ? w.sample : w.lemma);
     const markKnown = async (lemma: string) => {
         await setWordKnown(book.language, lemma, true);
         await show(); // the percentage and the list both come from the database, so they stay in step
@@ -103,16 +106,16 @@ export default function BookScreen() {
                 renderItem={({ item }) => (
                     <View style={s.row}>
                         <View style={{ flex: 1 }}>
-                            <Text style={s.word}>{item.lemma}</Text>
+                            <Text style={s.word}>{shown(item)}</Text>
                             <Text style={s.count}>{item.count}×</Text>
                         </View>
-                        <Pressable style={s.small} onPress={() => markKnown(item.lemma)} accessibilityRole="button" accessibilityLabel={`I know ${item.lemma}`}>
+                        <Pressable style={s.small} onPress={() => markKnown(item.lemma)} accessibilityRole="button" accessibilityLabel={`I know ${shown(item)}`}>
                             <Text style={s.smallText}>Known</Text>
                         </Pressable>
-                        <Pressable style={s.small} onPress={() => markIgnored(item.lemma)} accessibilityRole="button" accessibilityLabel={`${item.lemma} is ignored`}>
+                        <Pressable style={s.small} onPress={() => markIgnored(item.lemma)} accessibilityRole="button" accessibilityLabel={`${shown(item)} is ignored`}>
                             <Text style={s.smallText}>Ignore</Text>
                         </Pressable>
-                        <Pressable style={[s.small, s.primary]} onPress={() => void openAddCard(book.language, { text: item.lemma })} accessibilityRole="button" accessibilityLabel={`Add ${item.lemma} as a card`}>
+                        <Pressable style={[s.small, s.primary]} onPress={() => void openAddCard(book.language, { text: shown(item) })} accessibilityRole="button" accessibilityLabel={`Add ${shown(item)} as a card`}>
                             <Text style={[s.smallText, { color: t.bg }]}>+ Card</Text>
                         </Pressable>
                     </View>
