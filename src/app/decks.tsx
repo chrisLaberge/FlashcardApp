@@ -44,7 +44,7 @@ export default function DecksScreen() {
                                 "Backup restored",
                                 `${result.decks} deck${result.decks === 1 ? "" : "s"}, ${result.cards} cards and your progress are back.`
                                     + (result.books > 0
-                                        ? ` ${result.books} book${result.books === 1 ? "" : "s"} and your known words came back too. PDF files are not in a backup, so add those again.`
+                                        ? ` ${result.books} book${result.books === 1 ? "" : "s"} and your known words came back too.${result.pdfs > 0 ? ` ${result.pdfs} PDF file${result.pdfs === 1 ? "" : "s"} came back as well.` : " PDF files are not in this backup, so add those again."}`
                                         : ""),
                             );
                         } catch (error) {

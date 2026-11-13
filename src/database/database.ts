@@ -779,6 +779,19 @@ const RESTORE_TABLES = [
     "my_texts", "known_words", "book_vocab",
 ] as const;
 
+/** Books that have a PDF file on this phone. */
+export async function getPdfBooks(): Promise<{ id: number; pdfPath: string }[]> {
+    const database = await getDatabase();
+    const rows = await database.getAllAsync<{ id: number; pdf_path: string }>("SELECT id, pdf_path FROM my_texts WHERE pdf_path IS NOT NULL AND pdf_path != ''");
+    return rows.map((r) => ({ id: r.id, pdfPath: r.pdf_path }));
+}
+
+/** Points a book at its PDF file (used when a backup brings the file back). */
+export async function setPdfPath(id: number, path: string): Promise<void> {
+    const database = await getDatabase();
+    await database.runAsync("UPDATE my_texts SET pdf_path = ? WHERE id = ?", path, id);
+}
+
 /** Columns that point at files on the old phone. The files are not in a backup, so they are forgotten. */
 const RESTORE_SKIP_COLUMNS: Record<string, string[]> = { images: ["local_path"], my_texts: ["pdf_path"] };
 
