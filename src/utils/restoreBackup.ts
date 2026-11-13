@@ -1,11 +1,52 @@
 import * as DocumentPicker from "expo-document-picker";
 import { Directory, File, FileMode, Paths } from "expo-file-system";
+import * as LegacyFileSystem from "expo-file-system/legacy";
 import * as SQLite from "expo-sqlite";
 import { restoreFromBackup, setPdfPath, type RestoreResult } from "../database/database";
+import { fromBase64 } from "../models/Base64";
 import { applySettings } from "../services/backupSettings";
 import { BUNDLE_MAGIC, bundleJsonLength, isBundle, parseBundleHeader } from "../models/BackupBundle";
 
 const PIECE = 4 * 1024 * 1024;
+
+const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
+
+/**
+ * Gets the picked file onto the phone's own storage, trying every route a phone might allow (a file from Google
+ * Drive or another app is often only readable one particular way). The reasons for each failure are kept, so if
+ * every route fails the message says why.
+ */
+async function localCopy(uri: string): Promise<File> {
+    const target = new File(Paths.cache, `restore-${Date.now()}.tmp`);
+    const problems: string[] = [];
+    const routes: [string, () => Promise<void>][] = [
+        ["copy", async () => LegacyFileSystem.copyAsync({ from: uri, to: target.uri })],
+        ["fetch", async () => {
+            const bytes = new Uint8Array(await (await fetch(uri)).arrayBuffer());
+            if (bytes.length === 0) throw new Error("empty file");
+            target.create({ overwrite: true });
+            target.write(bytes);
+        }],
+        ["read", async () => {
+            const data = await LegacyFileSystem.readAsStringAsync(uri, { encoding: LegacyFileSystem.EncodingType.Base64 });
+            const bytes = fromBase64(data);
+            if (bytes.length === 0) throw new Error("empty file");
+            target.create({ overwrite: true });
+            target.write(bytes);
+        }],
+    ];
+    for (const [name, run] of routes) {
+        try {
+            await run();
+            if (target.exists && target.size > 0) return target;
+            problems.push(`${name}: nothing was copied`);
+        } catch (error) {
+            problems.push(`${name}: ${message(error)}`);
+            if (target.exists) target.delete();
+        }
+    }
+    throw new Error(`Could not read the file. ${problems.join(" | ")}`);
+}
 
 /** Something that hands out a file's bytes in order. */
 type Reader = { readBytes(length: number): Promise<Uint8Array>; close(): void };
@@ -42,12 +83,12 @@ export type RestoreOutcome = RestoreResult & { /** PDF files that came back with
 export async function pickAndRestoreBackup(): Promise<RestoreOutcome | null> {
     const picked = await DocumentPicker.getDocumentAsync({
         type: "*/*",
-        copyToCacheDirectory: true,
+        copyToCacheDirectory: false,
         multiple: false,
     });
     if (picked.canceled) return null;
 
-    const source = new File(picked.assets[0].uri);
+    const source = await localCopy(picked.assets[0].uri);
     const input = await openReader(source);
     try {
         const start = await input.readBytes(BUNDLE_MAGIC.length + 4);
@@ -79,6 +120,7 @@ export async function pickAndRestoreBackup(): Promise<RestoreOutcome | null> {
         return { ...result, pdfs: await restorePdfs(input, pdfs) };
     } finally {
         input.close();
+        if (source.exists) source.delete(); // the temporary copy
     }
 }
 
