@@ -618,7 +618,7 @@ export default function EditCardScreen() {
                     />
 
                     {renderWatermark(
-                        `${learningLanguageCode.toUpperCase()}`
+                        `${getLanguage(learningLanguageCode)?.flag ?? "🌐"} ${learningLanguageCode.toUpperCase()}`
                     )}
                     {renderTranslateButton("learningToLocalized")}
                 </View>
@@ -634,7 +634,7 @@ export default function EditCardScreen() {
                     />
 
                     {renderWatermark(
-                        `${localizedLanguageCode.toUpperCase()}`
+                        `${getLanguage(localizedLanguageCode)?.flag ?? "🌐"} ${localizedLanguageCode.toUpperCase()}`
                     )}
                     {renderTranslateButton("localizedToLearning")}
                 </View>

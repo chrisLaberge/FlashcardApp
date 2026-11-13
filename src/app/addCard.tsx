@@ -698,7 +698,7 @@ export default function AddCardScreen() {
                         />
 
                         {renderWatermark(
-                            `${learningLanguageCode.toUpperCase()} `
+                            `${getLanguage(learningLanguageCode)?.flag ?? "🌐"} ${learningLanguageCode.toUpperCase()} `
                         )}
 
                         {renderTranslateButton("learningToLocalized")}
@@ -717,7 +717,7 @@ export default function AddCardScreen() {
                         />
 
                         {renderWatermark(
-                            `${localizedLanguageCode.toUpperCase()} `
+                            `${getLanguage(localizedLanguageCode)?.flag ?? "🌐"} ${localizedLanguageCode.toUpperCase()} `
                         )}
 
                         {renderTranslateButton("localizedToLearning")}
