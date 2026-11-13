@@ -74,12 +74,16 @@ export default function PetView({ level, look = {}, size = 160, animated = true,
 
     // Body shape and colours by stage.
     const adult = stage.id === "adult" || stage.id === "golden";
+    const hatchling0 = stage.id === "hatchling";
     const shape =
-        stage.id === "chick" ? { cy: 82, rx: 24, ry: 18, headCy: 60, headR: 15, legTop: 96 }
-        : stage.id === "youngster" ? { cy: 78, rx: 26, ry: 21, headCy: 52, headR: 16, legTop: 97 }
+        stage.id === "chick" ? { cy: 82, rx: 22, ry: 17, headCy: 60, headR: 14, legTop: 94 }
+        : stage.id === "youngster" ? { cy: 72, rx: 25, ry: 19, headCy: 48, headR: 15, legTop: 87 }
+        : stage.id === "adult" ? { cy: 64, rx: 27, ry: 21, headCy: 38, headR: 16, legTop: 81 }
+        : stage.id === "golden" ? { cy: 62, rx: 28, ry: 23, headCy: 35, headR: 16, legTop: 80 }
+        : hatchling0 ? { cy: 74, rx: 28, ry: 24, headCy: 46, headR: 17, legTop: 97 }
         : { cy: 74, rx: 28, ry: 24, headCy: 46, headR: 17, legTop: 97 };
-    const body = maxed ? "url(#gold)" : adult ? "#1d2440" : "#262b3d";
-    const chest = maxed ? "#fff3b0" : "#3b4fb8";
+    const body = maxed ? "url(#gold)" : adult ? "#20244a" : stage.id === "youngster" ? "#232a55" : "#262b3d";
+    const chest = maxed ? "#fff3b0" : stage.id === "youngster" ? "#3b4fb8" : "#4a55d6";
     const beak = maxed ? "#e0a21b" : "#e5484d";
 
     const sway = bob.interpolate({ inputRange: [0, 1], outputRange: [0, -4] });
@@ -125,6 +129,66 @@ export default function PetView({ level, look = {}, size = 160, animated = true,
         </G>
     );
 
+    // The grown-up bird: a pukeko with a big red shield and beak, a blue chest and long legs with huge feet.
+    const bigger = stage.id === "adult" || stage.id === "golden";
+    const hc = shape.headCy;
+    const hr = shape.headR;
+    const sh = stage.id === "chick" ? 0 : stage.id === "youngster" ? 0.55 : 1;
+    const bk = stage.id === "chick" ? 0.55 : stage.id === "youngster" ? 0.8 : 1;
+    const toe = stage.id === "chick" ? 8 : stage.id === "youngster" ? 11 : 14;
+    const legW = stage.id === "chick" ? 3 : stage.id === "youngster" ? 3.8 : 4.6;
+    const foot = (x: number, y: number) => `M${x} ${y} L${x + toe} ${y + 3} M${x} ${y} L${x + 2} ${y + 4.5} M${x} ${y} L${x - toe * 0.8} ${y + 3.5}`;
+    const bird = (
+        <G>
+            {maxed ? (
+                <G>
+                    <Circle cx={60} cy={62} r={50} fill="#ffd25a" opacity={0.13} />
+                    {Array.from({ length: 14 }, (_, i) => {
+                        const a = (Math.PI * 2 * i) / 14;
+                        return <Path key={i} d={`M${60 + Math.cos(a) * 40} ${62 + Math.sin(a) * 40} L${60 + Math.cos(a) * 58} ${62 + Math.sin(a) * 58}`} stroke="#ffd25a" strokeWidth={3} strokeLinecap="round" opacity={0.5} />;
+                    })}
+                </G>
+            ) : null}
+            {/* legs: one planted, one lifted mid-stomp (both planted for the chick) */}
+            <G stroke={beak} strokeWidth={legW} strokeLinecap="round" strokeLinejoin="round" fill="none">
+                <Path d={`M70 ${shape.legTop} L72 108 ${foot(72, 108)}`} />
+                {stage.id === "chick"
+                    ? <Path d={`M50 ${shape.legTop} L48 108 ${foot(48, 108)}`} />
+                    : <Path d={`M50 ${shape.legTop} L45 ${shape.legTop + 9} L36 ${shape.legTop + 12} ${foot(36, shape.legTop + 12)}`} />}
+            </G>
+            {bigger ? (
+                <G>
+                    {maxed
+                        ? [-1, 0, 1].map((i) => <Path key={i} d={`M${60 + shape.rx - 6} ${shape.cy} Q${60 + shape.rx + 14 + i * 3} ${shape.cy + i * 9 - 6} ${60 + shape.rx + 12 + i * 4} ${shape.cy + i * 12 - 18}`} stroke="url(#gold)" strokeWidth={6} strokeLinecap="round" fill="none" />)
+                        : <Path d={`M${60 + shape.rx - 5} ${shape.cy - 4} Q${60 + shape.rx + 13} ${shape.cy - 10} ${60 + shape.rx + 9} ${shape.cy - 18} Q${60 + shape.rx + 12} ${shape.cy + 2} ${60 + shape.rx - 2} ${shape.cy + 6} Z`} fill={body} />}
+                    <Polygon points={`${60 + shape.rx - 2},${shape.cy + 3} ${60 + shape.rx + 9},${shape.cy - 1} ${60 + shape.rx + 3},${shape.cy + 9}`} fill="#ffffff" />
+                </G>
+            ) : null}
+            <Ellipse cx={60} cy={shape.cy} rx={shape.rx} ry={shape.ry} fill={body} />
+            {bigger ? <Path d={`M${60 - shape.rx * 0.1} ${shape.cy - shape.ry * 0.55} Q${60 + shape.rx * 0.75} ${shape.cy - shape.ry * 0.75} ${60 + shape.rx * 0.88} ${shape.cy + shape.ry * 0.1} Q${60 + shape.rx * 0.35} ${shape.cy + shape.ry * 0.55} ${60 - shape.rx * 0.1} ${shape.cy - shape.ry * 0.55} Z`} fill={maxed ? "#c98f1c" : "#13173a"} opacity={0.7} /> : null}
+            {stage.id !== "chick" ? <Ellipse cx={58} cy={shape.cy + shape.ry * 0.3} rx={shape.rx * 0.66} ry={shape.ry * 0.62} fill={chest} opacity={maxed ? 0.95 : 0.9} /> : null}
+            {stage.id !== "chick" && !maxed ? <Ellipse cx={55} cy={shape.cy + shape.ry * 0.15} rx={shape.rx * 0.34} ry={shape.ry * 0.3} fill="#7f8aff" opacity={0.45} /> : null}
+            {maxed ? [-1, 0, 1].map((i) => <Path key={`c${i}`} d={`M${60 + i * 5} ${hc - hr + 2} Q${60 + i * 9} ${hc - hr - 7} ${60 + i * 14} ${hc - hr - 11 + Math.abs(i) * 3}`} stroke="url(#gold)" strokeWidth={3.2} strokeLinecap="round" fill="none" />) : null}
+            <Circle cx={60} cy={hc} r={hr} fill={body} />
+            {stage.id === "chick" ? <Path d={`M54 ${hc - hr + 1} l-2 -5 M60 ${hc - hr} l0 -6 M66 ${hc - hr + 1} l2 -5`} stroke={body} strokeWidth={2.4} strokeLinecap="round" /> : null}
+            {sh > 0 ? (
+                <G>
+                    <Path d={`M${60 - 6.5 * sh} ${hc - 3} Q${60 - 8.5 * sh} ${hc - hr + 1} 60 ${hc - hr - 1} Q${60 + 8.5 * sh} ${hc - hr + 1} ${60 + 6.5 * sh} ${hc - 3} Z`} fill={maxed ? "#d63a3a" : beak} />
+                    <Rect x={58.4} y={hc - 4} width={3.2} height={7} fill={maxed ? "#d63a3a" : beak} />
+                </G>
+            ) : null}
+            {eyes}
+            <Polygon points={`${60 - 7 * bk},${hc + 2} ${60 + 7 * bk},${hc + 2} 60,${hc + 2 + 11 * bk}`} fill={beak} />
+            <Polygon points={`${60 - 2.6 * bk},${hc + 2 + 8 * bk} ${60 + 2.6 * bk},${hc + 2 + 8 * bk} 60,${hc + 2 + 11 * bk}`} fill="#ffd9a0" />
+            {bigger ? null : (
+                <G>
+                    <Circle cx={60 - hr * 0.8} cy={hc + 5} r={3} fill="#ff8fb8" opacity={0.5} />
+                    <Circle cx={60 + hr * 0.8} cy={hc + 5} r={3} fill="#ff8fb8" opacity={0.5} />
+                </G>
+            )}
+        </G>
+    );
+
     return (
         <Pressable onPress={jump} disabled={!onPress && !animated} accessibilityRole="image" accessibilityLabel={`${stage.name}, level ${lvl}`} style={{ width: size, height: size }}>
             <Animated.View style={{ width: size, height: size, transform: [{ translateY: Animated.add(sway, lift) }] }}>
@@ -159,30 +223,14 @@ export default function PetView({ level, look = {}, size = 160, animated = true,
                         </G>
                     ) : (
                         <G>
-                            {/* legs */}
-                            <G stroke={beak} strokeWidth={adult ? 3 : 2.6} strokeLinecap="round" fill="none">
-                                <Path d={`M52 ${shape.legTop} L52 111 M52 111 l-6 1 M52 111 l5 1.4`} />
-                                <Path d={`M68 ${shape.legTop} L68 111 M68 111 l-6 1.4 M68 111 l6 1`} />
-                            </G>
-                            {hatchling ? null : <Ellipse cx={60} cy={shape.cy} rx={shape.rx} ry={shape.ry} fill={body} />}
-                            {hatchling ? null : adult ? <Ellipse cx={60} cy={shape.cy + shape.ry * 0.35} rx={shape.rx * 0.7} ry={shape.ry * 0.55} fill={chest} opacity={maxed ? 0.9 : 0.75} /> : null}
-                            <Circle cx={60} cy={hatchling ? 70 : shape.headCy} r={hatchling ? 17 : shape.headR} fill={body} />
-                            {/* red shield on the forehead of a grown pukeko */}
-                            {adult ? <Path d={`M54 ${shape.headCy - shape.headR + 3} Q60 ${shape.headCy - shape.headR - 3} 66 ${shape.headCy - shape.headR + 3} L64 ${shape.headCy - shape.headR + 8} L56 ${shape.headCy - shape.headR + 8} Z`} fill={beak} /> : null}
                             {hatchling ? (
                                 <G>
+                                    <Circle cx={60} cy={70} r={17} fill={body} />
                                     <G transform="translate(0 24)">{eyes}</G>
                                     <Polygon points="55,76 65,76 60,83" fill={beak} />
                                     <Path d="M32 92 l6 -7 l6 7 l6 -7 l6 7 l6 -7 l6 7 l6 -7 l6 7 l6 -7 l6 7 Q94 114 60 114 Q26 114 32 92 Z" fill="url(#shell)" stroke="#bdb5a1" strokeWidth={1.2} />
                                 </G>
-                            ) : (
-                                <G>
-                                    {eyes}
-                                    <Polygon points={`${60 - 5},${shape.headCy + 4} ${60 + 5},${shape.headCy + 4} 60,${shape.headCy + 11}`} fill={beak} />
-                                    <Circle cx={45} cy={shape.headCy + 5} r={3} fill="#ff8fb8" opacity={0.55} />
-                                    <Circle cx={75} cy={shape.headCy + 5} r={3} fill="#ff8fb8" opacity={0.55} />
-                                </G>
-                            )}
+                            ) : bird}
                             {worn}
                             {/* the gold shine sweeps across the body and head only */}
                             {maxed && animated ? (
