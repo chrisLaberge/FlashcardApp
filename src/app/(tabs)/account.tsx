@@ -1,11 +1,12 @@
 import { useState, useMemo } from "react";
 import KeyboardInsetView from "@/components/KeyboardInsetView";
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, View } from "react-native";
 import Pressable from "../../components/Pressable";
 import { deleteAccount } from "../../services/account";
 import { useUser } from "../../hooks/useUser";
-import { resetPassword, signInWithEmail, signInWithGoogle, signOut, signUpWithEmail } from "../../services/auth";
-import { authErrorMessage, isPlausibleEmail } from "../../utils/authErrors";
+import { signOut } from "../../services/auth";
+import { authErrorMessage } from "../../utils/authErrors";
+import Onboarding from "../../components/Onboarding";
 import ProgressSection from "../../components/ProgressSection";
 import DailyGoalSettings from "../../components/DailyGoalSettings";
 import ThemePicker from "../../components/ThemePicker";
@@ -16,12 +17,9 @@ export default function AccountScreen() {
     const t = useTheme();
     const s = useMemo(() => makeS(t), [t]);
     const user = useUser();
-    const [mode, setMode] = useState<"signIn" | "signUp">("signIn");
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
     const [busy, setBusy] = useState(false);
     const [message, setMessage] = useState("");
-    const [showForm, setShowForm] = useState(false);
+    const [tour, setTour] = useState(false);
 
     const run = async (action: () => Promise<unknown>) => {
         if (busy) return;
@@ -34,20 +32,6 @@ export default function AccountScreen() {
         } finally {
             setBusy(false);
         }
-    };
-
-    const submit = () => {
-        if (!isPlausibleEmail(email)) return setMessage(authErrorMessage({ code: "auth/invalid-email" }));
-        if (password.length < 6) return setMessage(authErrorMessage({ code: "auth/weak-password" }));
-        void run(() => (mode === "signUp" ? signUpWithEmail(email, password) : signInWithEmail(email, password)));
-    };
-
-    const forgot = () => {
-        if (!isPlausibleEmail(email)) return setMessage("Type your email above first, then tap this again.");
-        void run(async () => {
-            await resetPassword(email);
-            Alert.alert("Check your email", "If an account exists for that address, a reset link is on its way.");
-        });
     };
 
     const confirmDelete = () =>
@@ -70,71 +54,26 @@ export default function AccountScreen() {
                 <ProgressSection />
 
                 <Text style={s.section}>Account</Text>
-                {user ? (
-                    <View style={s.card}>
-                        <Text style={s.email}>{user.email ?? user.displayName ?? "Your account"}</Text>
-                        <Text style={s.hint}>Your decks and progress stay on this phone.</Text>
-                        <Pressable style={({ pressed }) => [s.button, s.secondary, pressed && s.pressed]} onPress={() => run(signOut)} disabled={busy}>
-                            <Text style={s.secondaryText}>Sign out</Text>
-                        </Pressable>
-                    </View>
-                ) : !showForm ? (
-                    <View style={s.card}>
-                        <Text style={s.hint}>Sign in for friends and the leaderboard.</Text>
-                        <Pressable style={({ pressed }) => [s.button, s.primary, pressed && s.pressed]} onPress={() => setShowForm(true)}>
-                            <Text style={s.primaryText}>Sign in</Text>
-                        </Pressable>
-                    </View>
-                ) : (
-                    <View style={s.card}>
-                        <Text style={s.heading}>{mode === "signIn" ? "Sign in" : "Create account"}</Text>
-                        <Pressable style={({ pressed }) => [s.button, s.google, pressed && s.pressed]} onPress={() => run(signInWithGoogle)} disabled={busy}>
-                            <Text style={s.googleText}>Continue with Google</Text>
-                        </Pressable>
-                        <Text style={s.or}>or with email</Text>
-                        <TextInput
-                            style={s.input}
-                            placeholder="Email"
-                            placeholderTextColor={t.subtle}
-                            autoCapitalize="none"
-                            autoComplete="email"
-                            keyboardType="email-address"
-                            value={email}
-                            onChangeText={setEmail}
-                        />
-                        <TextInput
-                            style={s.input}
-                            placeholder="Password"
-                            placeholderTextColor={t.subtle}
-                            secureTextEntry
-                            autoCapitalize="none"
-                            autoComplete={mode === "signUp" ? "new-password" : "current-password"}
-                            value={password}
-                            onChangeText={setPassword}
-                            onSubmitEditing={submit}
-                        />
-                        <Pressable style={({ pressed }) => [s.button, s.primary, pressed && s.pressed]} onPress={submit} disabled={busy}>
-                            {busy ? <ActivityIndicator color={t.bg} /> : <Text style={s.primaryText}>{mode === "signIn" ? "Sign in" : "Create account"}</Text>}
-                        </Pressable>
-                        <Pressable onPress={() => { setMode(mode === "signIn" ? "signUp" : "signIn"); setMessage(""); }}>
-                            <Text style={s.link}>{mode === "signIn" ? "New here? Create an account" : "Have an account? Sign in"}</Text>
-                        </Pressable>
-                        {mode === "signIn" && (
-                            <Pressable onPress={forgot}>
-                                <Text style={s.link}>Forgot password?</Text>
-                            </Pressable>
-                        )}
-                    </View>
-                )}
+                <View style={s.card}>
+                    <Text style={s.email}>{user?.email ?? user?.displayName ?? "Your account"}</Text>
+                    <Text style={s.hint}>Your decks and progress stay on this phone.</Text>
+                    <Pressable style={({ pressed }) => [s.button, s.secondary, pressed && s.pressed]} onPress={() => run(signOut)} disabled={busy}>
+                        <Text style={s.secondaryText}>Sign out</Text>
+                    </Pressable>
+                </View>
                 {message ? <Text style={s.error}>{message}</Text> : null}
 
                 <DailyGoalSettings />
                 <ThemePicker />
-                {user ? (
-                    <Pressable onPress={confirmDelete} disabled={busy}>
-                        <Text style={s.danger}>Delete account</Text>
-                    </Pressable>
-                ) : null}
+                <Pressable onPress={() => setTour(true)} accessibilityRole="button">
+                    <Text style={s.link}>How the app works</Text>
+                </Pressable>
+                <Modal visible={tour} animationType="slide" onRequestClose={() => setTour(false)}>
+                    <Onboarding mode="replay" onDone={() => setTour(false)} />
+                </Modal>
+                <Pressable onPress={confirmDelete} disabled={busy}>
+                    <Text style={s.danger}>Delete account</Text>
+                </Pressable>
             </ScrollView>
         </KeyboardInsetView>
     );

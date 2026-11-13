@@ -1,22 +1,6 @@
-# Publishing checklist (status as of 2026-11-03)
+# Publishing notes
 
-## Done
-- Rename to StompaCard, package `com.chrislaberge.stompacard`.
-- Sign-in (Google + email), backend token checks, rate limits, size limits.
-- In-app account deletion (Account tab) and online-data deletion (Friends), matching the backend `DELETE /social/me`.
-- Pixabay credit line shown above image search results.
-- Privacy policy draft: `hosting/public/privacy/index.html`, published with Firebase Hosting (see below).
-
-## You need to do
-1. Publish the privacy policy (contact email is already filled in) (Cloud Shell, from the repo folder):
-   ```
-   cd hosting
-   npx firebase-tools login --no-localhost
-   npx firebase-tools deploy --only hosting --project stompacard-7a65b
-   ```
-   The policy is then at `https://stompacard-7a65b.web.app/privacy`. Play Console asks for that URL, and for the data-safety form use the list of what is collected in the policy. Re-run the deploy after any edit.
-2. Set `AUTH_MODE=enforce` on the Cloud Run service once every phone is on a build that signs in.
-3. Add the Play App Signing SHA-1 to the Firebase Android app once the app is on Play (Google sign-in will otherwise fail for Play installs).
+The release steps are in [RELEASE.md](RELEASE.md). What is below is background.
 
 ## Pixabay (read from their license page and API documentation)
 - Images can be used for free, commercially, without attribution. Modified or adapted use is allowed. Selling or distributing images **standalone** (no creative effort applied) is not.

@@ -7,7 +7,7 @@ import AddedHistory from "../components/AddedHistory";
 import { getCardsPage } from "../database/database";
 import { formatTimeRemaining } from "../utils/timeRemaining";
 import { Card } from "../models/Card";
-import { exportDatabase } from "../utils/exportDatabase";
+import { countPdfFiles, exportDatabase } from "../utils/exportDatabase";
 import { useTheme } from "../theme/ThemeProvider";
 import type { Palette } from "../theme/themes";
 
@@ -88,15 +88,28 @@ export default function CardsScreen() {
     const handleImport = () => {
         router.push("/import");
     };
-    const handleExport = async () => {
+    const runExport = async (withPdfs: boolean) => {
         try {
-            await exportDatabase();
+            await exportDatabase(withPdfs);
         } catch (error) {
             Alert.alert(
                 "Export failed",
                 error instanceof Error ? error.message : String(error)
             );
         }
+    };
+    const handleExport = async () => {
+        const pdfs = await countPdfFiles().catch(() => 0);
+        if (pdfs === 0) return runExport(false);
+        Alert.alert(
+            "Include your PDFs?",
+            `You have ${pdfs} PDF${pdfs === 1 ? "" : "s"} on this phone. Adding them makes a bigger file.`,
+            [
+                { text: "Cards only", onPress: () => void runExport(false) },
+                { text: "With PDFs", onPress: () => void runExport(true) },
+                { text: "Cancel", style: "cancel" },
+            ],
+        );
     };
 
 

@@ -1,3 +1,5 @@
+import Mark from "../components/Mark";
+import LangBadge from "../components/LangBadge";
 import { router } from "expo-router";
 import { useEffect, useState, useMemo } from "react";
 import { FlatList, Modal, StyleSheet, Text, TextInput, View } from "react-native";
@@ -68,7 +70,7 @@ export default function CreateDeckScreen() {
                     onPress={() => setModalVisible(true)}
                 >
                     <View style={styles.languageLeft}>
-                        <Text style={styles.flag}>{language.flag}</Text>
+                        <View style={styles.flag}><LangBadge code={language.code} size={32} /></View>
 
                         <View>
                             <Text style={styles.languageName}>
@@ -164,9 +166,7 @@ export default function CreateDeckScreen() {
                                         setSearch("");
                                     }}
                                 >
-                                    <Text style={styles.optionFlag}>
-                                        {item.flag}
-                                    </Text>
+                                    <View style={styles.optionFlag}><LangBadge code={item.code} size={30} /></View>
 
                                     <View style={styles.optionText}>
                                         <Text style={styles.optionIgnore}>
@@ -179,7 +179,7 @@ export default function CreateDeckScreen() {
                                     </View>
 
                                     {item.code === language.code && (
-                                        <Text style={styles.check}>✓</Text>
+                                        <Mark kind="check" size={18} color="#4caf50" />
                                     )}
                                 </Pressable>
                             )}
@@ -265,7 +265,6 @@ const makeStyles = (t: Palette) => StyleSheet.create({
     },
 
     flag: {
-        fontSize: 27,
         marginRight: 13,
     },
 
@@ -392,9 +391,8 @@ const makeStyles = (t: Palette) => StyleSheet.create({
     },
 
     optionFlag: {
-        fontSize: 27,
-        width: 45,
-        textAlign: "center",
+        width: 52,
+        alignItems: "center",
     },
 
     optionText: {

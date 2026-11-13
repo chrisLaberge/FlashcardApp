@@ -1,5 +1,5 @@
 import { DatabaseSync } from "node:sqlite";
-import { freezeTime, makeTempDir, MINUTE, startApp, stopApp, T0, unfreezeTime } from "./helpers/testDb";
+import { freezeTime, makeTempDir, rawDb, MINUTE, startApp, stopApp, T0, unfreezeTime } from "./helpers/testDb";
 
 beforeEach(() => freezeTime(T0));
 afterEach(() => {
@@ -218,5 +218,74 @@ describe("restoreFromBackup", () => {
         expect(result.cards).toBe(1);
         expect((await db.getCards(1)).map((c) => c.learningText)).toEqual(["ok"]);
         expect(await db.getCardProgress(2)).toBeUndefined();
+    });
+
+    test("brings back the pet and the shop too", async () => {
+        const tmp = makeTempDir();
+        try {
+            const file = tmp.path("pet.db");
+            const raw = startApp(file);
+            const deck = await raw.addDeck("Russian", "ru");
+            await raw.addCard("вода", "water", "", "voda", deck);
+            await raw.setPetState("name", "Stompa");
+            await raw.recordShopAction({ ledger: [{ itemId: "chef", gems: 0, kind: "case" }], addItem: "chef" }, 5);
+            stopApp();
+
+            const db = startApp();
+            await db.restoreFromBackup(asSource(new DatabaseSync(file, { readOnly: true })));
+            expect((await db.getPetState()).name).toBe("Stompa");
+            expect(await db.getInventory()).toEqual(["chef"]);
+            expect(await db.getLedger()).toEqual([{ itemId: "chef", gems: 0, kind: "case", at: 5 }]);
+        } finally {
+            stopApp();
+            tmp.cleanup();
+        }
+    });
+
+    test("a fully loaded backup comes back row for row, in every table", async () => {
+        const tmp = makeTempDir();
+        try {
+            const file = tmp.path("full.db");
+            const app = startApp(file);
+            const deck = await app.addDeck("Russian", "ru");
+            const a = await app.addCard("яблоко", "apple", "Я ем яблоко.", "yabloko", deck);
+            const b = await app.addCard("вода", "water", "", "voda", deck);
+            const image = await app.addImage("pixabay", "99", "https://x.test/99.webp", null, null, null, null);
+            await app.setCardImage(a, image);
+            await app.markCardCorrect(a, { prompt: "learning", durationMs: 3000 });
+            await app.markCardIncorrect(b, { prompt: "audio", durationMs: 5000 });
+            await app.recordAchievementUnlocks([{ track: "cards", tier: 1 }], 7);
+            await app.saveCardExplanation(a, "sig", { meaning: "apple" } as never);
+            await app.saveWordLookup("ru:вода", { word: "вода" } as never);
+            await app.setPetState("name", "Stompa");
+            await app.recordShopAction({ ledger: [{ itemId: "chef", gems: 0, kind: "case" }], addItem: "chef" }, 5);
+            const book = await app.addMyText("Book", "ru", "яблоко вода", 9, "file:///old/book.pdf");
+            await app.setLastPage(book, 4);
+            await app.saveBookAnalysis(book, 4, 2, new Map([["яблоко", { count: 3, sample: "яблоко" }], ["иван", { count: 1, sample: "Иван", ignored: true }]]));
+            await app.setWordKnown("ru", "вода", true);
+            await app.setWordIgnored("ru", "иван", true);
+            await app.saveAppSettings({ "app-theme": "dark", "daily-goal": "30" });
+
+            // Everything in the file, table by table, as it is before the restore.
+            const raw = rawDb();
+            const tables = (raw.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'").all() as { name: string }[]).map((r) => r.name);
+            const skipped: Record<string, string[]> = { images: ["local_path"], my_texts: ["pdf_path"] };
+            const dump = (db: DatabaseSync, table: string) => {
+                const cols = (db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).map((c) => c.name).filter((c) => !(skipped[table] ?? []).includes(c));
+                return db.prepare(`SELECT ${cols.join(", ")} FROM ${table} ORDER BY ${cols.join(", ")}`).all();
+            };
+            const before = Object.fromEntries(tables.map((t) => [t, dump(raw, t)]));
+            // Every table must hold something, or this test proves nothing about it.
+            for (const t of tables) expect({ t, rows: before[t].length > 0 }).toEqual({ t, rows: true });
+            stopApp();
+
+            const fresh = startApp();
+            await fresh.restoreFromBackup(asSource(new DatabaseSync(file, { readOnly: true })));
+            const after = rawDb();
+            for (const t of tables) expect({ t, rows: dump(after, t) }).toEqual({ t, rows: before[t] });
+        } finally {
+            stopApp();
+            tmp.cleanup();
+        }
     });
 });

@@ -9,12 +9,12 @@ type Props = {
     learningText: string;
     localizedText: string;
     languageName: string;
-    /** Set when the card already exists, so the full explanation is kept for the ⓘ sheet. */
+    /** Set when the card already exists, so the full explanation is kept for the info sheet. */
     cardId?: number;
     onExample: (sentence: string) => void;
 };
 
-/** A small ✨ button that writes an example sentence for the card. Shown only while the example is empty. */
+/** A small sparkle button that writes an example sentence for the card. Shown only while the example is empty. */
 export default function ExampleButton({ learningText, localizedText, languageName, cardId, onExample }: Props) {
     const t = useTheme();
     const [loading, setLoading] = useState(false);

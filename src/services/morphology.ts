@@ -2,8 +2,10 @@
 import Az from "az";
 import { Asset } from "expo-asset";
 import * as FileSystem from "expo-file-system/legacy";
+import { getDecks } from "../database/database";
 import { fromBase64 } from "../models/Base64";
 import { createRussianAnalyzer } from "../models/language/russian";
+import { createStemAnalyzer } from "../models/language/stemmed";
 import type { Analyzer } from "../models/language/types";
 import { plainAnalyzer } from "../models/ReaderWords";
 
@@ -76,7 +78,7 @@ function loadRussian(): Promise<Analyzer> {
  * moment). Null for languages without one. A failed load can be tried again later.
  */
 export function analyzerFor(language: string): Promise<Analyzer | null> {
-    if (language !== "ru") return Promise.resolve(null);
+    if (language !== "ru") return Promise.resolve(createStemAnalyzer(language));
     russian ??= loadRussian().catch((error: unknown) => {
         russian = null;
         throw error;
@@ -90,5 +92,14 @@ export async function readerAnalyzerFor(language: string): Promise<Analyzer> {
         return (await analyzerFor(language)) ?? plainAnalyzer(language);
     } catch {
         return plainAnalyzer(language);
+    }
+}
+
+/** Starts loading the Russian dictionary in the background when you study Russian, so opening a PDF does not wait for it. */
+export async function prewarmAnalyzers(): Promise<void> {
+    try {
+        if ((await getDecks()).some((d) => d.language === "ru")) await analyzerFor("ru");
+    } catch {
+        // It loads again when it is needed.
     }
 }

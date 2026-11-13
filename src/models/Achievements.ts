@@ -8,6 +8,11 @@ import { totalXp } from "./Progression";
 import { dailyStats, localDay, totals, type LoggedReview } from "./Stats";
 import { streakWithFreezes } from "./StreakFreeze";
 
+/** Names from the Material Community Icons set. */
+export type AchievementIcon =
+    | "cards" | "target" | "fire" | "calendar-check" | "timer-outline" | "run-fast" | "folder-multiple"
+    | "diamond-stone" | "headphones" | "earth" | "weather-sunset-up" | "owl";
+
 export const TIERS = [
     { id: "bronze", name: "Bronze", color: "#cd7f32" },
     { id: "silver", name: "Silver", color: "#b8c2cc" },
@@ -23,7 +28,7 @@ const HOUR_MS = 60 * 60 * 1000;
 type Track = {
     id: string;
     title: string;
-    icon: string;
+    icon: AchievementIcon;
     /** "Review {n} cards": what the next tier asks for. */
     goal: (n: number) => string;
     /** One target per tier, rising. */
@@ -33,18 +38,18 @@ type Track = {
 const n = (value: number) => value.toLocaleString("en-US");
 
 const TRACKS: readonly Track[] = [
-    { id: "reviews", title: "Card Shark", icon: "🃏", goal: (v) => `Review ${n(v)} cards`, targets: [10, 100, 1000, 5000, 10000, 50000, 100000] },
-    { id: "correct", title: "Sharpshooter", icon: "🎯", goal: (v) => `Answer ${n(v)} cards correctly`, targets: [10, 100, 500, 2500, 7500, 25000, 50000] },
-    { id: "streak", title: "Wildfire", icon: "🔥", goal: (v) => `Study ${n(v)} days in a row`, targets: [3, 7, 14, 30, 100, 365, 730] },
-    { id: "days", title: "Creature of Habit", icon: "📅", goal: (v) => `Study on ${n(v)} different days`, targets: [3, 10, 30, 100, 200, 365, 500] },
-    { id: "time", title: "Clocking In", icon: "⏱️", goal: (v) => `Spend ${n(v)} hours in reviews`, targets: [1, 5, 10, 25, 50, 100, 250] },
-    { id: "bigday", title: "Cram Session", icon: "🏃", goal: (v) => `Review ${n(v)} cards in one day`, targets: [20, 50, 100, 200, 300, 500, 1000] },
-    { id: "added", title: "Pack Rat", icon: "🗂️", goal: (v) => `Add ${n(v)} cards`, targets: [10, 50, 100, 500, 1000, 2500, 5000] },
-    { id: "xp", title: "Sage", icon: "💎", goal: (v) => `Earn ${n(v)} XP`, targets: [100, 1000, 5000, 25000, 100000, 250000, 500000] },
-    { id: "audio", title: "All Ears", icon: "🎧", goal: (v) => `Answer ${n(v)} listening cards correctly`, targets: [10, 50, 200, 500, 1000, 2500, 5000] },
-    { id: "localized", title: "Rosetta", icon: "🌍", goal: (v) => `Answer ${n(v)} translation cards correctly`, targets: [10, 50, 200, 500, 1000, 2500, 5000] },
-    { id: "early", title: "Early Bird", icon: "🌅", goal: (v) => `Review ${n(v)} cards before 8 am`, targets: [10, 50, 100, 250, 500, 1000, 2500] },
-    { id: "night", title: "Night Owl", icon: "🦉", goal: (v) => `Review ${n(v)} cards after 10 pm`, targets: [10, 50, 100, 250, 500, 1000, 2500] },
+    { id: "reviews", title: "Card Shark", icon: "cards", goal: (v) => `Review ${n(v)} cards`, targets: [10, 100, 1000, 5000, 10000, 50000, 100000] },
+    { id: "correct", title: "Sharpshooter", icon: "target", goal: (v) => `Answer ${n(v)} cards correctly`, targets: [10, 100, 500, 2500, 7500, 25000, 50000] },
+    { id: "streak", title: "Wildfire", icon: "fire", goal: (v) => `Study ${n(v)} days in a row`, targets: [3, 7, 14, 30, 100, 365, 730] },
+    { id: "days", title: "Creature of Habit", icon: "calendar-check", goal: (v) => `Study on ${n(v)} different days`, targets: [3, 10, 30, 100, 200, 365, 500] },
+    { id: "time", title: "Clocking In", icon: "timer-outline", goal: (v) => `Spend ${n(v)} hours in reviews`, targets: [1, 5, 10, 25, 50, 100, 250] },
+    { id: "bigday", title: "Cram Session", icon: "run-fast", goal: (v) => `Review ${n(v)} cards in one day`, targets: [20, 50, 100, 200, 300, 500, 1000] },
+    { id: "added", title: "Pack Rat", icon: "folder-multiple", goal: (v) => `Add ${n(v)} cards`, targets: [10, 50, 100, 500, 1000, 2500, 5000] },
+    { id: "xp", title: "Sage", icon: "diamond-stone", goal: (v) => `Earn ${n(v)} XP`, targets: [100, 1000, 5000, 25000, 100000, 250000, 500000] },
+    { id: "audio", title: "All Ears", icon: "headphones", goal: (v) => `Answer ${n(v)} listening cards correctly`, targets: [10, 50, 200, 500, 1000, 2500, 5000] },
+    { id: "localized", title: "Rosetta", icon: "earth", goal: (v) => `Answer ${n(v)} translation cards correctly`, targets: [10, 50, 200, 500, 1000, 2500, 5000] },
+    { id: "early", title: "Early Bird", icon: "weather-sunset-up", goal: (v) => `Review ${n(v)} cards before 8 am`, targets: [10, 50, 100, 250, 500, 1000, 2500] },
+    { id: "night", title: "Night Owl", icon: "owl", goal: (v) => `Review ${n(v)} cards after 10 pm`, targets: [10, 50, 100, 250, 500, 1000, 2500] },
 ];
 
 /** Bonus XP for earning each tier, bronze first. 12 tracks x sum(this) = 24,900, just under the server's MAX_BONUS_XP (25,000). */
@@ -58,7 +63,7 @@ export function bonusXpFor(unlocks: readonly { tier: number }[]): number {
 export type Achievement = {
     id: string;
     title: string;
-    icon: string;
+    icon: AchievementIcon;
     value: number;
     /** Tiers earned, 0 to 7. */
     tier: number;

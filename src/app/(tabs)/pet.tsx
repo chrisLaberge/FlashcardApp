@@ -3,6 +3,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { Alert, Modal, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import Pressable from "../../components/Pressable";
 import BannerView from "../../components/pet/BannerView";
+import AccessoryIcon from "../../components/pet/AccessoryIcon";
 import CaseSpin from "../../components/pet/CaseSpin";
 import PetView from "../../components/pet/PetView";
 import KeyboardInsetView from "../../components/KeyboardInsetView";
@@ -200,7 +201,7 @@ export default function PetScreen() {
                                                 accessibilityRole="button"
                                                 accessibilityState={{ selected: on }}
                                             >
-                                                <Text style={s.chipEmoji}>{item.emoji}</Text>
+                                                <AccessoryIcon id={item.id} size={26} />
                                                 <Text style={s.chipText}>{item.name}</Text>
                                             </Pressable>
                                         );
@@ -319,7 +320,6 @@ const makeS = (t: Palette) => StyleSheet.create({
     buttonText: { color: t.bg, fontWeight: "600", fontSize: 14 },
     chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
     chip: { flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 2, borderRadius: 12, paddingVertical: 6, paddingHorizontal: 10 },
-    chipEmoji: { fontSize: 18 },
     chipText: { color: t.text, fontSize: 13, fontWeight: "600" },
     shopRow: { flexDirection: "row", alignItems: "center", gap: 12 },
     bannerRow: { flexDirection: "row", alignItems: "center", gap: 10 },

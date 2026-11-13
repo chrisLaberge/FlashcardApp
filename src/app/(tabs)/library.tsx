@@ -1,3 +1,5 @@
+import Mark from "../../components/Mark";
+import LangBadge from "../../components/LangBadge";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
@@ -12,7 +14,7 @@ import { drop, enqueue, fractionOf, type ImportJob } from "../../services/pdfImp
 import { SYNC_SALT } from "../../models/ReaderWords";
 import { readerAnalyzerFor } from "../../services/morphology";
 import { addPdf, removePdfFile } from "../../services/pdfReading";
-import { syncIfCardsChanged } from "../../services/vocabulary";
+import { analyzeNewBooks, syncIfCardsChanged } from "../../services/vocabulary";
 import { useTheme } from "../../theme/ThemeProvider";
 import type { Palette } from "../../theme/themes";
 
@@ -72,9 +74,15 @@ export default function LibraryScreen() {
         // Waits until the screen has been drawn and has settled before doing any work.
         const timer = setTimeout(async () => {
             try {
-                if (live && texts.length > 0 && await syncIfCardsChanged(language, () => readerAnalyzerFor(language), SYNC_SALT)) {
-                    if (live) await loadTexts();
+                if (!live || texts.length === 0) return;
+                let changed = await syncIfCardsChanged(language, () => readerAnalyzerFor(language), SYNC_SALT);
+                // Books counted with older word rules are counted again, one at a time, so the percentages stay right.
+                const analyzer = await readerAnalyzerFor(language);
+                if (live && texts.some((b) => b.analyzerVersion !== analyzer.version)) {
+                    await analyzeNewBooks(language, analyzer);
+                    changed = true;
                 }
+                if (live && changed) await loadTexts();
             } catch {
                 // The saved numbers stay; this runs again next time.
             }
@@ -111,7 +119,7 @@ export default function LibraryScreen() {
         <View style={s.container}>
             <View style={s.dropWrap}>
                 <Pressable style={({ pressed }) => [s.deckButton, pressed && { opacity: 0.7 }]} onPress={() => setPicking(true)} accessibilityRole="button" accessibilityLabel="Choose a deck">
-                    <Text style={s.dropFlag}>{lang?.flag ?? "🌐"}</Text>
+                    <LangBadge code={lang?.code} size={22} />
                     <Text style={s.deckName} numberOfLines={1}>{deck?.name ?? "No decks"}</Text>
                     <Text style={s.dropArrow}>▼</Text>
                 </Pressable>
@@ -122,7 +130,7 @@ export default function LibraryScreen() {
                     <ScrollView style={s.menu} showsVerticalScrollIndicator>
                         {(myDecks ?? []).map((d) => (
                             <Pressable key={d.id} style={[s.menuRow, d.id === deckId && s.menuRowOn]} onPress={() => { setChosenId(d.id); setPicking(false); }} accessibilityRole="button">
-                                <Text style={s.dropFlag}>{getLanguage(d.language)?.flag ?? "🌐"}</Text>
+                                <LangBadge code={d.language} size={22} />
                                 <Text style={s.menuText} numberOfLines={1}>{d.name}</Text>
                             </Pressable>
                         ))}
@@ -153,10 +161,10 @@ export default function LibraryScreen() {
                                 onPress={() => router.push({ pathname: "/premade", params: { id: item.id, deckId: String(deckId) } })}
                                 accessibilityRole="button"
                             >
-                                <Text style={s.flag}>{lang?.flag ?? "🌐"}</Text>
+                                <LangBadge code={lang?.code} size={28} />
                                 <View style={{ flex: 1 }}>
                                     <Text style={s.name}>{item.name}</Text>
-                                    <Text style={[s.meta, all && s.metaDone]}>{all ? "All in your deck ✓" : `${have} / ${item.cards.length} in your deck`}</Text>
+                                    <Text style={[s.meta, all && s.metaDone]}>{all ? "All in your deck" : `${have} / ${item.cards.length} in your deck`}</Text>
                                 </View>
                                 <Text style={s.arrow}>›</Text>
                             </Pressable>
@@ -204,7 +212,7 @@ export default function LibraryScreen() {
                                 </Pressable>
                             ) : null}
                             <Pressable onPress={() => removeText(item.id, item.title)} hitSlop={12} accessibilityRole="button" accessibilityLabel={`Delete ${item.title}`}>
-                                <Text style={s.remove}>✕</Text>
+                                <Mark kind="close" size={20} />
                             </Pressable>
                         </Pressable>
                         );

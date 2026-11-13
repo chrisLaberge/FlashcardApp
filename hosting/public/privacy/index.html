@@ -20,10 +20,10 @@
 <h2>What stays on your phone</h2>
 <p>Your decks, cards, pictures, study progress, review history and settings are stored on your phone. They are not uploaded unless you use one of the online features described below. You can export a backup file yourself with the Export button.</p>
 
-<h2>Using the app without an account</h2>
-<p>You can use StompaCard without signing in. Without an account, nothing about your studying is sent to us.</p>
+<h2>Your account</h2>
+<p>StompaCard needs an account to use. Your decks, cards and progress still live on your phone; the account is used for sign-in, friends and the leaderboard.</p>
 
-<h2>If you create an account</h2>
+<h2>What an account stores</h2>
 <p>You can sign in with email and password or with Google. Sign-in is handled by Google Firebase Authentication. We receive your email address and, for Google sign-in, your Google account name. We never see your password.</p>
 <p>If you set up an online profile for friends and the leaderboard, we store:</p>
 <ul>
@@ -37,6 +37,8 @@
 <ul>
   <li><strong>Translation:</strong> when you ask for a translation, the text you typed is sent to our server and on to Google Cloud Translation.</li>
   <li><strong>Picture search:</strong> your search term is sent to our server and on to Pixabay. Pictures you choose are downloaded from Pixabay, resized, and stored in our cloud storage so they can be shown on your cards. Stored pictures have a web address that is not listed anywhere but is not password-protected.</li>
+  <li><strong>Word explanations and lookups:</strong> when you tap a word or ask for an explanation, the word, its meaning on your card and (for lookups) the sentence it was in are sent to our server and on to Anthropic, which writes the explanation. Answers may be kept on our server for up to a week so the same question is not asked twice. Nothing else from your cards is sent.</li>
+  <li><strong>PDFs:</strong> PDF files you add are read on your phone and are not uploaded.</li>
   <li><strong>Spoken pronunciation:</strong> for most languages, speech is produced on your phone by Android's speech engine. For some languages the word may be sent to our server to generate audio.</li>
 </ul>
 
@@ -47,7 +49,7 @@
 <p>StompaCard has no ads and no third-party analytics. We do not sell your data.</p>
 
 <h2>Who processes your data</h2>
-<p>We use Google Cloud and Firebase (hosting, database, storage, sign-in, translation) and Pixabay (pictures). Their own privacy policies apply to the data they handle.</p>
+<p>We use Google Cloud and Firebase (hosting, database, storage, sign-in, translation), Pixabay (pictures) and Anthropic (word explanations). Their own privacy policies apply to the data they handle.</p>
 
 <h2>Deleting your data</h2>
 <ul>

@@ -1,3 +1,4 @@
+import Mark from "./Mark";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
@@ -29,7 +30,7 @@ export default function DailyGoalCard() {
     const reached = state.done >= state.goal;
     return (
         <View style={s.chip} accessibilityLabel={`Daily goal: ${state.done} of ${state.goal} cards`}>
-            <Text style={s.count}>{state.done}/{state.goal}{reached ? " ✓" : ""}</Text>
+            <Text style={s.count}>{state.done}/{state.goal}</Text>{reached ? <Mark kind="check" size={14} color={t.yellow} /> : null}
             <View style={s.track}>
                 <View style={[s.fill, { width: `${Math.round(goalFraction(state.done, state.goal) * 100)}%`, backgroundColor: reached ? t.yellow : t.green }]} />
             </View>

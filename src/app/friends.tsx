@@ -1,5 +1,6 @@
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState, useMemo } from "react";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { ActivityIndicator, Alert, ScrollView, Share, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import Pressable from "../components/Pressable";
 import Avatar from "../components/Avatar";
@@ -7,7 +8,7 @@ import BannerView from "../components/pet/BannerView";
 import { PersonPet } from "../components/pet/PersonPet";
 import PetView from "../components/pet/PetView";
 import KeyboardInsetView from "../components/KeyboardInsetView";
-import { AVATARS } from "../constants/avatars";
+import { AVATAR_ICONS, AVATARS } from "../constants/avatars";
 import { useUser } from "../hooks/useUser";
 import {
     acceptRequest, deleteMyData, getFriends, getProfile, removeFriend, removeRequest, requestFriend, saveUsername, setAvatar, setShowGlobal,
@@ -169,7 +170,7 @@ export default function FriendsScreen() {
                             style={[s.avatarOption, profile.avatar === a && s.avatarOn]}
                             accessibilityLabel={`Use ${a} as your picture`}
                         >
-                            <Text style={s.avatarEmoji}>{a}</Text>
+                            <MaterialCommunityIcons name={AVATAR_ICONS[a] as never} size={28} color={t.text} />
                         </Pressable>
                     ))}
                 </View>

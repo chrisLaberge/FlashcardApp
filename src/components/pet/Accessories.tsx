@@ -69,6 +69,77 @@ const hat = (id: string, { cx, headTop: top, r }: Anchors) => {
                     <Circle cx={cx + r * 0.5} cy={base - 5} r={1.8} fill="#5fdcf0" />
                 </G>
             );
+        case "chef":
+            return (
+                <G>
+                    <Rect x={cx - r * 0.7} y={base - 10} width={r * 1.4} height={10} rx={2} fill="#f4f4f4" stroke="#cfcfcf" strokeWidth={1} />
+                    <Circle cx={cx - r * 0.45} cy={base - 14} r={r * 0.5} fill="#ffffff" stroke="#d6d6d6" strokeWidth={1} />
+                    <Circle cx={cx + r * 0.45} cy={base - 14} r={r * 0.5} fill="#ffffff" stroke="#d6d6d6" strokeWidth={1} />
+                    <Circle cx={cx} cy={base - 20} r={r * 0.6} fill="#ffffff" stroke="#d6d6d6" strokeWidth={1} />
+                </G>
+            );
+        case "ninja":
+            return (
+                <G>
+                    <Path d={`M${cx - r * 1.0} ${base - 2} Q${cx} ${base - 9} ${cx + r * 1.0} ${base - 2} L${cx + r * 1.0} ${base + 5} Q${cx} ${base - 2} ${cx - r * 1.0} ${base + 5} Z`} fill="#1b1b22" />
+                    <Rect x={cx - 6} y={base - 4} width={12} height={7} rx={1.5} fill="#c9ccd6" />
+                    <Path d={`M${cx + r * 1.0} ${base} l7 -4 M${cx + r * 1.0} ${base + 2} l8 3`} stroke="#1b1b22" strokeWidth={3} strokeLinecap="round" />
+                </G>
+            );
+        case "cowboy":
+            return (
+                <G>
+                    <Path d={`M${cx - r * 0.6} ${base} Q${cx - r * 0.7} ${top - r * 0.9} ${cx - r * 0.2} ${top - r * 0.6} Q${cx} ${top - r * 0.2} ${cx + r * 0.2} ${top - r * 0.6} Q${cx + r * 0.7} ${top - r * 0.9} ${cx + r * 0.6} ${base} Z`} fill="#a9743f" />
+                    <Path d={`M${cx - r * 0.62} ${base - 4} L${cx + r * 0.62} ${base - 4}`} stroke="#5d3b1c" strokeWidth={3} />
+                    <Path d={`M${cx - r * 1.5} ${base - 4} Q${cx - r * 1.0} ${base + 5} ${cx} ${base + 2} Q${cx + r * 1.0} ${base + 5} ${cx + r * 1.5} ${base - 4} Q${cx + r * 1.0} ${base - 1} ${cx} ${base - 2} Q${cx - r * 1.0} ${base - 1} ${cx - r * 1.5} ${base - 4} Z`} fill="#8c5d2c" />
+                </G>
+            );
+        case "headphones":
+            return (
+                <G>
+                    <Path d={`M${cx - r * 1.0} ${base + 6} Q${cx} ${top - r * 1.05} ${cx + r * 1.0} ${base + 6}`} stroke="#c9ccd6" strokeWidth={4} fill="none" strokeLinecap="round" />
+                    <Rect x={cx - r * 1.2} y={base - 1} width={7} height={13} rx={3} fill="#5fdcf0" stroke="#c9ccd6" strokeWidth={1.5} />
+                    <Rect x={cx + r * 1.2 - 7} y={base - 1} width={7} height={13} rx={3} fill="#5fdcf0" stroke="#c9ccd6" strokeWidth={1.5} />
+                </G>
+            );
+        case "knight":
+            return (
+                <G>
+                    <Path d={`M${cx - r * 0.95} ${base + 6} L${cx - r * 0.95} ${top - r * 0.1} Q${cx} ${top - r * 1.3} ${cx + r * 0.95} ${top - r * 0.1} L${cx + r * 0.95} ${base + 6} Z`} fill="#b7c0cc" stroke="#7b8594" strokeWidth={1.2} />
+                    <Rect x={cx - r * 0.7} y={base - 3} width={r * 1.4} height={4} rx={1.5} fill="#2b2f3d" />
+                    <Path d={`M${cx} ${top - r * 1.15} Q${cx + 6} ${top - r * 1.9} ${cx - 2} ${top - r * 2.1}`} stroke="#e5484d" strokeWidth={4} strokeLinecap="round" fill="none" />
+                </G>
+            );
+        case "pirate":
+            return (
+                <G>
+                    <Path d={`M${cx - r * 1.45} ${base + 2} Q${cx - r * 0.6} ${top - r * 1.1} ${cx} ${top - r * 1.0} Q${cx + r * 0.6} ${top - r * 1.1} ${cx + r * 1.45} ${base + 2} Q${cx} ${base - 4} ${cx - r * 1.45} ${base + 2} Z`} fill="#1b1b22" />
+                    <Circle cx={cx} cy={top - r * 0.35} r={3.2} fill="#f4efe0" />
+                    <Path d={`M${cx - 4.5} ${top - r * 0.05} l9 -5 M${cx - 4.5} ${top - r * 0.65} l9 5`} stroke="#f4efe0" strokeWidth={1.4} />
+                </G>
+            );
+        case "antlers":
+            return (
+                <G stroke="#8c5d2c" strokeWidth={3} strokeLinecap="round" fill="none">
+                    <Path d={`M${cx - r * 0.55} ${base} L${cx - r * 0.9} ${top - r * 1.1} M${cx - r * 0.75} ${top - r * 0.5} L${cx - r * 1.25} ${top - r * 0.75} M${cx - r * 0.85} ${top - r * 0.9} L${cx - r * 0.55} ${top - r * 1.35}`} />
+                    <Path d={`M${cx + r * 0.55} ${base} L${cx + r * 0.9} ${top - r * 1.1} M${cx + r * 0.75} ${top - r * 0.5} L${cx + r * 1.25} ${top - r * 0.75} M${cx + r * 0.85} ${top - r * 0.9} L${cx + r * 0.55} ${top - r * 1.35}`} />
+                </G>
+            );
+        case "flames":
+            return (
+                <G>
+                    <Path d={`M${cx - r * 0.8} ${base} Q${cx - r * 1.0} ${top - r * 0.6} ${cx - r * 0.55} ${top - r * 1.1} Q${cx - r * 0.5} ${top - r * 0.5} ${cx - r * 0.25} ${top - r * 0.4} Q${cx - r * 0.2} ${top - r * 1.3} ${cx} ${top - r * 1.7} Q${cx + r * 0.2} ${top - r * 1.3} ${cx + r * 0.25} ${top - r * 0.4} Q${cx + r * 0.5} ${top - r * 0.5} ${cx + r * 0.55} ${top - r * 1.1} Q${cx + r * 1.0} ${top - r * 0.6} ${cx + r * 0.8} ${base} Z`} fill="#ff6a1a" />
+                    <Path d={`M${cx - r * 0.45} ${base} Q${cx - r * 0.5} ${top - r * 0.2} ${cx} ${top - r * 0.9} Q${cx + r * 0.5} ${top - r * 0.2} ${cx + r * 0.45} ${base} Z`} fill="#ffd23f" />
+                </G>
+            );
+        case "stonks":
+            return (
+                <G>
+                    <Path d={`M${cx - r * 1.1} ${top + r * 0.2} L${cx - r * 0.45} ${top - r * 0.25} L${cx - r * 0.1} ${top - r * 0.0} L${cx + r * 0.75} ${top - r * 0.95}`} stroke="#1fb36b" strokeWidth={4.5} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                    <Polygon points={`${cx + r * 1.15},${top - r * 1.25} ${cx + r * 0.35},${top - r * 1.05} ${cx + r * 0.95},${top - r * 0.45}`} fill="#1fb36b" />
+                    <Rect x={cx - r * 0.9} y={base - 4} width={r * 1.8} height={4} rx={2} fill="#1b1b22" />
+                </G>
+            );
         case "egghat":
             return (
                 <G>
@@ -130,6 +201,42 @@ const glasses = (id: string, { cx, eyeY: y, r }: Anchors) => {
             return <Rect x={cx - r * 0.95} y={y - lens * 0.8} width={r * 1.9} height={lens * 1.6} rx={lens * 0.8} fill="#5fdcf0" fillOpacity={0.55} stroke="#2a9fb8" strokeWidth={1.5} />;
         case "stars":
             return <G>{star(cx - dx, y, lens * 1.25)}{star(cx + dx, y, lens * 1.25)}</G>;
+        case "3d":
+            return (
+                <G>
+                    <Rect x={cx - dx - lens} y={y - lens * 0.75} width={lens * 2} height={lens * 1.5} rx={1.5} fill="#e5484d" fillOpacity={0.75} stroke="#ffffff" strokeWidth={1.8} />
+                    <Rect x={cx + dx - lens} y={y - lens * 0.75} width={lens * 2} height={lens * 1.5} rx={1.5} fill="#2f9fe0" fillOpacity={0.75} stroke="#ffffff" strokeWidth={1.8} />
+                </G>
+            );
+        case "goggles":
+            return (
+                <G>
+                    <Path d={`M${cx - r * 1.0} ${y} L${cx + r * 1.0} ${y}`} stroke="#6b4a2b" strokeWidth={4} />
+                    <Circle cx={cx - dx} cy={y} r={lens * 1.15} fill="#9be7ff" fillOpacity={0.5} stroke="#b8860b" strokeWidth={2.6} />
+                    <Circle cx={cx + dx} cy={y} r={lens * 1.15} fill="#9be7ff" fillOpacity={0.5} stroke="#b8860b" strokeWidth={2.6} />
+                </G>
+            );
+        case "pixel": {
+            const px = lens * 0.85;
+            const block = (x0: number, y0: number, w: number, h: number) => <Rect key={`${x0}${y0}`} x={x0} y={y0} width={w} height={h} fill="#1b1b22" stroke="#c9ccd6" strokeWidth={0.8} />;
+            return (
+                <G>
+                    {block(cx - dx - lens, y - px, lens * 2, px)}
+                    {block(cx - dx - lens + px, y, lens * 2 - px * 2, px)}
+                    {block(cx + dx - lens, y - px, lens * 2, px)}
+                    {block(cx + dx - lens + px, y, lens * 2 - px * 2, px)}
+                    {block(cx - dx + lens, y - px, dx * 2 - lens * 2, px)}
+                </G>
+            );
+        }
+        case "cyber":
+            return (
+                <G>
+                    <Rect x={cx - r * 1.0} y={y - lens * 0.45} width={r * 2.0} height={lens * 0.9} rx={lens * 0.45} fill="#12121a" stroke="#ff2e63" strokeWidth={1.6} />
+                    <Rect x={cx - r * 0.82} y={y - 1.2} width={r * 1.64} height={2.4} rx={1.2} fill="#ff2e63" />
+                    <Circle cx={cx + r * 0.7} cy={y} r={2.2} fill="#ffffff" />
+                </G>
+            );
         default:
             return null;
     }
@@ -141,6 +248,67 @@ const scarf = (id: string, { cx, neckY: y, r }: Anchors) => {
         scarfred: ["#e5484d"], scarfblue: ["#2f6fd0"], stripes: ["#2f6fd0", "#ffffff"], goldscarf: [GOLD],
         rainbow: ["#ff4f4f", "#ff9f43", "#f5e03a", "#4fdc7a", "#4f9dff", "#b25cff"],
     };
+    if (id === "bandana") {
+        return (
+            <G>
+                <Path d={`M${cx - half} ${y - 1} L${cx + half} ${y - 1} L${cx} ${y + 16} Z`} fill="#e5484d" />
+                <Circle cx={cx - 5} cy={y + 3} r={1.4} fill="#ffffff" />
+                <Circle cx={cx + 5} cy={y + 3} r={1.4} fill="#ffffff" />
+                <Circle cx={cx} cy={y + 8} r={1.4} fill="#ffffff" />
+            </G>
+        );
+    }
+    if (id === "bowtie") {
+        return (
+            <G>
+                <Polygon points={`${cx},${y + 3} ${cx - 11},${y - 3} ${cx - 11},${y + 9}`} fill="#1b1b22" />
+                <Polygon points={`${cx},${y + 3} ${cx + 11},${y - 3} ${cx + 11},${y + 9}`} fill="#1b1b22" />
+                <Circle cx={cx} cy={y + 3} r={3} fill="#e5484d" />
+            </G>
+        );
+    }
+    if (id === "cape") {
+        return (
+            <G>
+                <Path d={`M${cx - half} ${y - 1} Q${cx - half - 12} ${y + 24} ${cx - half - 6} ${y + 34} Q${cx} ${y + 26} ${cx + half + 6} ${y + 34} Q${cx + half + 12} ${y + 24} ${cx + half} ${y - 1} Q${cx} ${y + 6} ${cx - half} ${y - 1} Z`} fill="#c0392b" />
+                <Circle cx={cx} cy={y + 4} r={3} fill={GOLD} />
+            </G>
+        );
+    }
+    if (id === "neon") {
+        return (
+            <G fill="none" strokeLinecap="round">
+                <Path d={`M${cx - half} ${y} Q${cx} ${y + 7} ${cx + half} ${y}`} stroke="#39ff88" strokeOpacity={0.35} strokeWidth={10} />
+                <Path d={`M${cx - half} ${y} Q${cx} ${y + 7} ${cx + half} ${y}`} stroke="#39ff88" strokeWidth={4} />
+                <Path d={`M${cx - half} ${y} Q${cx} ${y + 7} ${cx + half} ${y}`} stroke="#eafff3" strokeWidth={1.4} />
+            </G>
+        );
+    }
+    if (id === "gigachad") {
+        return (
+            <G>
+                <Path d={`M${cx - half * 1.05} ${y - 4} L${cx - half * 0.95} ${y + 9} L${cx - half * 0.5} ${y + 19} L${cx + half * 0.5} ${y + 19} L${cx + half * 0.95} ${y + 9} L${cx + half * 1.05} ${y - 4} Z`} fill="#d9b08c" stroke="#a67c58" strokeWidth={1.2} strokeLinejoin="round" />
+                <Path d={`M${cx} ${y + 11} L${cx} ${y + 19}`} stroke="#a67c58" strokeWidth={1.4} />
+                <Path d={`M${cx - half * 0.9} ${y + 5} Q${cx - half * 0.7} ${y + 14} ${cx - half * 0.35} ${y + 17} M${cx + half * 0.9} ${y + 5} Q${cx + half * 0.7} ${y + 14} ${cx + half * 0.35} ${y + 17}`} stroke="#b88d66" strokeWidth={1.2} fill="none" />
+                {[[-0.6, 11], [-0.3, 14], [0.3, 14], [0.6, 11], [-0.45, 8], [0.45, 8]].map(([dx, dy]) => (
+                    <Circle key={`${dx}${dy}`} cx={cx + half * dx} cy={y + dy} r={0.7} fill="#7d5a3c" />
+                ))}
+            </G>
+        );
+    }
+    if (id === "cosmos") {
+        return (
+            <G>
+                <Path d={`M${cx - half} ${y} Q${cx} ${y + 7} ${cx + half} ${y}`} stroke="#2b1b6b" strokeWidth={8} fill="none" strokeLinecap="round" />
+                <Path d={`M${cx + half * 0.45} ${y + 4} l3 13`} stroke="#2b1b6b" strokeWidth={6} strokeLinecap="round" />
+                <Circle cx={cx - half * 0.6} cy={y + 2} r={1.2} fill="#ffffff" />
+                <Circle cx={cx - half * 0.1} cy={y + 5} r={1.5} fill="#ff4fa3" />
+                <Circle cx={cx + half * 0.35} cy={y + 3} r={1.1} fill="#5fdcf0" />
+                <Circle cx={cx + half * 0.75} cy={y + 1} r={1.3} fill="#ffffff" />
+                <Circle cx={cx + half * 0.5} cy={y + 12} r={1.2} fill="#ffe58a" />
+            </G>
+        );
+    }
     const list = colors[id];
     if (!list) return null;
     const band = (color: string, offset: number, width: number) => (
@@ -157,9 +325,9 @@ const scarf = (id: string, { cx, neckY: y, r }: Anchors) => {
 };
 
 export const slotOf = (id: string): "hat" | "glasses" | "scarf" | null => {
-    if (["cap", "beanie", "party", "tophat", "wizard", "viking", "halo", "crown", "egghat"].includes(id)) return "hat";
-    if (["round", "shades", "hearts", "monocle", "visor", "stars"].includes(id)) return "glasses";
-    if (["scarfred", "scarfblue", "stripes", "rainbow", "goldscarf"].includes(id)) return "scarf";
+    if (["cap", "beanie", "party", "tophat", "wizard", "viking", "halo", "crown", "egghat", "chef", "ninja", "cowboy", "headphones", "knight", "pirate", "antlers", "flames", "stonks"].includes(id)) return "hat";
+    if (["round", "shades", "hearts", "monocle", "visor", "stars", "3d", "goggles", "pixel", "cyber"].includes(id)) return "glasses";
+    if (["scarfred", "scarfblue", "stripes", "rainbow", "goldscarf", "bandana", "bowtie", "cape", "neon", "cosmos", "gigachad"].includes(id)) return "scarf";
     return null;
 };
 

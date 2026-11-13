@@ -1,3 +1,4 @@
+import LangBadge from "../components/LangBadge";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState, useMemo } from "react";
@@ -43,7 +44,7 @@ export default function DecksScreen() {
                                 "Backup restored",
                                 `${result.decks} deck${result.decks === 1 ? "" : "s"}, ${result.cards} cards and your progress are back.`
                                     + (result.books > 0
-                                        ? ` ${result.books} book${result.books === 1 ? "" : "s"} and your known words came back too. PDF files are not in a backup, so add those again.`
+                                        ? ` ${result.books} book${result.books === 1 ? "" : "s"} and your known words came back too.${result.pdfs > 0 ? ` ${result.pdfs} PDF file${result.pdfs === 1 ? "" : "s"} came back as well.` : " PDF files are not in this backup, so add those again."}`
                                         : ""),
                             );
                         } catch (error) {
@@ -129,7 +130,7 @@ export default function DecksScreen() {
                             onLongPress={() => setDeckToDelete(item)}
                             style={[s.card, selected && s.cardSelected]}
                         >
-                            <Text style={s.flag}>{lang?.flag ?? "🌐"}</Text>
+                            <View style={s.flag}><LangBadge code={item.language} size={34} /></View>
 
                             <View style={{ flex: 1 }}>
                                 <Text style={[s.name, selected && s.onAccent]}>{item.name}</Text>
@@ -138,7 +139,7 @@ export default function DecksScreen() {
                                 </Text>
                                 {item.card_count > 0 && (
                                     <Text style={[item.due_count > 0 ? s.due : s.caughtUp, selected && s.onAccent]}>
-                                        {item.due_count > 0 ? `${item.due_count} due` : "All caught up ✓"}
+                                        {item.due_count > 0 ? `${item.due_count} due` : "All caught up"}
                                     </Text>
                                 )}
                             </View>
@@ -164,9 +165,7 @@ export default function DecksScreen() {
             >
                 <Pressable style={s.backdrop} dim={false} onPress={() => setDeckToDelete(null)}>
                     <Pressable style={s.dialog} onPress={() => { }}>
-                        <Text style={s.dialogFlag}>
-                            {deckToDelete ? getLanguage(deckToDelete.language)?.flag ?? "🌐" : ""}
-                        </Text>
+                        {deckToDelete ? <View style={s.dialogFlag}><LangBadge code={deckToDelete.language} size={40} /></View> : null}
                         <Text style={s.dialogTitle}>Delete deck?</Text>
                         <Text style={s.dialogBody}>
                             <Text style={s.dialogDeck}>{deckToDelete?.name}</Text> and all{" "}
@@ -221,7 +220,7 @@ const makeS = (t: Palette) => StyleSheet.create({
         marginBottom: 12,
     },
     cardSelected: { backgroundColor: t.gold },
-    flag: { fontSize: 32, marginRight: 14 },
+    flag: { marginRight: 14 },
     name: { color: t.text, fontSize: 19, fontWeight: "600" },
     language: { color: t.muted, fontSize: 14, marginTop: 3 },
     countBox: { alignItems: "center", marginLeft: 12 },
@@ -274,7 +273,7 @@ const makeS = (t: Palette) => StyleSheet.create({
         padding: 24,
         alignItems: "center",
     },
-    dialogFlag: { fontSize: 40, marginBottom: 10 },
+    dialogFlag: { alignSelf: "center", marginBottom: 12 },
     dialogTitle: { color: t.text, fontSize: 20, fontWeight: "600", marginBottom: 10 },
     dialogBody: { color: t.muted, fontSize: 15, lineHeight: 22, textAlign: "center" },
     dialogDeck: { color: t.text, fontWeight: "600" },

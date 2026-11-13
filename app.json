@@ -13,13 +13,18 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#747679",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundImage": "./assets/images/android-icon-background.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.chrislaberge.stompacard"
+      "package": "com.chrislaberge.stompacard",
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ]
     },
     "web": {
       "output": "static",
@@ -49,6 +54,7 @@
       "eas": {
         "projectId": "b1c2bd2a-a986-4409-bf51-5c2b2999e0f2"
       }
-    }
+    },
+    "description": "Learn languages with flashcards, read your own PDFs, and keep a pet that grows as you study."
   }
 }

@@ -1,3 +1,4 @@
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Animated, StyleSheet, Text, View } from "react-native";
@@ -7,6 +8,7 @@ import { usePetLook } from "../hooks/usePetLook";
 import { onCorrectRun } from "../services/cheers";
 import PetView from "./pet/PetView";
 import { onGoalReached } from "../services/dailyGoal";
+import type { AchievementIcon } from "../models/Achievements";
 import { onAchievementsUnlocked, type UnlockEvent, type UnlockItem } from "../services/achievementUnlocks";
 import { useTheme } from "../theme/ThemeProvider";
 import type { Palette } from "../theme/themes";
@@ -15,11 +17,11 @@ const SHOW_MS = 3800;
 /** More than this at once (e.g. the first time after an update) become one summary. */
 const MAX_SEPARATE = 3;
 
-type Message = { id: string; icon: string; title: string; subtitle: string; color: string; xp?: number; to?: "/achievements"; /** Show the pet instead of the icon. */ pet?: boolean };
+type Message = { id: string; icon: AchievementIcon | "trophy"; title: string; subtitle: string; color: string; xp?: number; to?: "/achievements"; /** Show the pet instead of the icon. */ pet?: boolean };
 
 function messagesFor(event: UnlockEvent): Message[] {
     if (event.items.length > MAX_SEPARATE) {
-        return [{ id: event.items.map((i) => i.id).join(","), icon: "🏆", title: `${event.items.length} achievements unlocked`, subtitle: "Tap to see them", color: "#ffc933", xp: event.totalXp, to: "/achievements" }];
+        return [{ id: event.items.map((i) => i.id).join(","), icon: "trophy", title: `${event.items.length} achievements unlocked`, subtitle: "Tap to see them", color: "#ffc933", xp: event.totalXp, to: "/achievements" }];
     }
     return event.items.map((i: UnlockItem) => ({ id: i.id, icon: i.icon, title: i.title, subtitle: i.tierName, color: i.color, xp: i.xp, to: "/achievements" as const }));
 }
@@ -38,12 +40,12 @@ export default function AchievementToast() {
 
     useEffect(() => onAchievementsUnlocked((event) => setQueue((q) => [...q, ...messagesFor(event)])), []);
     useEffect(
-        () => onGoalReached(({ goal }) => setQueue((q) => [...q, { id: `goal-${Date.now()}`, icon: "🎯", title: "Daily goal reached!", subtitle: `${goal} cards done today`, color: "#2fbf71" }])),
+        () => onGoalReached(({ goal }) => setQueue((q) => [...q, { id: `goal-${Date.now()}`, icon: "target", title: "Daily goal reached!", subtitle: `${goal} cards done today`, color: "#2fbf71" }])),
         [],
     );
 
     useEffect(
-        () => onCorrectRun((run) => setQueue((q) => [...q, { id: `run-${run}-${Date.now()}`, icon: "🔥", title: `${run} in a row!`, subtitle: "Keep it going", color: "#ff8a3d", pet: true }])),
+        () => onCorrectRun((run) => setQueue((q) => [...q, { id: `run-${run}-${Date.now()}`, icon: "fire", title: `${run} in a row!`, subtitle: "Keep it going", color: "#ff8a3d", pet: true }])),
         [],
     );
 
@@ -73,7 +75,7 @@ export default function AchievementToast() {
             style={[s.wrap, { top: insets.top + 8, opacity: slide, transform: [{ translateY: slide.interpolate({ inputRange: [0, 1], outputRange: [-80, 0] }) }] }]}
         >
             <Pressable style={[s.banner, { borderColor: current.color }]} onPress={() => { dismiss(); if (current.to) router.push(current.to); }}>
-                {pet ? <PetView level={pet.level} look={pet.look} size={52} animated={false} /> : <Text style={s.icon}>{current.icon}</Text>}
+                {pet ? <PetView level={pet.level} look={pet.look} size={52} animated={false} /> : <MaterialCommunityIcons name={current.icon} size={30} color={current.color} />}
                 <View style={{ flex: 1 }}>
                     <Text style={s.title}>{current.title}</Text>
                     <Text style={[s.subtitle, { color: current.color }]}>{current.subtitle}</Text>

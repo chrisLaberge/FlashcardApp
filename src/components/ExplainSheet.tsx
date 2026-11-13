@@ -1,3 +1,4 @@
+import Mark from "./Mark";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, View } from "react-native";
 import Pressable from "./Pressable";
@@ -45,7 +46,7 @@ export default function ExplainSheet({ visible, onClose, card, languageName }: P
                         {card.romanization ? <Text style={s.muted}>{card.romanization}</Text> : null}
                         <Text style={s.muted}>{card.localizedText}</Text>
                     </View>
-                    <Pressable onPress={onClose} hitSlop={12} accessibilityLabel="Close"><Text style={s.close}>✕</Text></Pressable>
+                    <Pressable onPress={onClose} hitSlop={12} accessibilityLabel="Close"><Mark kind="close" size={22} /></Pressable>
                 </View>
 
                 <ScrollView contentContainerStyle={s.content}>

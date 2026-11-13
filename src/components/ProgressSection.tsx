@@ -1,3 +1,4 @@
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState, useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
@@ -108,7 +109,7 @@ export default function ProgressSection() {
                 <View style={s.medals}>
                     {summary.achievements.map((a) => (
                         <View key={a.id} style={[s.medal, { borderColor: a.tier > 0 ? TIERS[a.tier - 1].color : t.surfaceHigh }]}>
-                            <Text style={[s.medalIcon, a.tier === 0 && { opacity: 0.35 }]}>{a.icon}</Text>
+                            <MaterialCommunityIcons name={a.icon} size={20} color={a.tier > 0 ? TIERS[a.tier - 1].color : t.muted} style={a.tier === 0 ? { opacity: 0.5 } : undefined} />
                         </View>
                     ))}
                 </View>

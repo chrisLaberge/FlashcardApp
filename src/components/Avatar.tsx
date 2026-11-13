@@ -1,5 +1,6 @@
-import { StyleSheet, Text, View } from "react-native";
-import { avatarFor, nameHash } from "../constants/avatars";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { StyleSheet, View } from "react-native";
+import { AVATAR_ICONS, avatarFor, nameHash } from "../constants/avatars";
 import { useTheme } from "../theme/ThemeProvider";
 
 /** A round profile picture: the chosen animal on a soft colour taken from the theme. */
@@ -9,7 +10,7 @@ export default function Avatar({ avatar, name, size = 40 }: { avatar?: string | 
     const tint = tints[nameHash(name) % tints.length];
     return (
         <View style={[s.circle, { width: size, height: size, borderRadius: size / 2, backgroundColor: `${tint}40`, borderColor: tint }]}>
-            <Text style={{ fontSize: size * 0.5 }}>{avatarFor(avatar, name)}</Text>
+            <MaterialCommunityIcons name={AVATAR_ICONS[avatarFor(avatar, name)] as never} size={size * 0.55} color={tint} />
         </View>
     );
 }

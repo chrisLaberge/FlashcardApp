@@ -1,3 +1,4 @@
+import Mark from "./Mark";
 import { Ionicons } from "@expo/vector-icons";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -52,7 +53,7 @@ export default function LookupSheet({ onClose, text, context, languageName, onAd
                         {state.status === "done" && state.lookup.romanization ? <Text style={s.muted}>{state.lookup.romanization}</Text> : null}
                         {state.status === "done" ? <Text style={s.translation}>{state.lookup.translation}</Text> : null}
                     </View>
-                    <Pressable onPress={onClose} hitSlop={12} accessibilityLabel="Close"><Text style={s.close}>✕</Text></Pressable>
+                    <Pressable onPress={onClose} hitSlop={12} accessibilityLabel="Close"><Mark kind="close" size={22} /></Pressable>
                 </View>
 
                 <ScrollView contentContainerStyle={s.content}>

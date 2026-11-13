@@ -1,11 +1,11 @@
 import { getAchievementUnlocks, getCardsAdded, getReviewLog, recordAchievementUnlocks } from "../database/database";
-import { achievements, bonusXpFor, newlyEarned, TIER_BONUS_XP, TIERS } from "../models/Achievements";
+import { achievements, type AchievementIcon, bonusXpFor, newlyEarned, TIER_BONUS_XP, TIERS } from "../models/Achievements";
 import { levelProgress, totalXp } from "../models/Progression";
 import { checkLevelUp } from "./levelUp";
 import { syncStats } from "./syncStats";
 
 /** One newly earned tier, ready to show. */
-export type UnlockItem = { id: string; title: string; icon: string; tierName: string; color: string; xp: number };
+export type UnlockItem = { id: string; title: string; icon: AchievementIcon; tierName: string; color: string; xp: number };
 export type UnlockEvent = { items: UnlockItem[]; totalXp: number };
 
 type Listener = (event: UnlockEvent) => void;

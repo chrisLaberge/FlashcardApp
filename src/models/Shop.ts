@@ -52,33 +52,52 @@ export const TIER_COUNT = TIER_BONUS_XP.length;
 export type Rarity = "common" | "rare" | "epic" | "legendary";
 export type Slot = "hat" | "glasses" | "scarf";
 
-export type Accessory = { id: string; name: string; slot: Slot; rarity: Rarity; emoji: string };
+export type Accessory = { id: string; name: string; slot: Slot; rarity: Rarity };
 
 export const RARITY_COLOR: Record<Rarity, string> = { common: "#9aa7b5", rare: "#4f9dff", epic: "#b25cff", legendary: "#ff4fa3" };
 export const RARITIES: readonly Rarity[] = ["common", "rare", "epic", "legendary"];
 
 export const ACCESSORIES: readonly Accessory[] = [
-    { id: "cap", name: "Baseball cap", slot: "hat", rarity: "common", emoji: "🧢" },
-    { id: "beanie", name: "Beanie", slot: "hat", rarity: "common", emoji: "🧶" },
-    { id: "party", name: "Party hat", slot: "hat", rarity: "common", emoji: "🎉" },
-    { id: "tophat", name: "Top hat", slot: "hat", rarity: "rare", emoji: "🎩" },
-    { id: "wizard", name: "Wizard hat", slot: "hat", rarity: "rare", emoji: "🧙" },
-    { id: "viking", name: "Viking helmet", slot: "hat", rarity: "epic", emoji: "🪖" },
-    { id: "halo", name: "Halo", slot: "hat", rarity: "epic", emoji: "😇" },
-    { id: "crown", name: "Crown", slot: "hat", rarity: "legendary", emoji: "👑" },
-    { id: "round", name: "Round glasses", slot: "glasses", rarity: "common", emoji: "👓" },
-    { id: "shades", name: "Sunglasses", slot: "glasses", rarity: "common", emoji: "🕶️" },
-    { id: "hearts", name: "Heart glasses", slot: "glasses", rarity: "rare", emoji: "😍" },
-    { id: "monocle", name: "Monocle", slot: "glasses", rarity: "rare", emoji: "🧐" },
-    { id: "visor", name: "Space visor", slot: "glasses", rarity: "epic", emoji: "🥽" },
-    { id: "stars", name: "Star glasses", slot: "glasses", rarity: "legendary", emoji: "🤩" },
-    { id: "scarfred", name: "Red scarf", slot: "scarf", rarity: "common", emoji: "🧣" },
-    { id: "scarfblue", name: "Blue scarf", slot: "scarf", rarity: "common", emoji: "🧣" },
-    { id: "stripes", name: "Striped scarf", slot: "scarf", rarity: "rare", emoji: "🧣" },
-    { id: "rainbow", name: "Rainbow scarf", slot: "scarf", rarity: "epic", emoji: "🌈" },
-    { id: "goldscarf", name: "Golden scarf", slot: "scarf", rarity: "legendary", emoji: "🏅" },
+    { id: "cap", name: "Baseball cap", slot: "hat", rarity: "common" },
+    { id: "beanie", name: "Beanie", slot: "hat", rarity: "common" },
+    { id: "party", name: "Party hat", slot: "hat", rarity: "common" },
+    { id: "tophat", name: "Top hat", slot: "hat", rarity: "rare" },
+    { id: "wizard", name: "Wizard hat", slot: "hat", rarity: "rare" },
+    { id: "viking", name: "Viking helmet", slot: "hat", rarity: "epic" },
+    { id: "halo", name: "Halo", slot: "hat", rarity: "epic" },
+    { id: "crown", name: "Crown", slot: "hat", rarity: "legendary" },
+    { id: "round", name: "Round glasses", slot: "glasses", rarity: "common" },
+    { id: "shades", name: "Sunglasses", slot: "glasses", rarity: "common" },
+    { id: "hearts", name: "Heart glasses", slot: "glasses", rarity: "rare" },
+    { id: "monocle", name: "Monocle", slot: "glasses", rarity: "rare" },
+    { id: "visor", name: "Space visor", slot: "glasses", rarity: "epic" },
+    { id: "stars", name: "Star glasses", slot: "glasses", rarity: "legendary" },
+    { id: "scarfred", name: "Red scarf", slot: "scarf", rarity: "common" },
+    { id: "scarfblue", name: "Blue scarf", slot: "scarf", rarity: "common" },
+    { id: "stripes", name: "Striped scarf", slot: "scarf", rarity: "rare" },
+    { id: "rainbow", name: "Rainbow scarf", slot: "scarf", rarity: "epic" },
+    { id: "goldscarf", name: "Golden scarf", slot: "scarf", rarity: "legendary" },
+    { id: "chef", name: "Chef hat", slot: "hat", rarity: "common" },
+    { id: "ninja", name: "Ninja headband", slot: "hat", rarity: "common" },
+    { id: "cowboy", name: "Cowboy hat", slot: "hat", rarity: "rare" },
+    { id: "headphones", name: "Headphones", slot: "hat", rarity: "rare" },
+    { id: "knight", name: "Knight helmet", slot: "hat", rarity: "epic" },
+    { id: "pirate", name: "Pirate hat", slot: "hat", rarity: "epic" },
+    { id: "antlers", name: "Antlers", slot: "hat", rarity: "epic" },
+    { id: "flames", name: "Crown of flames", slot: "hat", rarity: "legendary" },
+    { id: "3d", name: "3D glasses", slot: "glasses", rarity: "common" },
+    { id: "goggles", name: "Aviator goggles", slot: "glasses", rarity: "rare" },
+    { id: "pixel", name: "Pixel shades", slot: "glasses", rarity: "epic" },
+    { id: "cyber", name: "Cyber visor", slot: "glasses", rarity: "legendary" },
+    { id: "bandana", name: "Bandana", slot: "scarf", rarity: "common" },
+    { id: "bowtie", name: "Bow tie", slot: "scarf", rarity: "common" },
+    { id: "cape", name: "Hero cape", slot: "scarf", rarity: "rare" },
+    { id: "neon", name: "Neon scarf", slot: "scarf", rarity: "epic" },
+    { id: "cosmos", name: "Cosmos scarf", slot: "scarf", rarity: "legendary" },
+    { id: "stonks", name: "Stonks arrow", slot: "hat", rarity: "rare" },
+    { id: "gigachad", name: "Gigachad jaw", slot: "scarf", rarity: "epic" },
     // Never in a case: given for finding the easter eggs.
-    { id: "egghat", name: "Golden egg hat", slot: "hat", rarity: "legendary", emoji: "🥚" },
+    { id: "egghat", name: "Golden egg hat", slot: "hat", rarity: "legendary" },
 ];
 
 /** Items a case can drop (everything but the easter-egg reward). */

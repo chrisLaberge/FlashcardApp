@@ -120,6 +120,11 @@ async function openAndPrepareDatabase(): Promise<SQLite.SQLiteDatabase> {
             );
             -- The pet and the shop. Gems are never stored as a balance: what you earned comes from the
             -- review log, and this ledger holds only what was spent (and refunded).
+            -- Settings kept on the phone elsewhere (theme, daily goal, ...) copied here when a backup is made, so they travel with it.
+            CREATE TABLE IF NOT EXISTS app_settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );
             CREATE TABLE IF NOT EXISTS pet_state (
                 key TEXT PRIMARY KEY,
                 value TEXT NOT NULL
@@ -774,10 +779,22 @@ export type RestoreResult = {
 
 export class RestoreError extends Error {}
 
-const RESTORE_TABLES = [
-    "decks", "images", "cards", "card_progress", "review_log", "card_add_log", "achievement_unlocks",
-    "my_texts", "known_words", "book_vocab",
-] as const;
+
+
+const PET_TABLES: readonly string[] = ["pet_state", "shop_inventory", "shop_ledger", "app_settings"];
+
+/** Books that have a PDF file on this phone. */
+export async function getPdfBooks(): Promise<{ id: number; pdfPath: string }[]> {
+    const database = await getDatabase();
+    const rows = await database.getAllAsync<{ id: number; pdf_path: string }>("SELECT id, pdf_path FROM my_texts WHERE pdf_path IS NOT NULL AND pdf_path != ''");
+    return rows.map((r) => ({ id: r.id, pdfPath: r.pdf_path }));
+}
+
+/** Points a book at its PDF file (used when a backup brings the file back). */
+export async function setPdfPath(id: number, path: string): Promise<void> {
+    const database = await getDatabase();
+    await database.runAsync("UPDATE my_texts SET pdf_path = ? WHERE id = ?", path, id);
+}
 
 /** Columns that point at files on the old phone. The files are not in a backup, so they are forgotten. */
 const RESTORE_SKIP_COLUMNS: Record<string, string[]> = { images: ["local_path"], my_texts: ["pdf_path"] };
@@ -824,8 +841,11 @@ export async function restoreFromBackup(source: RestoreSource): Promise<RestoreR
         // Rows are copied table by table; references are checked once everything is in.
         await database.execAsync("PRAGMA defer_foreign_keys = ON");
 
-        for (const table of RESTORE_TABLES) {
-            if (!tables.includes(table)) continue;
+        // Every table the backup and this app share is copied, so nothing can be left behind (new tables included).
+        const copyTables = (await database.getAllAsync<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'"))
+            .map((row) => row.name)
+            .filter((name) => tables.includes(name));
+        for (const table of copyTables) {
 
             const targetColumns = await columnNames(database, table);
             const skip = RESTORE_SKIP_COLUMNS[table] ?? [];
@@ -837,7 +857,8 @@ export async function restoreFromBackup(source: RestoreSource): Promise<RestoreR
             const rows = await source.getAllAsync<Record<string, SQLite.SQLiteBindValue>>(
                 `SELECT ${columns.join(", ")} FROM ${table}`,
             );
-            const insert = `INSERT INTO ${table} (${columns.join(", ")}) VALUES (${columns.map(() => "?").join(", ")})`;
+            // The pet tables may already hold a default row; everything else must not conflict, or the restore fails.
+            const insert = `INSERT ${PET_TABLES.includes(table) ? "OR REPLACE " : ""}INTO ${table} (${columns.join(", ")}) VALUES (${columns.map(() => "?").join(", ")})`;
             for (const row of rows) {
                 await database.runAsync(insert, ...columns.map((name) => row[name] ?? null));
             }
@@ -855,6 +876,7 @@ export async function restoreFromBackup(source: RestoreSource): Promise<RestoreR
             UPDATE cards SET image_id = NULL WHERE image_id IS NOT NULL AND image_id NOT IN (SELECT id FROM images);
             INSERT OR IGNORE INTO card_progress (card_id) SELECT id FROM cards;
             DELETE FROM book_vocab WHERE book_id NOT IN (SELECT id FROM my_texts);
+            DELETE FROM card_explanations WHERE card_id NOT IN (SELECT id FROM cards);
         `);
         const orphanCards = await database.getFirstAsync<{ n: number }>(
             "SELECT COUNT(*) AS n FROM cards WHERE deck_id NOT IN (SELECT id FROM decks)",
@@ -874,6 +896,16 @@ export async function restoreFromBackup(source: RestoreSource): Promise<RestoreR
 }
 
 /** Returns a complete, consistent snapshot of the database as bytes (read-only). */
+/** Settings copied into the database so a backup carries them. */
+export async function saveAppSettings(entries: Record<string, string>): Promise<void> {
+    const database = await getDatabase();
+    await database.withTransactionAsync(async () => {
+        for (const [key, value] of Object.entries(entries)) {
+            await database.runAsync("INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)", key, value);
+        }
+    });
+}
+
 export async function serializeDatabase(): Promise<Uint8Array> {
     const database = await getDatabase();
     return database.serializeAsync();
