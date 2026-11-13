@@ -132,6 +132,14 @@ const hat = (id: string, { cx, headTop: top, r }: Anchors) => {
                     <Path d={`M${cx - r * 0.45} ${base} Q${cx - r * 0.5} ${top - r * 0.2} ${cx} ${top - r * 0.9} Q${cx + r * 0.5} ${top - r * 0.2} ${cx + r * 0.45} ${base} Z`} fill="#ffd23f" />
                 </G>
             );
+        case "stonks":
+            return (
+                <G>
+                    <Path d={`M${cx - r * 1.1} ${top + r * 0.2} L${cx - r * 0.45} ${top - r * 0.25} L${cx - r * 0.1} ${top - r * 0.0} L${cx + r * 0.75} ${top - r * 0.95}`} stroke="#1fb36b" strokeWidth={4.5} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                    <Polygon points={`${cx + r * 1.15},${top - r * 1.25} ${cx + r * 0.35},${top - r * 1.05} ${cx + r * 0.95},${top - r * 0.45}`} fill="#1fb36b" />
+                    <Rect x={cx - r * 0.9} y={base - 4} width={r * 1.8} height={4} rx={2} fill="#1b1b22" />
+                </G>
+            );
         case "egghat":
             return (
                 <G>
@@ -276,6 +284,18 @@ const scarf = (id: string, { cx, neckY: y, r }: Anchors) => {
             </G>
         );
     }
+    if (id === "gigachad") {
+        return (
+            <G>
+                <Path d={`M${cx - half * 1.05} ${y - 4} L${cx - half * 0.95} ${y + 9} L${cx - half * 0.5} ${y + 19} L${cx + half * 0.5} ${y + 19} L${cx + half * 0.95} ${y + 9} L${cx + half * 1.05} ${y - 4} Z`} fill="#d9b08c" stroke="#a67c58" strokeWidth={1.2} strokeLinejoin="round" />
+                <Path d={`M${cx} ${y + 11} L${cx} ${y + 19}`} stroke="#a67c58" strokeWidth={1.4} />
+                <Path d={`M${cx - half * 0.9} ${y + 5} Q${cx - half * 0.7} ${y + 14} ${cx - half * 0.35} ${y + 17} M${cx + half * 0.9} ${y + 5} Q${cx + half * 0.7} ${y + 14} ${cx + half * 0.35} ${y + 17}`} stroke="#b88d66" strokeWidth={1.2} fill="none" />
+                {[[-0.6, 11], [-0.3, 14], [0.3, 14], [0.6, 11], [-0.45, 8], [0.45, 8]].map(([dx, dy]) => (
+                    <Circle key={`${dx}${dy}`} cx={cx + half * dx} cy={y + dy} r={0.7} fill="#7d5a3c" />
+                ))}
+            </G>
+        );
+    }
     if (id === "cosmos") {
         return (
             <G>
@@ -305,9 +325,9 @@ const scarf = (id: string, { cx, neckY: y, r }: Anchors) => {
 };
 
 export const slotOf = (id: string): "hat" | "glasses" | "scarf" | null => {
-    if (["cap", "beanie", "party", "tophat", "wizard", "viking", "halo", "crown", "egghat", "chef", "ninja", "cowboy", "headphones", "knight", "pirate", "antlers", "flames"].includes(id)) return "hat";
+    if (["cap", "beanie", "party", "tophat", "wizard", "viking", "halo", "crown", "egghat", "chef", "ninja", "cowboy", "headphones", "knight", "pirate", "antlers", "flames", "stonks"].includes(id)) return "hat";
     if (["round", "shades", "hearts", "monocle", "visor", "stars", "3d", "goggles", "pixel", "cyber"].includes(id)) return "glasses";
-    if (["scarfred", "scarfblue", "stripes", "rainbow", "goldscarf", "bandana", "bowtie", "cape", "neon", "cosmos"].includes(id)) return "scarf";
+    if (["scarfred", "scarfblue", "stripes", "rainbow", "goldscarf", "bandana", "bowtie", "cape", "neon", "cosmos", "gigachad"].includes(id)) return "scarf";
     return null;
 };
 

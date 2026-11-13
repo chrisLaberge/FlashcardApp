@@ -94,6 +94,8 @@ export const ACCESSORIES: readonly Accessory[] = [
     { id: "cape", name: "Hero cape", slot: "scarf", rarity: "rare" },
     { id: "neon", name: "Neon scarf", slot: "scarf", rarity: "epic" },
     { id: "cosmos", name: "Cosmos scarf", slot: "scarf", rarity: "legendary" },
+    { id: "stonks", name: "Stonks arrow", slot: "hat", rarity: "rare" },
+    { id: "gigachad", name: "Gigachad jaw", slot: "scarf", rarity: "epic" },
     // Never in a case: given for finding the easter eggs.
     { id: "egghat", name: "Golden egg hat", slot: "hat", rarity: "legendary" },
 ];
