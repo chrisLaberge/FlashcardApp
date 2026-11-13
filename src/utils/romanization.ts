@@ -1,5 +1,5 @@
 import hangulRomanization from "hangul-romanization";
-import pinyin from "pinyin";
+import { pinyin } from "pinyin-pro";
 import ToJyutping from "to-jyutping";
 import { transliterate } from "transliteration";
 import { toRomaji } from "wanakana";
@@ -8,6 +8,20 @@ import { toRomaji } from "wanakana";
 // ─────────────────────────────
 // Japanese (lazy-loaded, initialised once)
 // ─────────────────────────────
+
+/**
+ * Pinyin with tone marks. The reading of a character depends on the word around it (银行 yín háng, 行李 xíng li),
+ * which pinyin-pro works out from its own phrase list, so no word splitter is needed. Punctuation stays attached.
+ */
+export function chinesePinyin(text: string): string {
+    const syllables = pinyin(text, { toneType: "symbol", type: "array", nonZh: "consecutive" });
+    return syllables
+        .join(" ")
+        .replace(/ ([，。！？、；：,.!?;:）」』”’)])/g, "$1")
+        .replace(/([（「『“‘(]) /g, "$1")
+        .replace(/\s+/g, " ")
+        .trim();
+}
 
 // ─────────────────────────────
 // Main entry point
@@ -23,15 +37,8 @@ export async function getRomanization(
 
     switch (languageCode) {
         // Mandarin → Hanyu Pinyin with tone marks
-        case "zh": {
-            const pinyinResult = pinyin(text, { style: pinyin.STYLE_TONE }) as Array<
-                Array<string | undefined>
-            >;
-
-            return pinyinResult
-                .map((syllable: Array<string | undefined>) => syllable[0] ?? "")
-                .join(" ");
-        }
+        case "zh":
+            return chinesePinyin(text);
 
         // Cantonese → Jyutping
         case "yue":

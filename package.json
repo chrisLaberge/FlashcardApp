@@ -36,7 +36,7 @@
     "kuroshiro": "^1.2.1",
     "kuroshiro-analyzer-kuromoji": "^1.1.0",
     "papaparse": "^5.7.0",
-    "pinyin": "^4.0.0",
+    "pinyin-pro": "^3.29.5",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-native": "0.88.0",

@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Modal, StyleSheet, Text, View } from "react-native";
 import Pressable from "./Pressable";
 import { formatStudyTime } from "../models/Stats";
+import PetView from "./pet/PetView";
+import { usePetLook } from "../hooks/usePetLook";
 import { buildSummary, onStudyScreenLeft, type SessionSummary } from "../services/sessionSummary";
 import { useTheme } from "../theme/ThemeProvider";
 import type { Palette } from "../theme/themes";
@@ -23,6 +25,8 @@ export default function SessionSummaryPopup() {
         [],
     );
 
+    const pet = usePetLook(summary !== null);
+
     if (!summary) return null;
     const { session } = summary;
     const accuracy = session.reviews === 0 ? 0 : Math.round((session.correct / session.reviews) * 100);
@@ -33,6 +37,7 @@ export default function SessionSummaryPopup() {
         <Modal visible transparent animationType="fade" statusBarTranslucent onRequestClose={() => setSummary(null)}>
             <View style={s.backdrop}>
                 <View style={s.card}>
+                    {pet ? <View style={s.pet}><PetView level={pet.level} look={pet.look} size={110} /></View> : null}
                     <Text style={s.title}>{done ? "Session complete" : "Session so far"}</Text>
                     {summary.deckName ? <Text style={s.deck}>{summary.deckName}</Text> : null}
 
@@ -82,6 +87,7 @@ export default function SessionSummaryPopup() {
 const makeS = (t: Palette) => StyleSheet.create({
     backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)", alignItems: "center", justifyContent: "center", padding: 24 },
     card: { width: "100%", maxWidth: 380, backgroundColor: t.bg, borderRadius: 20, padding: 20, gap: 14, borderWidth: 1, borderColor: t.surfaceHigh },
+    pet: { alignItems: "center", marginTop: -4 },
     title: { color: t.text, fontSize: 22, fontWeight: "700", textAlign: "center" },
     deck: { color: t.muted, fontSize: 14, textAlign: "center", marginTop: -8 },
     big: { backgroundColor: t.surface, borderRadius: 12, paddingVertical: 14, alignItems: "center", borderWidth: StyleSheet.hairlineWidth, borderColor: t.surfaceHigh },

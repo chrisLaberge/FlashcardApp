@@ -7,6 +7,7 @@
  */
 
 import { TIER_BONUS_XP } from "./Achievements";
+import { shiftDay } from "./Stats";
 
 /* ----------------------------------- gems ----------------------------------- */
 
@@ -18,6 +19,29 @@ export function gemsEarned(level: number, earnedTiers: readonly { tier: number }
     const fromLevels = Math.max(0, Math.floor(level) - 1) * GEMS_PER_LEVEL;
     const fromTiers = earnedTiers.reduce((sum, e) => sum + (GEMS_PER_TIER[e.tier - 1] ?? 0), 0);
     return fromLevels + fromTiers;
+}
+
+/** A streak pays out every 7 days, and each week pays more: 10 gems at 7 days, 20 more at 14, 30 more at 21 ... */
+export const STREAK_GEMS_STEP = 10;
+export const STREAK_MILESTONE_DAYS = 7;
+
+/** Gems for one streak of `days` days in a row: every finished week pays 10 times the week's number. */
+export function gemsForStreak(days: number): number {
+    const weeks = Math.floor(days / STREAK_MILESTONE_DAYS);
+    return STREAK_GEMS_STEP * weeks * (weeks + 1) / 2;
+}
+
+/** Streak gems from every run of consecutive study days ever (each run is paid once, so nothing is paid twice). */
+export function streakGemsEarned(studiedDays: readonly string[]): number {
+    const days = [...new Set(studiedDays)].sort();
+    let total = 0;
+    let run = 0;
+    for (let i = 0; i < days.length; i++) {
+        run = i > 0 && shiftDay(days[i - 1], 1) === days[i] ? run + 1 : 1;
+        const last = i === days.length - 1 || shiftDay(days[i], 1) !== days[i + 1];
+        if (last) total += gemsForStreak(run);
+    }
+    return total;
 }
 
 // Keeps the two tables the same length: a tier added to one must be added to the other.
@@ -105,6 +129,5 @@ export function openCase(random: () => number = Math.random): Accessory {
     return pool[Math.min(pool.length - 1, Math.floor(random() * pool.length))];
 }
 
-/** A free case at every 10 pet levels (10, 20 ... 100). */
-export const FREE_CASE_EVERY_LEVELS = 10;
-export const freeCasesEarned = (level: number): number => Math.floor(Math.min(level, 100) / FREE_CASE_EVERY_LEVELS);
+/** A free case every time the level goes up (level 2 has earned one, level 3 two ...). */
+export const freeCasesEarned = (level: number): number => Math.max(0, Math.floor(level) - 1);

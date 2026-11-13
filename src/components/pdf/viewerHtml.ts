@@ -20,6 +20,7 @@ canvas { display:block; }
 #text > span { position:absolute; white-space:pre; color:transparent; transform-origin:0 0; cursor:text; }
 #text ::selection { background:rgba(0,110,255,0.35); }
 .u { background:var(--hl); border-bottom:2px solid var(--accent); border-radius:3px; }
+.l { background:rgba(79,157,255,0.10); border-radius:3px; }
 #bar { position:absolute; left:0; right:0; bottom:0; height:60px; background:var(--bar); display:flex; align-items:center; gap:4px; padding:0 8px; box-sizing:border-box; }
 .btn { flex:none; width:40px; height:40px; border:0; border-radius:10px; background:transparent; color:var(--fg); font-size:22px; line-height:40px; text-align:center; padding:0; }
 .btn:active { background:rgba(255,255,255,0.12); }
@@ -66,6 +67,29 @@ const SCRIPT = String.raw`
     WORD.lastIndex = 0;
     while ((m = WORD.exec(raw))) out.push({ text: m[0], index: m.index });
     return out;
+  }
+  // A word cut by the end of a line ("inter-" then "national") is one word. Each piece gets the whole word as
+  // its .whole, so both pieces are marked and counted together. Only used for languages with spaces.
+  function endsCut(ws, raw) {
+    var w = ws.length ? ws[ws.length - 1] : null;
+    return w && /[-\u00AD\u2010]$/.test(w.text) && w.index + w.text.length >= raw.replace(/\s+$/, "").length ? w : null;
+  }
+  function wordsAt(i) {
+    var raw = textDivs[i].getAttribute("data-raw") || "", ws = wordsOf(raw), j;
+    for (j = 0; j < ws.length; j++) ws[j].whole = ws[j].text.replace(/[-\u00AD\u2010]+$/, "");
+    var tail = endsCut(ws, raw);
+    if (tail && i + 1 < textDivs.length) {
+      var nraw = textDivs[i + 1].getAttribute("data-raw") || "", nws = wordsOf(nraw);
+      if (nws.length && nws[0].index === nraw.search(/\S/) && /^\p{Ll}/u.test(nws[0].text)) tail.whole = tail.whole + nws[0].text;
+    }
+    if (ws.length && i > 0) {
+      var praw = textDivs[i - 1].getAttribute("data-raw") || "", pws = wordsOf(praw), pt = endsCut(pws, praw);
+      if (pt && ws[0].index === raw.search(/\S/) && /^\p{Ll}/u.test(ws[0].text)) {
+        pt.whole = pt.text.replace(/[-\u00AD\u2010]+$/, "") + ws[0].text;
+        ws[0].whole = pt.whole;
+      }
+    }
+    return ws;
   }
   var minLen = function () { return segment ? 1 : 2; };
   var setMsg = function (t) { msg.textContent = t || ""; msg.style.display = t ? "block" : "none"; };
@@ -168,7 +192,7 @@ const SCRIPT = String.raw`
       var raw = textDivs[i].getAttribute("data-raw") || "", html = "", last = 0, rs = ranges[i];
       if (!rs.length) { if (textDivs[i].children.length) textDivs[i].textContent = raw; continue; }
       for (var q = 0; q < rs.length; q++) {
-        html += esc(raw.slice(last, rs[q][0])) + '<span class="u" data-w="' + esc(rs[q][2]) + '">' + esc(raw.slice(rs[q][0], rs[q][1])) + "</span>";
+        html += esc(raw.slice(last, rs[q][0])) + '<span class="' + (unknown[key(rs[q][2])] === 2 ? "l" : "u") + '" data-w="' + esc(rs[q][2]) + '">' + esc(raw.slice(rs[q][0], rs[q][1])) + "</span>";
         last = rs[q][1];
       }
       textDivs[i].innerHTML = html + esc(raw.slice(last));
@@ -180,11 +204,11 @@ const SCRIPT = String.raw`
       var div = textDivs[i];
       var raw = div.getAttribute("data-raw");
       if (raw === null || raw === "") continue;
-      var html = "", last = 0, any = false, ws = wordsOf(raw);
+      var html = "", last = 0, any = false, ws = wordsAt(i);
       for (var j = 0; j < ws.length; j++) {
-        var w = ws[j];
-        if (w.text.length >= minLen() && unknown[key(w.text)]) {
-          html += esc(raw.slice(last, w.index)) + '<span class="u">' + esc(w.text) + "</span>";
+        var w = ws[j], wk = key(w.whole);
+        if (w.whole.length >= minLen() && unknown[wk]) {
+          html += esc(raw.slice(last, w.index)) + '<span class="' + (unknown[wk] === 2 ? "l" : "u") + '" data-w="' + esc(w.whole) + '">' + esc(w.text) + "</span>";
           last = w.index + w.text.length;
           any = true;
         }
@@ -209,10 +233,10 @@ const SCRIPT = String.raw`
     }
     for (var i = 0; i < (segment ? 0 : textDivs.length); i++) {
       var raw = textDivs[i].getAttribute("data-raw") || "";
-      var ws = wordsOf(raw);
+      var ws = wordsAt(i);
       for (var j = 0; j < ws.length; j++) {
-        if (ws[j].text.length < minLen()) continue;
-        var k = key(ws[j].text);
+        if (ws[j].whole.length < minLen()) continue;
+        var k = key(ws[j].whole);
         if (seen[k]) continue;
         seen[k] = 1;
         if (all || !asked[k]) { asked[k] = 1; fresh.push(k); }
@@ -253,7 +277,7 @@ const SCRIPT = String.raw`
     if (sel && !sel.isCollapsed) return;
     if (pinched) { pinched = false; return; }
     var t = e.target;
-    if (t && t.className === "u") { post({ type: "select", text: t.getAttribute("data-w") || t.textContent, context: contextFor(t) }); return; }
+    if (t && (t.className === "u" || t.className === "l")) { post({ type: "select", text: t.getAttribute("data-w") || t.textContent, context: contextFor(t) }); return; }
     if (selectedAtStart) return; // this tap only dropped a selection
     var f = e.clientX / window.innerWidth;
     if (f > 0.65) goto(pageNo + 1);
@@ -273,6 +297,15 @@ const SCRIPT = String.raw`
   nextBtn.onclick = function () { goto(pageNo + 1); };
   document.getElementById("zout").onclick = function () { setZoom(zoom / 1.25); };
   document.getElementById("zin").onclick = function () { setZoom(zoom * 1.25); };
+  // Sends the words marked as unknown on this page (not the faint ones) so the app can mark them all known.
+  document.getElementById("all").onclick = function () {
+    var spans = textEl.querySelectorAll("span.u"), seen = {}, keys = [];
+    for (var i = 0; i < spans.length; i++) {
+      var k = key(spans[i].getAttribute("data-w") || spans[i].textContent);
+      if (!seen[k]) { seen[k] = 1; keys.push(k); }
+    }
+    post({ type: "markPage", keys: keys });
+  };
   document.getElementById("night").onclick = function () { sheet.classList.toggle("night"); post({ type: "night", on: sheet.classList.contains("night") }); };
   function setZoom(z) { zoom = Math.max(0.6, Math.min(4, z)); render(true); }
 
@@ -356,6 +389,7 @@ const SCRIPT = String.raw`
       if (it.str.length) prev = it;
     }
     out = out.replace(/[ \t]+/g, " ").trim();
+    if (!segment) out = out.replace(/(\p{L})[-\u00AD\u2010] ?\n+ ?(\p{Ll})/gu, "$1$2").replace(/\u00AD/g, "");
     if (segment) out = out.normalize("NFKC");
     if (segment && segmenter) {
       var spaced = "", it = segmenter.segment(out)[Symbol.iterator](), r;
@@ -441,6 +475,7 @@ const SCRIPT = String.raw`
     } else if (m.t === "unknown") {
       if (m.replace) unknown = {};
       for (var i = 0; i < m.keys.length; i++) unknown[m.keys[i]] = 1;
+      if (m.learning) for (var q2 = 0; q2 < m.learning.length; q2++) unknown[m.learning[q2]] = 2;
       highlight();
     } else if (m.t === "reclassify") {
       announceWords(true);
@@ -471,6 +506,7 @@ const BODY = `
   <button class="btn" id="next" aria-label="Next page">&#8250;</button>
   <button class="btn" id="zout" aria-label="Zoom out">&#8722;</button>
   <button class="btn" id="zin" aria-label="Zoom in">+</button>
+  <button class="btn" id="all" aria-label="Mark this page's words as known">&#10003;</button>
   <button class="btn" id="night" aria-label="Dark pages">&#9680;</button>
 </div>`;
 

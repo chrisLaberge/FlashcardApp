@@ -41,7 +41,10 @@ export default function DecksScreen() {
                             void backfillLocalImages(); // pictures are copied to this phone again in the background
                             Alert.alert(
                                 "Backup restored",
-                                `${result.decks} deck${result.decks === 1 ? "" : "s"}, ${result.cards} cards and your progress are back.`,
+                                `${result.decks} deck${result.decks === 1 ? "" : "s"}, ${result.cards} cards and your progress are back.`
+                                    + (result.books > 0
+                                        ? ` ${result.books} book${result.books === 1 ? "" : "s"} and your known words came back too. PDF files are not in a backup, so add those again.`
+                                        : ""),
                             );
                         } catch (error) {
                             Alert.alert(

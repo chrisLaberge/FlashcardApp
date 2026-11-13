@@ -13,24 +13,35 @@ const LOOKUP = (() => {
     return table;
 })();
 
-/** The bytes of a base64 string (padding and line breaks are fine). */
+/** The bytes of a base64 string (padding and line breaks are fine). Works four characters at a time, since the big dictionary files go through here. */
 export function fromBase64(data: string): Uint8Array {
-    const clean = data.replace(/[\s=]+/g, "");
-    const out = new Uint8Array(Math.floor((clean.length * 3) / 4));
-    let bits = 0;
-    let value = 0;
+    const clean = /[^A-Za-z0-9+/]/.test(data) ? data.replace(/[\s=]+/g, "") : data;
+    const length = clean.length;
+    const out = new Uint8Array(Math.floor((length * 3) / 4));
+    const table = LOOKUP;
     let n = 0;
-    for (let i = 0; i < clean.length; i++) {
-        const code = clean.charCodeAt(i);
-        const digit = code < 128 ? LOOKUP[code] : -1;
-        if (digit < 0) throw new Error("Not base64");
-        value = (value << 6) | digit;
-        bits += 6;
-        if (bits >= 8) {
-            bits -= 8;
-            out[n++] = (value >> bits) & 0xff;
-            value &= (1 << bits) - 1;
-        }
+    let i = 0;
+    const whole = length - (length % 4);
+    for (; i < whole; i += 4) {
+        const a = table[clean.charCodeAt(i)];
+        const b = table[clean.charCodeAt(i + 1)];
+        const c = table[clean.charCodeAt(i + 2)];
+        const d = table[clean.charCodeAt(i + 3)];
+        // Codes of 128 and over read past the table (undefined), which fails the check below like -1 does.
+        if (!(a >= 0 && b >= 0 && c >= 0 && d >= 0)) throw new Error("Not base64");
+        out[n++] = (a << 2) | (b >> 4);
+        out[n++] = ((b & 15) << 4) | (c >> 2);
+        out[n++] = ((c & 3) << 6) | d;
+    }
+    const rest = length - whole;
+    if (rest === 1) throw new Error("Not base64");
+    if (rest > 0) {
+        const a = table[clean.charCodeAt(i)];
+        const b = table[clean.charCodeAt(i + 1)];
+        const c = rest === 3 ? table[clean.charCodeAt(i + 2)] : 0;
+        if (!(a >= 0 && b >= 0 && c >= 0)) throw new Error("Not base64");
+        out[n++] = (a << 2) | (b >> 4);
+        if (rest === 3) out[n++] = ((b & 15) << 4) | (c >> 2);
     }
     return out.subarray(0, n);
 }

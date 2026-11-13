@@ -22,6 +22,7 @@ import {
 } from "../database/database";
 import { scheduleAchievementCheck } from "../services/achievementUnlocks";
 import { scheduleGoalCheck, scheduleReminderRefresh } from "../services/dailyGoal";
+import { recordAnswer, undoAnswer } from "../services/cheers";
 import { announceStudyScreenLeft, currentSession } from "../services/sessionSummary";
 import { formatStudyTime, type StudySession } from "../models/Stats";
 import { useFocusedInterval } from "../hooks/useFocusedInterval";
@@ -230,6 +231,7 @@ export default function LearnScreen() {
       if (newLevel !== undefined) card.level = newLevel;
 
       queue.answer(direction);
+      recordAnswer(direction === "right");
       scheduleAchievementCheck();
       scheduleReminderRefresh();
       scheduleGoalCheck();
@@ -250,6 +252,7 @@ export default function LearnScreen() {
       }
 
       queue.undo(last.card);
+      undoAnswer();
       setHistory((h) => h.slice(0, -1));
       refreshSession();
       show(true);

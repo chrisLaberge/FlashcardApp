@@ -170,7 +170,7 @@ export default function PetScreen() {
                 {/* cases */}
                 <Text style={s.heading}>Accessory case</Text>
                 <View style={s.card}>
-                    <Text style={s.cardText}>Free spin every 10 levels</Text>
+                    <Text style={s.cardText}>Free spin every level</Text>
                     <View style={s.row}>
                         <Pressable style={[s.button, state.freeCasesLeft === 0 && s.buttonOff]} disabled={state.freeCasesLeft === 0} onPress={() => openCase(true)} accessibilityRole="button">
                             <Text style={s.buttonText}>Free spin ({state.freeCasesLeft})</Text>

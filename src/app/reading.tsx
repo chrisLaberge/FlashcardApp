@@ -36,7 +36,9 @@ export default function ReadingScreen() {
     const refreshCoverage = useCallback(() => {
         void getBookSummary(Number(id)).then((b) => setCoverage(b && b.totalTokens ? coveragePercent(b.knownTokens, b.totalTokens - b.ignoredTokens) : null)).catch(() => undefined);
     }, [id]);
-    useEffect(() => { refreshCoverage(); }, [refreshCoverage]);
+    // A PDF shows its percentage once the reader has brought the known words up to date, so it does not jump.
+    const isPdf = !!text?.pdfPath;
+    useEffect(() => { if (text !== undefined && !isPdf) refreshCoverage(); }, [refreshCoverage, text, isPdf]);
 
     const lines = useMemo(() => (text ? pdfLines(text.body) : []), [text]);
 

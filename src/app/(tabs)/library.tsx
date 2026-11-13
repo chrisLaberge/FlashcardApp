@@ -9,7 +9,10 @@ import { useImportJobs } from "../../hooks/useImportJobs";
 import { cardKey, premadeDecksFor, presentIndexes } from "../../models/PremadeDecks";
 import { coveragePercent } from "../../models/Vocabulary";
 import { drop, enqueue, fractionOf, type ImportJob } from "../../services/pdfImport";
+import { SYNC_SALT } from "../../models/ReaderWords";
+import { readerAnalyzerFor } from "../../services/morphology";
 import { addPdf, removePdfFile } from "../../services/pdfReading";
+import { syncIfCardsChanged } from "../../services/vocabulary";
 import { useTheme } from "../../theme/ThemeProvider";
 import type { Palette } from "../../theme/themes";
 
@@ -60,6 +63,26 @@ export default function LibraryScreen() {
         void refreshBooks();
         return () => undefined; // `waiting` is a dependency on purpose: it reloads the list when a PDF finishes
     }, [refreshBooks, waiting]));
+
+    // Once the screen is up, bring the known words up to date if the cards changed since last time (a card you
+    // studied or added moves the percentages). Does nothing, and costs one small query, when nothing changed.
+    useFocusEffect(useCallback(() => {
+        if (!language || tab !== "pdfs") return undefined;
+        let live = true;
+        // Waits until the screen has been drawn and has settled before doing any work.
+        const timer = setTimeout(async () => {
+            try {
+                if (live && texts.length > 0 && await syncIfCardsChanged(language, () => readerAnalyzerFor(language), SYNC_SALT)) {
+                    if (live) await loadTexts();
+                }
+            } catch {
+                // The saved numbers stay; this runs again next time.
+            }
+        }, 700);
+        return () => { live = false; clearTimeout(timer); };
+        // `texts.length` is read only to skip the work when there are no books; it should not re-run this.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [language, tab, loadTexts]));
 
     const pickPdf = async () => {
         if (busy || !language) return;

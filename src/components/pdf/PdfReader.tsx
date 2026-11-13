@@ -1,16 +1,16 @@
 import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, StyleSheet, Text, View } from "react-native";
 import type { WebViewMessageEvent } from "react-native-webview";
-import { getBookIgnored, getKnownLemmas, setLastPage, setMyTextBody, setWordKnown, setWordIgnored, type MyText } from "../../database/database";
-import { bookText, marksWords, unknownKeys } from "../../models/ReaderWords";
+import { getBookIgnored, getBookSummary, getInDeckLemmas, getKnownLemmas, setLastPage, setMyTextBody, setWordKnown, setWordIgnored, type MyText } from "../../database/database";
+import { bookText, learningKeys, marksWords, SYNC_SALT, unknownKeys } from "../../models/ReaderWords";
 import type { Analyzer } from "../../models/language/types";
 import { tokenize } from "../../models/Tokens";
 import { readerAnalyzerFor } from "../../services/morphology";
 import { openAddCard } from "../../services/openAddCard";
 import { friendlyPdfError } from "../../models/PdfErrors";
 import { sendPdf } from "../../services/pdfReading";
-import { analyzeBook, syncKnownWords } from "../../services/vocabulary";
+import { analyzeBook, syncIfCardsChanged, syncKnownWords } from "../../services/vocabulary";
 import { useTheme } from "../../theme/ThemeProvider";
 import type { Palette } from "../../theme/themes";
 import LookupSheet from "../LookupSheet";
@@ -28,6 +28,7 @@ type Incoming =
     | { type: "page"; page: number; pages: number }
     | { type: "words"; words: string[]; replace?: boolean }
     | { type: "select"; text: string; context: string }
+    | { type: "markPage"; keys: string[] }
     | { type: "text"; from: number; pages: string[] }
     | { type: "textDone" }
     | { type: "error"; message: string; code?: string };
@@ -44,6 +45,7 @@ export default function PdfReader({ book, languageName, onAnalyzed }: Props) {
     const [working, setWorking] = useState(false);
 
     const known = useRef<Set<string>>(new Set());
+    const deck = useRef<Set<string>>(new Set());
     const prep = useRef<Promise<Analyzer> | null>(null);
     const pagesText = useRef<string[]>([]);
     const needText = book.body.trim() === "";
@@ -62,11 +64,13 @@ export default function PdfReader({ book, languageName, onAnalyzed }: Props) {
         prep.current ??= (async () => {
             const analyzer = await readerAnalyzerFor(book.language);
             try {
-                await syncKnownWords(book.language, analyzer);
+                // Only does the work when the cards changed since the last time.
+                await syncIfCardsChanged(book.language, () => Promise.resolve(analyzer), SYNC_SALT);
             } catch {
                 // The words you marked yourself still work.
             }
             known.current = await getKnownLemmas(book.language);
+            deck.current = await getInDeckLemmas(book.language);
             // Names the book's own capitalisation gives away are left unmarked too.
             for (const name of await getBookIgnored(book.id).catch(() => new Set<string>())) known.current.add(name);
             return analyzer;
@@ -82,6 +86,9 @@ export default function PdfReader({ book, languageName, onAnalyzed }: Props) {
             if (saveTimer.current) clearTimeout(saveTimer.current);
         };
     }, [ready]);
+
+    // Starts loading the word dictionary right away, while the PDF itself is still opening.
+    useEffect(() => { void ready(); }, [ready]);
 
     const send = useCallback((message: object) => {
         web.current?.injectJavaScript(`window.onRN(${JSON.stringify(message)});true;`);
@@ -102,6 +109,7 @@ export default function PdfReader({ book, languageName, onAnalyzed }: Props) {
                 const fresh = await getKnownLemmas(book.language);
                 for (const name of await getBookIgnored(book.id).catch(() => new Set<string>())) fresh.add(name);
                 known.current = fresh;
+                deck.current = await getInDeckLemmas(book.language);
                 send({ t: "reclassify" });
                 onAnalyzed?.();
             } catch {
@@ -146,6 +154,53 @@ export default function PdfReader({ book, languageName, onAnalyzed }: Props) {
         }
     }, [book.id, ready, onAnalyzed]);
 
+    // Marks every highlighted word on the page as known, after asking, because it is easy to tap by accident.
+    const askMarkPage = useCallback((keys: string[]) => {
+        if (keys.length === 0) {
+            Alert.alert("Nothing to mark", "There are no highlighted words on this page.");
+            return;
+        }
+        Alert.alert(
+            "Mark this page as known?",
+            `${keys.length} highlighted word${keys.length === 1 ? "" : "s"} on this page will count as known.`,
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Mark known",
+                    onPress: () => void (async () => {
+                        const analyzer = await ready();
+                        const lemmas = new Set(keys.map((k) => analyzer.lemma(k).lemma));
+                        for (const lemma of lemmas) {
+                            known.current.add(lemma);
+                            await setWordKnown(book.language, lemma, true);
+                        }
+                        send({ t: "reclassify" });
+                        onAnalyzed?.();
+                    })(),
+                },
+            ],
+        );
+    }, [book.language, ready, send, onAnalyzed]);
+
+    // After the first words are marked: if the book was counted with older rules, count it again, then tell the
+    // header. Until then the percentage is not shown, so it does not jump while the book opens.
+    const settled = useRef(false);
+    const settle = useCallback((analyzer: Analyzer) => {
+        if (settled.current) return;
+        settled.current = true;
+        setTimeout(() => void (async () => {
+            try {
+                const saved = await getBookSummary(book.id);
+                if (saved && saved.analyzerVersion !== analyzer.version && analyzer.language === book.language) {
+                    await analyzeBook(book.id, analyzer);
+                }
+            } catch {
+                // The old counts stay.
+            }
+            if (mounted.current) onAnalyzed?.();
+        })(), 800);
+    }, [book.id, book.language, onAnalyzed]);
+
     const onMessage = useCallback(async (event: WebViewMessageEvent) => {
         let message: Incoming;
         try {
@@ -161,7 +216,7 @@ export default function PdfReader({ book, languageName, onAnalyzed }: Props) {
                 // The page is on screen; only now load the word dictionary, so opening is never held up by it.
                 if (!started.current) {
                     started.current = true;
-                    setTimeout(() => void ready(), 500);
+                    void ready();
                 }
                 if (saveTimer.current) clearTimeout(saveTimer.current);
                 const n = message.page;
@@ -170,9 +225,18 @@ export default function PdfReader({ book, languageName, onAnalyzed }: Props) {
             }
             case "words": {
                 const analyzer = await ready();
-                send({ t: "unknown", keys: unknownKeys(message.words, analyzer, known.current), replace: !!message.replace });
+                send({
+                    t: "unknown",
+                    keys: unknownKeys(message.words, analyzer, known.current),
+                    learning: learningKeys(message.words, analyzer, deck.current),
+                    replace: !!message.replace,
+                });
+                settle(analyzer);
                 break;
             }
+            case "markPage":
+                askMarkPage(message.keys);
+                break;
             case "select":
                 setLookup({ text: message.text, context: message.context });
                 break;
@@ -188,7 +252,7 @@ export default function PdfReader({ book, languageName, onAnalyzed }: Props) {
                 if (!/worker|importScripts/i.test(message.message)) setFailure(friendlyPdfError(message.code, message.message));
                 break;
         }
-    }, [book.id, open, ready, send, finishText]);
+    }, [book.id, open, ready, send, finishText, askMarkPage, settle]);
 
     // A single word can be marked known; a phrase cannot.
     const single = lookup ? (marksWords(book.language) ? tokenize(lookup.text).filter((x) => x.word).length === 1 : !/\s/.test(lookup.text.trim())) : false;
