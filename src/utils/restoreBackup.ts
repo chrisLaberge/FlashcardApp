@@ -2,6 +2,7 @@ import * as DocumentPicker from "expo-document-picker";
 import { Directory, File, FileMode, Paths } from "expo-file-system";
 import * as SQLite from "expo-sqlite";
 import { restoreFromBackup, setPdfPath, type RestoreResult } from "../database/database";
+import { applySettings } from "../services/backupSettings";
 import { BUNDLE_MAGIC, bundleJsonLength, isBundle, parseBundleHeader } from "../models/BackupBundle";
 
 const PIECE = 4 * 1024 * 1024;
@@ -44,6 +45,9 @@ export async function pickAndRestoreBackup(): Promise<RestoreOutcome | null> {
         let result: RestoreResult;
         try {
             result = await restoreFromBackup(backup);
+            // Settings (theme, daily goal, ...) travel in the backup too. They take effect the next time the app starts.
+            const settings = await backup.getAllAsync<{ key: string; value: string }>("SELECT key, value FROM app_settings").catch(() => []);
+            await applySettings(settings).catch(() => undefined);
         } finally {
             await backup.closeAsync().catch(() => undefined);
         }

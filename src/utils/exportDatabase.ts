@@ -1,6 +1,7 @@
 import { File, FileMode, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import { getPdfBooks, serializeDatabase } from "../database/database";
+import { snapshotSettings } from "../services/backupSettings";
 import { encodeBundleHeader } from "../models/BackupBundle";
 
 const PIECE = 4 * 1024 * 1024;
@@ -17,6 +18,7 @@ export async function exportDatabase(withPdfs = false): Promise<void> {
         throw new Error("Sharing is not available on this device.");
     }
 
+    await snapshotSettings().catch(() => undefined);
     const bytes = await serializeDatabase();
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
     const pdfs = withPdfs ? (await getPdfBooks()).map((b) => ({ ...b, file: new File(b.pdfPath) })).filter((b) => b.file.exists && (b.file.size ?? 0) > 0) : [];
