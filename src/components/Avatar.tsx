@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { StyleSheet, View } from "react-native";
-import { AVATAR_ICONS, avatarFor, nameHash } from "../constants/avatars";
+import { Image, StyleSheet, View } from "react-native";
+import { AVATAR_ICONS, avatarFor, nameHash, PHOTO_PREFIX } from "../constants/avatars";
 import { useTheme } from "../theme/ThemeProvider";
 
 /** A round profile picture: the chosen animal on a soft colour taken from the theme. */
@@ -8,6 +8,9 @@ export default function Avatar({ avatar, name, size = 40 }: { avatar?: string | 
     const t = useTheme();
     const tints = [t.green, t.blue, t.yellow, t.orange, t.aqua, t.red];
     const tint = tints[nameHash(name) % tints.length];
+    if (avatar && avatar.startsWith(PHOTO_PREFIX)) {
+        return <Image source={{ uri: avatar.slice(PHOTO_PREFIX.length) }} style={[s.circle, { width: size, height: size, borderRadius: size / 2, backgroundColor: `${tint}40`, borderColor: tint }]} accessibilityLabel="Profile photo" />;
+    }
     return (
         <View style={[s.circle, { width: size, height: size, borderRadius: size / 2, backgroundColor: `${tint}40`, borderColor: tint }]}>
             <MaterialCommunityIcons name={AVATAR_ICONS[avatarFor(avatar, name)] as never} size={size * 0.55} color={tint} />

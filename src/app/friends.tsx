@@ -8,7 +8,7 @@ import BannerView from "../components/pet/BannerView";
 import { PersonPet } from "../components/pet/PersonPet";
 import PetView from "../components/pet/PetView";
 import KeyboardInsetView from "../components/KeyboardInsetView";
-import { AVATAR_ICONS, AVATARS } from "../constants/avatars";
+import { AVATAR_ICONS, AVATARS, googlePhotoAvatar } from "../constants/avatars";
 import { useUser } from "../hooks/useUser";
 import {
     acceptRequest, deleteMyData, getFriends, getProfile, removeFriend, removeRequest, requestFriend, saveUsername, setAvatar, setShowGlobal,
@@ -23,6 +23,7 @@ export default function FriendsScreen() {
     const t = useTheme();
     const s = useMemo(() => makeS(t), [t]);
     const user = useUser();
+    const photo = googlePhotoAvatar(user?.photoURL);
     const [loading, setLoading] = useState(true);
     const [profile, setProfile] = useState<Profile | null>(null);
     const [friends, setFriends] = useState<Friends>({ friends: [], incoming: [], outgoing: [] });
@@ -161,6 +162,15 @@ export default function FriendsScreen() {
 
             <View style={s.card}>
                 <Text style={s.heading}>Profile picture</Text>
+                {photo ? (
+                    <Pressable
+                        style={[s.smallButton, s.secondary, profile.avatar === photo && s.avatarOn]}
+                        onPress={() => quick({ avatar: photo }, () => setAvatar(photo))}
+                        accessibilityRole="button"
+                    >
+                        <Text style={s.secondaryText}>Use my Google photo</Text>
+                    </Pressable>
+                ) : null}
                 <View style={s.avatarGrid}>
                     {AVATARS.map((a) => (
                         <Pressable
