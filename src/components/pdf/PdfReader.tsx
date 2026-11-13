@@ -88,7 +88,7 @@ export default function PdfReader({ book, languageName, onAnalyzed }: Props) {
     }, [ready]);
 
     // Starts loading the word dictionary right away, while the PDF itself is still opening.
-    useEffect(() => { void ready(); }, [ready]);
+    useEffect(() => { ready().catch(() => undefined); }, [ready]);
 
     const send = useCallback((message: object) => {
         web.current?.injectJavaScript(`window.onRN(${JSON.stringify(message)});true;`);

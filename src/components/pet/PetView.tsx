@@ -2,7 +2,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useEffect, useRef, useState } from "react";
 import { Animated, Easing, StyleSheet, View } from "react-native";
 import Pressable from "../Pressable";
-import Svg, { Circle, ClipPath, Defs, Ellipse, G, LinearGradient, Path, Polygon, Rect, Stop } from "react-native-svg";
+import Svg, { Circle, ClipPath, Defs, Ellipse, G, LinearGradient, Path, Polygon, RadialGradient, Rect, Stop } from "react-native-svg";
 import { isMaxed, petLevel, petStage, stageProgress } from "../../models/Pet";
 import { renderAccessory, type Anchors } from "./Accessories";
 
@@ -169,6 +169,9 @@ export default function PetView({ level, look = {}, size = 160, animated = true,
 
     const bird = (
         <G>
+            {/* one soft ring of gold light behind the golden bird */}
+            {maxed ? <Circle cx={60} cy={62} r={54} fill="url(#aura)" /> : null}
+
             {/* legs */}
             <G stroke={beak} strokeWidth={legW} strokeLinecap="round" fill="none">
                 <Path d={`M${sharp ? 49 : 52} ${shape.legTop} L${sharp ? 49 : 52} ${baby ? 108 : 101}`} />
@@ -260,6 +263,11 @@ export default function PetView({ level, look = {}, size = 160, animated = true,
                             <Stop offset="0" stopColor="#fbf8ef" />
                             <Stop offset="1" stopColor="#dcd5c3" />
                         </LinearGradient>
+                        <RadialGradient id="aura" cx="60" cy="62" r="54" gradientUnits="userSpaceOnUse">
+                            <Stop offset="0.55" stopColor="#ffd25a" stopOpacity="0" />
+                            <Stop offset="0.8" stopColor="#ffd25a" stopOpacity="0.32" />
+                            <Stop offset="1" stopColor="#ffd25a" stopOpacity="0" />
+                        </RadialGradient>
                         <ClipPath id="silhouette">
                             <Ellipse cx={60} cy={shape.cy} rx={shape.rx} ry={shape.ry} />
                             <Circle cx={60} cy={shape.headCy} r={shape.headR} />

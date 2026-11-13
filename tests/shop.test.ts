@@ -132,3 +132,11 @@ describe("streak savers", () => {
         expect(streakGemsEarned([...week(1), ...week(1)])).toBe(10);
     });
 });
+
+describe("every accessory can be drawn", () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { slotOf } = require("../src/components/pet/Accessories") as typeof import("../src/components/pet/Accessories");
+    test("each item has a drawing in the slot the shop says", () => {
+        for (const item of ACCESSORIES) expect({ id: item.id, slot: slotOf(item.id) }).toEqual({ id: item.id, slot: item.slot });
+    });
+});

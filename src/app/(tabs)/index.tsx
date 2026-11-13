@@ -6,7 +6,6 @@ import { router, useFocusEffect } from "expo-router";
 import { useCallback, useRef, useState, useMemo } from "react";
 import { Animated, StyleSheet, Text, View } from "react-native";
 import Pressable from "../../components/Pressable";
-import { getLanguage } from "../../constants/languages";
 import { getDecks, getProgressCounts } from "../../database/database";
 import { useFocusedInterval } from "../../hooks/useFocusedInterval";
 import { useTheme } from "../../theme/ThemeProvider";
