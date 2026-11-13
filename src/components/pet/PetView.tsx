@@ -137,22 +137,24 @@ export default function PetView({ level, look = {}, size = 160, animated = true,
     const rx = shape.rx;
     const ry = shape.ry;
     const baby = stage.id === "chick";
-    const toe = baby ? 10 : stage.id === "youngster" ? 17 : 29;
-    const legW = baby ? 3.2 : stage.id === "youngster" ? 4.4 : 6;
+    const toe = baby ? 10 : stage.id === "youngster" ? 15 : 22;
+    const legW = baby ? 3.2 : stage.id === "youngster" ? 4 : 5;
     const red = maxed ? "#d63a3a" : beak;
 
-    // A foot made of long toes: the grown-up's is huge and drawn last, over everything, like it is stepping at you.
-    const foot = (x: number, y: number, size: number) => (
-        <G stroke={beak} strokeWidth={legW} strokeLinecap="round" fill="none">
-            <Path d={`M${x} ${y} L${x - size} ${y + size * 0.3} M${x} ${y} L${x - size * 0.45} ${y + size * 0.52} M${x} ${y} L${x + size * 0.2} ${y + size * 0.55} M${x} ${y} L${x + size * 0.7} ${y + size * 0.25}`} />
-            <G fill={maxed ? "#7a5a10" : "#2b0d0d"} stroke="none">
-                <Circle cx={x - size} cy={y + size * 0.3} r={legW * 0.45} />
-                <Circle cx={x - size * 0.45} cy={y + size * 0.52} r={legW * 0.45} />
-                <Circle cx={x + size * 0.2} cy={y + size * 0.55} r={legW * 0.45} />
-                <Circle cx={x + size * 0.7} cy={y + size * 0.25} r={legW * 0.45} />
+    // A foot made of long toes, spread outward (s is 1 for the left foot, -1 for the right). Drawn after the body.
+    const foot = (x: number, y: number, size: number, s: number) => {
+        const toes: [number, number][] = [[-s * size, size * 0.3], [-s * size * 0.45, size * 0.52], [s * size * 0.15, size * 0.55], [s * size * 0.3, size * 0.3]];
+        return (
+            <G>
+                <G stroke={beak} strokeWidth={legW} strokeLinecap="round" fill="none">
+                    <Path d={toes.map(([dx, dy]) => `M${x} ${y} L${x + dx} ${y + dy}`).join(" ")} />
+                </G>
+                <G fill={maxed ? "#7a5a10" : "#2b0d0d"}>
+                    {toes.slice(0, 3).map(([dx, dy]) => <Circle key={`${dx}`} cx={x + dx} cy={y + dy} r={legW * 0.42} />)}
+                </G>
             </G>
-        </G>
-    );
+        );
+    };
 
     const roundEyes = eyes;
     const seriousEyes = (
@@ -167,32 +169,16 @@ export default function PetView({ level, look = {}, size = 160, animated = true,
 
     const bird = (
         <G>
-            {maxed ? (
-                <G>
-                    <Circle cx={60} cy={62} r={50} fill="#ffd25a" opacity={0.13} />
-                    {Array.from({ length: 14 }, (_, i) => {
-                        const a = (Math.PI * 2 * i) / 14;
-                        return <Path key={i} d={`M${60 + Math.cos(a) * 40} ${62 + Math.sin(a) * 40} L${60 + Math.cos(a) * 58} ${62 + Math.sin(a) * 58}`} stroke="#ffd25a" strokeWidth={3} strokeLinecap="round" opacity={0.5} />;
-                    })}
-                </G>
-            ) : null}
-
-            {/* legs: the chick has two small ones; the others stand on one leg with a big foot (drawn after the body) */}
-            {baby ? (
-                <G stroke={beak} strokeWidth={legW} strokeLinecap="round" fill="none">
-                    <Path d={`M50 ${shape.legTop} L48 108`} />
-                    <Path d={`M70 ${shape.legTop} L72 108`} />
-                </G>
-            ) : (
-                <Path d={`M${sharp ? 58 : 60} ${shape.legTop} L${sharp ? 60 : 60} 101`} stroke={beak} strokeWidth={legW} strokeLinecap="round" />
-            )}
+            {/* legs */}
+            <G stroke={beak} strokeWidth={legW} strokeLinecap="round" fill="none">
+                <Path d={`M${sharp ? 49 : 52} ${shape.legTop} L${sharp ? 49 : 52} ${baby ? 108 : 101}`} />
+                <Path d={`M${sharp ? 71 : 68} ${shape.legTop} L${sharp ? 71 : 68} ${baby ? 108 : 101}`} />
+            </G>
 
             {sharp ? (
                 <G>
                     {/* tail: sharp spikes (gold fan when golden) */}
-                    {maxed
-                        ? [-1, 0, 1].map((i) => <Path key={i} d={`M${60 + rx - 8} ${cy} L${60 + rx + 16 + i * 2} ${cy + i * 11 - 18} L${60 + rx + 2} ${cy + i * 6 - 4} Z`} fill="url(#gold)" />)
-                        : <Path d={`M${60 + rx - 8} ${cy - 2} L${60 + rx + 16} ${cy - 20} L${60 + rx + 6} ${cy - 2} L${60 + rx + 14} ${cy + 6} L${60 + rx - 6} ${cy + 8} Z`} fill={body} />}
+                    <Path d={`M${60 + rx - 8} ${cy - 2} L${60 + rx + 16} ${cy - 20} L${60 + rx + 6} ${cy - 2} L${60 + rx + 14} ${cy + 6} L${60 + rx - 6} ${cy + 8} Z`} fill={body} />
                     <Polygon points={`${60 + rx - 4},${cy + 6} ${60 + rx + 11},${cy + 1} ${60 + rx + 3},${cy + 11}`} fill="#ffffff" />
                     {/* broad shoulders narrowing to the waist */}
                     <Path d={`M${60 - rx} ${cy - ry * 0.35} Q${60 - rx * 0.85} ${cy - ry * 1.05} 60 ${cy - ry * 1.1} Q${60 + rx * 0.85} ${cy - ry * 1.05} ${60 + rx} ${cy - ry * 0.35} L${60 + rx * 0.5} ${cy + ry * 0.95} L${60 - rx * 0.5} ${cy + ry * 0.95} Z`} fill={body} />
@@ -209,7 +195,7 @@ export default function PetView({ level, look = {}, size = 160, animated = true,
                 </G>
             )}
 
-            {maxed ? [-1, 0, 1].map((i) => <Path key={`c${i}`} d={`M${60 + i * 5} ${hc - hr + 2} Q${60 + i * 9} ${hc - hr - 7} ${60 + i * 14} ${hc - hr - 11 + Math.abs(i) * 3}`} stroke="url(#gold)" strokeWidth={3.2} strokeLinecap="round" fill="none" />) : null}
+            {maxed ? <Polygon points={`${60 - 9},${hc - hr + 3} ${60 - 7},${hc - hr - 9} ${60 - 2},${hc - hr + 1} 60,${hc - hr - 13} ${60 + 2},${hc - hr + 1} ${60 + 7},${hc - hr - 9} ${60 + 9},${hc - hr + 3}`} fill="url(#gold)" /> : null}
 
             {sharp ? (
                 <Path d={`M${60 - hr} ${hc - hr * 0.1} L${60 - hr * 0.82} ${hc - hr * 0.95} L${60 + hr * 0.82} ${hc - hr * 0.95} L${60 + hr} ${hc - hr * 0.1} L${60 + hr * 0.55} ${hc + hr * 0.85} L${60 - hr * 0.55} ${hc + hr * 0.85} Z`} fill={body} strokeLinejoin="round" />
@@ -248,10 +234,15 @@ export default function PetView({ level, look = {}, size = 160, animated = true,
 
             {baby ? (
                 <G stroke={beak} strokeWidth={legW} strokeLinecap="round" fill="none">
-                    <Path d={`M48 108 L38 111 M48 108 L40 113 M48 108 L51 113 M48 108 L58 111`} />
-                    <Path d={`M72 108 L62 111 M72 108 L66 113 M72 108 L75 113 M72 108 L82 111`} />
+                    <Path d={`M52 108 L42 111 M52 108 L44 113 M52 108 L55 113`} />
+                    <Path d={`M68 108 L78 111 M68 108 L76 113 M68 108 L65 113`} />
                 </G>
-            ) : foot(sharp ? 62 : 60, 101, toe)}
+            ) : (
+                <G>
+                    {foot(sharp ? 49 : 52, 101, toe, 1)}
+                    {foot(sharp ? 71 : 68, 101, toe, -1)}
+                </G>
+            )}
         </G>
     );
 
@@ -312,8 +303,6 @@ export default function PetView({ level, look = {}, size = 160, animated = true,
                 <View pointerEvents="none" style={StyleSheet.absoluteFill}>
                     {sparkle(0.12, 0.2, 0)}
                     {sparkle(0.8, 0.15, 0.2)}
-                    {sparkle(0.78, 0.62, 0.1)}
-                    {sparkle(0.08, 0.58, 0.3)}
                 </View>
             ) : null}
         </Pressable>
