@@ -1,3 +1,4 @@
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useEffect, useRef, useState } from "react";
 import { Animated, Easing, StyleSheet, View } from "react-native";
 import Pressable from "../Pressable";
@@ -86,12 +87,13 @@ export default function PetView({ level, look = {}, size = 160, animated = true,
     const shineX = shine.interpolate({ inputRange: [0, 1], outputRange: [-60, 130] });
 
     const sparkle = (left: number, top: number, delay: number) => (
-        <Animated.Text
+        <Animated.View
             key={`${left}-${top}`}
-            style={[s.sparkle, { left: left * size, top: top * size, fontSize: size * 0.13, opacity: glint, transform: [{ scale: glint.interpolate({ inputRange: [0, 1], outputRange: [0.4 + delay, 1.1] }) }] }]}
+            pointerEvents="none"
+            style={[s.sparkle, { left: left * size, top: top * size, opacity: glint, transform: [{ scale: glint.interpolate({ inputRange: [0, 1], outputRange: [0.4 + delay, 1.1] }) }] }]}
         >
-            ✦
-        </Animated.Text>
+            <MaterialCommunityIcons name="star-four-points" size={size * 0.13} color="#ffe58a" />
+        </Animated.View>
     );
 
     const eyes = (
@@ -208,6 +210,6 @@ export default function PetView({ level, look = {}, size = 160, animated = true,
 export const growthFraction = stageProgress;
 
 const s = StyleSheet.create({
-    sparkle: { position: "absolute", color: "#ffe58a", fontWeight: "bold" },
+    sparkle: { position: "absolute" },
 });
 

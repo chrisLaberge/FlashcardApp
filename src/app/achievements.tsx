@@ -1,3 +1,4 @@
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Stack, useFocusEffect } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
@@ -47,7 +48,7 @@ export default function AchievementsScreen() {
                     >
                         <View style={s.top}>
                             <View style={[s.medal, { borderColor: color }]}>
-                                <Text style={s.icon}>{a.icon}</Text>
+                                <MaterialCommunityIcons name={a.icon} size={26} color={a.tier > 0 ? color : t.muted} />
                             </View>
                             <View style={{ flex: 1 }}>
                                 <Text style={s.title}>{a.title}</Text>

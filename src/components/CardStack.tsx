@@ -1,3 +1,4 @@
+import Mark from "./Mark";
 import { getCardImage } from "@/database/database";
 import { downloadImageLocally, imageDisplayUrl, localImageUri } from "@/services/localImages";
 import { Ionicons } from "@expo/vector-icons";
@@ -958,7 +959,7 @@ function ActiveCards({
                             </Pressable>
                         )}
                         <Pressable style={[styles.pickButton, styles.pickButtonQuiet]} onPress={() => setPicked(null)} accessibilityLabel="Cancel">
-                            <Text style={styles.pickQuietText}>✕</Text>
+                            <Mark kind="close" size={22} />
                         </Pressable>
                     </View>
                 </View>

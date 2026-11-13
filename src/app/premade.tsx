@@ -1,3 +1,4 @@
+import Mark from "../components/Mark";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Stack, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
@@ -88,7 +89,7 @@ export default function PremadeDeckScreen() {
                         const on = !here && !skipped.has(index);
                         return (
                             <Pressable style={[s.card, here && s.cardHere]} disabled={here} onPress={() => toggle(index)} accessibilityRole="checkbox" accessibilityState={{ checked: here || on, disabled: here }}>
-                                <Text style={[s.box, on && { color: t.green }]}>{here ? "✓" : on ? "☑" : "☐"}</Text>
+                                <View style={s.box}><Mark kind={here ? "check" : on ? "boxOn" : "box"} size={22} color={here || on ? t.green : t.muted} /></View>
                                 <View style={{ flex: 1 }}>
                                     <Text style={s.learning}>{item.learning}</Text>
                                     <Text style={s.meaning}>{item.meaning}</Text>
@@ -103,7 +104,7 @@ export default function PremadeDeckScreen() {
                 <View style={s.bar}>
                     <Pressable style={[s.button, (busy || chosen.length === 0) && s.off]} disabled={busy || chosen.length === 0} onPress={add} accessibilityRole="button">
                         {busy ? <ActivityIndicator color={t.bg} /> : (
-                            <Text style={s.buttonText}>{missing.length === 0 ? "All cards are in your deck ✓" : `Add ${chosen.length} card${chosen.length === 1 ? "" : "s"}`}</Text>
+                            <Text style={s.buttonText}>{missing.length === 0 ? "All cards are in your deck" : `Add ${chosen.length} card${chosen.length === 1 ? "" : "s"}`}</Text>
                         )}
                     </Pressable>
                 </View>
@@ -118,7 +119,7 @@ const makeS = (t: Palette) => StyleSheet.create({
     status: { color: t.text, fontSize: 15, fontWeight: "600", marginBottom: 6 },
     card: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: t.surface, borderRadius: 12, padding: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: t.surfaceHigh },
     cardHere: { opacity: 0.5 },
-    box: { color: t.muted, fontSize: 24 },
+    box: { width: 28, alignItems: "center" },
     learning: { color: t.text, fontSize: 18, fontWeight: "600" },
     meaning: { color: t.muted, fontSize: 13, marginTop: 2 },
     badge: { color: t.green, fontSize: 12, fontWeight: "600" },

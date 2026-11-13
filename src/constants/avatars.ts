@@ -12,6 +12,13 @@ export function nameHash(name: string): number {
 }
 
 /** The picture to show: the chosen one, or a stand-in picked from the name. */
-export function avatarFor(avatar: string | null | undefined, name: string): string {
-    return avatar && (AVATARS as readonly string[]).includes(avatar) ? avatar : AVATARS[nameHash(name) % AVATARS.length];
+export function avatarFor(avatar: string | null | undefined, name: string): (typeof AVATARS)[number] {
+    return avatar && (AVATARS as readonly string[]).includes(avatar) ? (avatar as (typeof AVATARS)[number]) : AVATARS[nameHash(name) % AVATARS.length];
 }
+
+/** What each picture looks like on screen. The saved value stays the one the server knows; only the drawing is an icon. */
+export const AVATAR_ICONS: Record<(typeof AVATARS)[number], string> = {
+    "🦊": "cat", "🐼": "panda", "🐯": "paw", "🦁": "horse", "🐸": "snail", "🐵": "rodent", "🐙": "jellyfish", "🦉": "owl",
+    "🐧": "penguin", "🦄": "unicorn", "🐢": "turtle", "🐳": "fish", "🦋": "butterfly", "🐝": "bee", "🦖": "snake", "🐺": "dog",
+    "🐨": "koala", "🐰": "rabbit", "🦈": "shark", "🦜": "bird", "🐲": "bat", "🦅": "duck", "🐬": "dolphin", "🦔": "pig",
+};

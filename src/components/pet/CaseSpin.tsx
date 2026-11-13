@@ -1,3 +1,4 @@
+import AccessoryIcon from "./AccessoryIcon";
 import { useEffect, useMemo, useState } from "react";
 import { Animated, Easing, Modal, StyleSheet, Text, View } from "react-native";
 import Pressable from "../Pressable";
@@ -54,7 +55,7 @@ export default function CaseSpin({ prize, duplicate, refund, onClose }: Props) {
                     <Animated.View style={[s.strip, { transform: [{ translateX: Animated.multiply(scroll, -1) }] }]}>
                         {strip.map((item, i) => (
                             <View key={i} style={[s.tile, { borderColor: RARITY_COLOR[item.rarity] }]}>
-                                <Text style={s.emoji}>{item.emoji}</Text>
+                                <AccessoryIcon id={item.id} size={46} />
                                 <Text style={s.tileName} numberOfLines={2}>{item.name}</Text>
                                 <View style={[s.rarityBar, { backgroundColor: RARITY_COLOR[item.rarity] }]} />
                             </View>
@@ -66,7 +67,8 @@ export default function CaseSpin({ prize, duplicate, refund, onClose }: Props) {
                 {done ? (
                     <View style={s.result}>
                         <Text style={[s.rarity, { color: RARITY_COLOR[prize.rarity] }]}>{prize.rarity.toUpperCase()}</Text>
-                        <Text style={s.prizeName}>{prize.emoji} {prize.name}</Text>
+                        <View style={s.prizeIcon}><AccessoryIcon id={prize.id} size={72} /></View>
+                        <Text style={s.prizeName}>{prize.name}</Text>
                         {duplicate ? <Text style={s.note}>Duplicate: {refund} gems back.</Text> : <Text style={s.note}>Added to your wardrobe.</Text>}
                         <Pressable style={s.button} onPress={onClose} accessibilityRole="button">
                             <Text style={s.buttonText}>Done</Text>
@@ -84,7 +86,7 @@ const makeS = (t: Palette) => StyleSheet.create({
     window: { height: TILE + 24, overflow: "hidden", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.06)" },
     strip: { flexDirection: "row", gap: GAP, paddingHorizontal: 0 },
     tile: { width: TILE, height: TILE + 8, borderRadius: 12, borderWidth: 2, backgroundColor: "#1b1d27", alignItems: "center", justifyContent: "center", padding: 6, overflow: "hidden" },
-    emoji: { fontSize: 34 },
+    prizeIcon: { alignItems: "center", marginBottom: 4 },
     tileName: { color: "#d8dbe6", fontSize: 11, textAlign: "center", marginTop: 2 },
     rarityBar: { position: "absolute", bottom: 0, left: 0, right: 0, height: 4 },
     marker: { position: "absolute", top: 0, bottom: 0, left: "50%", width: 3, marginLeft: -1.5, backgroundColor: "#ffffff" },

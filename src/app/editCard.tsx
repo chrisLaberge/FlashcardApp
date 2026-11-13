@@ -1,3 +1,4 @@
+import Mark from "../components/Mark";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import PixabayCredit from "../components/PixabayCredit";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -114,7 +115,7 @@ function ChoiceCard({
                     {label}
                 </Text>
                 {selected && (
-                    <Text style={[styles.check, { color: accent }]}>✓</Text>
+                    <Mark kind="check" size={18} color={accent} />
                 )}
             </View>
             <Text style={styles.choiceWord}>{word}</Text>
@@ -153,11 +154,9 @@ export default function EditCardScreen() {
     const [searchingImages, setSearchingImages] = useState(false);
 
     const [learningLanguageCode, setLearningLanguageCode] = useState("en");
-    const [learningLanguageFlag, setLearningLanguageFlag] = useState("🌐");
 
     // TODO: Replace these when localized language becomes selectable
     const localizedLanguageCode = "en";
-    const localizedLanguageFlag = "🇬🇧";
 
     const [translating, setTranslating] =
         useState<TranslationDirection>(null);
@@ -210,7 +209,6 @@ export default function EditCardScreen() {
                 if (deck) {
                     const language = getLanguage(deck.language);
                     setLearningLanguageCode(language?.code ?? "en");
-                    setLearningLanguageFlag(language?.flag ?? "🌐");
                 }
             }
         };
@@ -620,7 +618,7 @@ export default function EditCardScreen() {
                     />
 
                     {renderWatermark(
-                        `${learningLanguageFlag} ${learningLanguageCode.toUpperCase()}`
+                        `${learningLanguageCode.toUpperCase()}`
                     )}
                     {renderTranslateButton("learningToLocalized")}
                 </View>
@@ -636,7 +634,7 @@ export default function EditCardScreen() {
                     />
 
                     {renderWatermark(
-                        `${localizedLanguageFlag} ${localizedLanguageCode.toUpperCase()}`
+                        `${localizedLanguageCode.toUpperCase()}`
                     )}
                     {renderTranslateButton("localizedToLearning")}
                 </View>

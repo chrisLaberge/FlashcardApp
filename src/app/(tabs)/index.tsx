@@ -1,3 +1,4 @@
+import LangBadge from "../../components/LangBadge";
 import DailyGoalCard from "@/components/DailyGoalCard";
 import NavigationButton from "@/components/NavigationButton";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -21,7 +22,7 @@ export default function HomeScreen() {
 
     const [selectedDeckId, setSelectedDeckId] = useState<string | null>(null);
     const [selectedDeckName, setSelectedDeckName] = useState("Select a deck");
-    const [selectedDeckFlag, setSelectedDeckFlag] = useState("🌐");
+    const [selectedDeckCode, setSelectedDeckCode] = useState<string | null>(null);
     const [deckSelected, setDeckSelected] = useState(false);
 
     // The selected deck lives in storage (written by the decks screen), never in a route param:
@@ -54,7 +55,7 @@ export default function HomeScreen() {
                     void loadCounts(undefined);
                     setSelectedDeckId(null);
                     setSelectedDeckName("Select a deck");
-                    setSelectedDeckFlag("🌐");
+                    setSelectedDeckCode(null);
                     setDeckSelected(false);
                 };
 
@@ -68,7 +69,7 @@ export default function HomeScreen() {
                 void loadCounts(String(deck.id));
                 setSelectedDeckId(String(deck.id));
                 setSelectedDeckName(deck.name);
-                setSelectedDeckFlag(getLanguage(deck.language)?.flag ?? "🌐");
+                setSelectedDeckCode(deck.language);
                 setDeckSelected(true);
             };
 
@@ -139,7 +140,7 @@ export default function HomeScreen() {
                     ]}
                     onPress={() => router.push("/decks")}
                 >
-                    <Text style={styles.flag}>{selectedDeckFlag}</Text>
+                    <LangBadge code={selectedDeckCode} size={22} />
                     <Text style={styles.deckName} numberOfLines={1}>
                         {selectedDeckName}
                     </Text>

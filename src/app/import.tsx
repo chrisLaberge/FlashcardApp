@@ -1,3 +1,4 @@
+import Mark from "../components/Mark";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as DocumentPicker from "expo-document-picker";
 import { router } from "expo-router";
@@ -147,7 +148,7 @@ function ChoiceCard({
                     {label}
                 </Text>
                 {selected && (
-                    <Text style={[styles.check, { color: accent }]}>✓</Text>
+                    <Mark kind="check" size={18} color={accent} />
                 )}
             </View>
             <Text style={styles.cardWord}>{word}</Text>

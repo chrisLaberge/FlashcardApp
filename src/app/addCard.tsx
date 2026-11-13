@@ -1,3 +1,4 @@
+import Mark from "../components/Mark";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import PixabayCredit from "../components/PixabayCredit";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -109,7 +110,7 @@ function ChoiceCard({
                     {label}
                 </Text>
                 {selected && (
-                    <Text style={[styles.check, { color: accent }]}>✓</Text>
+                    <Mark kind="check" size={18} color={accent} />
                 )}
             </View>
             <Text style={styles.choiceWord}>{word}</Text>
@@ -128,11 +129,9 @@ export default function AddCardScreen() {
     const { deckId, text: presetText, meaning: presetMeaning, example: presetExample } = useLocalSearchParams<{ deckId?: string; text?: string; meaning?: string; example?: string }>();
 
     const [learningLanguageCode, setLearningLanguageCode] = useState("en");
-    const [learningLanguageFlag, setLearningLanguageFlag] = useState("🌐");
 
     // TODO: Replace when localized language becomes selectable
     const localizedLanguageCode = "en";
-    const localizedLanguageFlag = "🇬🇧";
 
     // A word tapped while reviewing arrives here already filled in (the meaning and sentence can be edited).
     const [learningText, setLearningText] = useState(typeof presetText === "string" ? presetText : "");
@@ -195,7 +194,6 @@ export default function AddCardScreen() {
 
                 if (!lastDeckId) {
                     setLearningLanguageCode("en");
-                    setLearningLanguageFlag("🌐");
                     return;
                 }
 
@@ -207,14 +205,12 @@ export default function AddCardScreen() {
 
                 if (!deck) {
                     setLearningLanguageCode("en");
-                    setLearningLanguageFlag("🌐");
                     return;
                 }
 
                 const language = getLanguage(deck.language);
 
                 setLearningLanguageCode(language?.code ?? "en");
-                setLearningLanguageFlag(language?.flag ?? "🌐");
             };
 
             loadDeck();
@@ -702,7 +698,7 @@ export default function AddCardScreen() {
                         />
 
                         {renderWatermark(
-                            `${learningLanguageFlag} ${learningLanguageCode.toUpperCase()} `
+                            `${learningLanguageCode.toUpperCase()} `
                         )}
 
                         {renderTranslateButton("learningToLocalized")}
@@ -721,7 +717,7 @@ export default function AddCardScreen() {
                         />
 
                         {renderWatermark(
-                            `${localizedLanguageFlag} ${localizedLanguageCode.toUpperCase()} `
+                            `${localizedLanguageCode.toUpperCase()} `
                         )}
 
                         {renderTranslateButton("localizedToLearning")}
