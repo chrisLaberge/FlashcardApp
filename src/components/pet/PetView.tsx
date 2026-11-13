@@ -129,15 +129,42 @@ export default function PetView({ level, look = {}, size = 160, animated = true,
         </G>
     );
 
-    // The grown-up bird: a pukeko with a big red shield and beak, a blue chest and long legs with huge feet.
-    const bigger = stage.id === "adult" || stage.id === "golden";
+    // The bird by age. Young ones are round and soft; the grown-up pukeko is sharp and serious, with one giant foot.
+    const sharp = stage.id === "adult" || stage.id === "golden";
     const hc = shape.headCy;
     const hr = shape.headR;
-    const sh = stage.id === "chick" ? 0 : stage.id === "youngster" ? 0.55 : 1;
-    const bk = stage.id === "chick" ? 0.55 : stage.id === "youngster" ? 0.8 : 1;
-    const toe = stage.id === "chick" ? 8 : stage.id === "youngster" ? 11 : 14;
-    const legW = stage.id === "chick" ? 3 : stage.id === "youngster" ? 3.8 : 4.6;
-    const foot = (x: number, y: number) => `M${x} ${y} L${x + toe} ${y + 3} M${x} ${y} L${x + 2} ${y + 4.5} M${x} ${y} L${x - toe * 0.8} ${y + 3.5}`;
+    const cy = shape.cy;
+    const rx = shape.rx;
+    const ry = shape.ry;
+    const baby = stage.id === "chick";
+    const toe = baby ? 10 : stage.id === "youngster" ? 17 : 29;
+    const legW = baby ? 3.2 : stage.id === "youngster" ? 4.4 : 6;
+    const red = maxed ? "#d63a3a" : beak;
+
+    // A foot made of long toes: the grown-up's is huge and drawn last, over everything, like it is stepping at you.
+    const foot = (x: number, y: number, size: number) => (
+        <G stroke={beak} strokeWidth={legW} strokeLinecap="round" fill="none">
+            <Path d={`M${x} ${y} L${x - size} ${y + size * 0.3} M${x} ${y} L${x - size * 0.45} ${y + size * 0.52} M${x} ${y} L${x + size * 0.2} ${y + size * 0.55} M${x} ${y} L${x + size * 0.7} ${y + size * 0.25}`} />
+            <G fill={maxed ? "#7a5a10" : "#2b0d0d"} stroke="none">
+                <Circle cx={x - size} cy={y + size * 0.3} r={legW * 0.45} />
+                <Circle cx={x - size * 0.45} cy={y + size * 0.52} r={legW * 0.45} />
+                <Circle cx={x + size * 0.2} cy={y + size * 0.55} r={legW * 0.45} />
+                <Circle cx={x + size * 0.7} cy={y + size * 0.25} r={legW * 0.45} />
+            </G>
+        </G>
+    );
+
+    const roundEyes = eyes;
+    const seriousEyes = (
+        <G>
+            <Path d={`M45 ${hc - 1.5} L56 ${hc - 1.5} L56 ${hc + 2.4} L47 ${hc + 2.4} Z`} fill="#ffffff" />
+            <Path d={`M75 ${hc - 1.5} L64 ${hc - 1.5} L64 ${hc + 2.4} L73 ${hc + 2.4} Z`} fill="#ffffff" />
+            <Circle cx={53.6} cy={hc + 0.4} r={1.9} fill="#0c0b0d" />
+            <Circle cx={66.4} cy={hc + 0.4} r={1.9} fill="#0c0b0d" />
+            <Path d={`M43 ${hc - 6} L57.5 ${hc - 1.6} M77 ${hc - 6} L62.5 ${hc - 1.6}`} stroke="#0c0b0d" strokeWidth={2.6} strokeLinecap="round" />
+        </G>
+    );
+
     const bird = (
         <G>
             {maxed ? (
@@ -149,43 +176,82 @@ export default function PetView({ level, look = {}, size = 160, animated = true,
                     })}
                 </G>
             ) : null}
-            {/* legs: one planted, one lifted mid-stomp (both planted for the chick) */}
-            <G stroke={beak} strokeWidth={legW} strokeLinecap="round" strokeLinejoin="round" fill="none">
-                <Path d={`M70 ${shape.legTop} L72 108 ${foot(72, 108)}`} />
-                {stage.id === "chick"
-                    ? <Path d={`M50 ${shape.legTop} L48 108 ${foot(48, 108)}`} />
-                    : <Path d={`M50 ${shape.legTop} L45 ${shape.legTop + 9} L36 ${shape.legTop + 12} ${foot(36, shape.legTop + 12)}`} />}
-            </G>
-            {bigger ? (
+
+            {/* legs: the chick has two small ones; the others stand on one leg with a big foot (drawn after the body) */}
+            {baby ? (
+                <G stroke={beak} strokeWidth={legW} strokeLinecap="round" fill="none">
+                    <Path d={`M50 ${shape.legTop} L48 108`} />
+                    <Path d={`M70 ${shape.legTop} L72 108`} />
+                </G>
+            ) : (
+                <Path d={`M${sharp ? 58 : 60} ${shape.legTop} L${sharp ? 60 : 60} 101`} stroke={beak} strokeWidth={legW} strokeLinecap="round" />
+            )}
+
+            {sharp ? (
                 <G>
+                    {/* tail: sharp spikes (gold fan when golden) */}
                     {maxed
-                        ? [-1, 0, 1].map((i) => <Path key={i} d={`M${60 + shape.rx - 6} ${shape.cy} Q${60 + shape.rx + 14 + i * 3} ${shape.cy + i * 9 - 6} ${60 + shape.rx + 12 + i * 4} ${shape.cy + i * 12 - 18}`} stroke="url(#gold)" strokeWidth={6} strokeLinecap="round" fill="none" />)
-                        : <Path d={`M${60 + shape.rx - 5} ${shape.cy - 4} Q${60 + shape.rx + 13} ${shape.cy - 10} ${60 + shape.rx + 9} ${shape.cy - 18} Q${60 + shape.rx + 12} ${shape.cy + 2} ${60 + shape.rx - 2} ${shape.cy + 6} Z`} fill={body} />}
-                    <Polygon points={`${60 + shape.rx - 2},${shape.cy + 3} ${60 + shape.rx + 9},${shape.cy - 1} ${60 + shape.rx + 3},${shape.cy + 9}`} fill="#ffffff" />
+                        ? [-1, 0, 1].map((i) => <Path key={i} d={`M${60 + rx - 8} ${cy} L${60 + rx + 16 + i * 2} ${cy + i * 11 - 18} L${60 + rx + 2} ${cy + i * 6 - 4} Z`} fill="url(#gold)" />)
+                        : <Path d={`M${60 + rx - 8} ${cy - 2} L${60 + rx + 16} ${cy - 20} L${60 + rx + 6} ${cy - 2} L${60 + rx + 14} ${cy + 6} L${60 + rx - 6} ${cy + 8} Z`} fill={body} />}
+                    <Polygon points={`${60 + rx - 4},${cy + 6} ${60 + rx + 11},${cy + 1} ${60 + rx + 3},${cy + 11}`} fill="#ffffff" />
+                    {/* broad shoulders narrowing to the waist */}
+                    <Path d={`M${60 - rx} ${cy - ry * 0.35} Q${60 - rx * 0.85} ${cy - ry * 1.05} 60 ${cy - ry * 1.1} Q${60 + rx * 0.85} ${cy - ry * 1.05} ${60 + rx} ${cy - ry * 0.35} L${60 + rx * 0.5} ${cy + ry * 0.95} L${60 - rx * 0.5} ${cy + ry * 0.95} Z`} fill={body} />
+                    <Polygon points={`${60 - rx * 0.72},${cy - ry * 0.62} ${60 + rx * 0.72},${cy - ry * 0.62} ${60 + rx * 0.28},${cy + ry * 0.7} ${60 - rx * 0.28},${cy + ry * 0.7}`} fill={chest} />
+                    {!maxed ? <Polygon points={`${60 - rx * 0.4},${cy - ry * 0.45} ${60 + rx * 0.4},${cy - ry * 0.45} 60,${cy + ry * 0.25}`} fill="#7f8aff" opacity={0.4} /> : null}
+                    <Polygon points={`${60 - rx - 3},${cy - ry * 0.5} ${60 - rx * 0.6},${cy - ry * 0.7} ${60 - rx * 0.62},${cy + ry * 0.5}`} fill={maxed ? "#c98f1c" : "#13173a"} />
+                    <Polygon points={`${60 + rx + 3},${cy - ry * 0.5} ${60 + rx * 0.6},${cy - ry * 0.7} ${60 + rx * 0.62},${cy + ry * 0.5}`} fill={maxed ? "#c98f1c" : "#13173a"} />
                 </G>
-            ) : null}
-            <Ellipse cx={60} cy={shape.cy} rx={shape.rx} ry={shape.ry} fill={body} />
-            {bigger ? <Path d={`M${60 - shape.rx * 0.1} ${shape.cy - shape.ry * 0.55} Q${60 + shape.rx * 0.75} ${shape.cy - shape.ry * 0.75} ${60 + shape.rx * 0.88} ${shape.cy + shape.ry * 0.1} Q${60 + shape.rx * 0.35} ${shape.cy + shape.ry * 0.55} ${60 - shape.rx * 0.1} ${shape.cy - shape.ry * 0.55} Z`} fill={maxed ? "#c98f1c" : "#13173a"} opacity={0.7} /> : null}
-            {stage.id !== "chick" ? <Ellipse cx={58} cy={shape.cy + shape.ry * 0.3} rx={shape.rx * 0.66} ry={shape.ry * 0.62} fill={chest} opacity={maxed ? 0.95 : 0.9} /> : null}
-            {stage.id !== "chick" && !maxed ? <Ellipse cx={55} cy={shape.cy + shape.ry * 0.15} rx={shape.rx * 0.34} ry={shape.ry * 0.3} fill="#7f8aff" opacity={0.45} /> : null}
+            ) : (
+                <G>
+                    <Ellipse cx={60} cy={cy} rx={rx} ry={ry} fill={body} />
+                    {stage.id !== "chick" ? <Ellipse cx={58} cy={cy + ry * 0.3} rx={rx * 0.66} ry={ry * 0.62} fill={chest} opacity={0.9} /> : null}
+                    {stage.id !== "chick" ? <Ellipse cx={55} cy={cy + ry * 0.15} rx={rx * 0.34} ry={ry * 0.3} fill="#7f8aff" opacity={0.45} /> : null}
+                </G>
+            )}
+
             {maxed ? [-1, 0, 1].map((i) => <Path key={`c${i}`} d={`M${60 + i * 5} ${hc - hr + 2} Q${60 + i * 9} ${hc - hr - 7} ${60 + i * 14} ${hc - hr - 11 + Math.abs(i) * 3}`} stroke="url(#gold)" strokeWidth={3.2} strokeLinecap="round" fill="none" />) : null}
-            <Circle cx={60} cy={hc} r={hr} fill={body} />
-            {stage.id === "chick" ? <Path d={`M54 ${hc - hr + 1} l-2 -5 M60 ${hc - hr} l0 -6 M66 ${hc - hr + 1} l2 -5`} stroke={body} strokeWidth={2.4} strokeLinecap="round" /> : null}
-            {sh > 0 ? (
+
+            {sharp ? (
+                <Path d={`M${60 - hr} ${hc - hr * 0.1} L${60 - hr * 0.82} ${hc - hr * 0.95} L${60 + hr * 0.82} ${hc - hr * 0.95} L${60 + hr} ${hc - hr * 0.1} L${60 + hr * 0.55} ${hc + hr * 0.85} L${60 - hr * 0.55} ${hc + hr * 0.85} Z`} fill={body} strokeLinejoin="round" />
+            ) : (
+                <Circle cx={60} cy={hc} r={hr} fill={body} />
+            )}
+            {baby ? <Path d={`M54 ${hc - hr + 1} l-2 -5 M60 ${hc - hr} l0 -6 M66 ${hc - hr + 1} l2 -5`} stroke={body} strokeWidth={2.4} strokeLinecap="round" /> : null}
+
+            {/* red shield on the forehead: a point on the grown-up, a soft bump on the young one */}
+            {sharp ? (
                 <G>
-                    <Path d={`M${60 - 6.5 * sh} ${hc - 3} Q${60 - 8.5 * sh} ${hc - hr + 1} 60 ${hc - hr - 1} Q${60 + 8.5 * sh} ${hc - hr + 1} ${60 + 6.5 * sh} ${hc - 3} Z`} fill={maxed ? "#d63a3a" : beak} />
-                    <Rect x={58.4} y={hc - 4} width={3.2} height={7} fill={maxed ? "#d63a3a" : beak} />
+                    <Polygon points={`${60 - 5},${hc - 2} ${60 - 7.5},${hc - hr + 4} 60,${hc - hr - 2} ${60 + 7.5},${hc - hr + 4} ${60 + 5},${hc - 2}`} fill={red} />
+                    <Rect x={58.2} y={hc - 4} width={3.6} height={7} fill={red} />
+                </G>
+            ) : stage.id === "youngster" ? (
+                <G>
+                    <Path d={`M${60 - 4} ${hc - 3} Q${60 - 5} ${hc - hr + 1} 60 ${hc - hr} Q${60 + 5} ${hc - hr + 1} ${60 + 4} ${hc - 3} Z`} fill={beak} />
+                    <Rect x={58.4} y={hc - 4} width={3.2} height={7} fill={beak} />
                 </G>
             ) : null}
-            {eyes}
-            <Polygon points={`${60 - 7 * bk},${hc + 2} ${60 + 7 * bk},${hc + 2} 60,${hc + 2 + 11 * bk}`} fill={beak} />
-            <Polygon points={`${60 - 2.6 * bk},${hc + 2 + 8 * bk} ${60 + 2.6 * bk},${hc + 2 + 8 * bk} 60,${hc + 2 + 11 * bk}`} fill="#ffd9a0" />
-            {bigger ? null : (
+
+            {sharp ? seriousEyes : roundEyes}
+
+            {sharp ? (
                 <G>
+                    <Polygon points={`${60 - 6},${hc + 3} ${60 + 6},${hc + 3} 60,${hc + 16}`} fill={red} />
+                    <Polygon points={`${60 - 2},${hc + 11} ${60 + 2},${hc + 11} 60,${hc + 16}`} fill="#ffd9a0" />
+                </G>
+            ) : (
+                <G>
+                    <Polygon points={`${60 - (baby ? 4 : 5.6)},${hc + 2} ${60 + (baby ? 4 : 5.6)},${hc + 2} 60,${hc + (baby ? 8 : 11)}`} fill={beak} />
                     <Circle cx={60 - hr * 0.8} cy={hc + 5} r={3} fill="#ff8fb8" opacity={0.5} />
                     <Circle cx={60 + hr * 0.8} cy={hc + 5} r={3} fill="#ff8fb8" opacity={0.5} />
                 </G>
             )}
+
+            {baby ? (
+                <G stroke={beak} strokeWidth={legW} strokeLinecap="round" fill="none">
+                    <Path d={`M48 108 L38 111 M48 108 L40 113 M48 108 L51 113 M48 108 L58 111`} />
+                    <Path d={`M72 108 L62 111 M72 108 L66 113 M72 108 L75 113 M72 108 L82 111`} />
+                </G>
+            ) : foot(sharp ? 62 : 60, 101, toe)}
         </G>
     );
 
