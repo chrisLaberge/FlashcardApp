@@ -34,3 +34,16 @@ export function parseBundleHeader(json: Uint8Array): BundleHeader | null {
         return null;
     }
 }
+
+/**
+ * A database saved while it was in WAL mode has "2" in two header bytes (offsets 18 and 19). Opened as a backup it
+ * then looks for a journal file that does not exist and fails with "unable to open database file" (error 14).
+ * The saved bytes already hold everything, so those two bytes are set to "1" (the normal mode) before opening.
+ */
+export function asRollbackJournal(bytes: Uint8Array): Uint8Array {
+    if (bytes.length < 20 || (bytes[18] !== 2 && bytes[19] !== 2)) return bytes;
+    const copy = new Uint8Array(bytes);
+    copy[18] = 1;
+    copy[19] = 1;
+    return copy;
+}

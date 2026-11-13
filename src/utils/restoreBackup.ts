@@ -5,7 +5,7 @@ import * as SQLite from "expo-sqlite";
 import { restoreFromBackup, setPdfPath, type RestoreResult } from "../database/database";
 import { fromBase64 } from "../models/Base64";
 import { applySettings } from "../services/backupSettings";
-import { BUNDLE_MAGIC, bundleJsonLength, isBundle, parseBundleHeader } from "../models/BackupBundle";
+import { asRollbackJournal, BUNDLE_MAGIC, bundleJsonLength, isBundle, parseBundleHeader } from "../models/BackupBundle";
 
 const PIECE = 4 * 1024 * 1024;
 
@@ -107,7 +107,7 @@ export async function pickAndRestoreBackup(): Promise<RestoreOutcome | null> {
         const header = String.fromCharCode(...bytes.slice(0, 15));
         if (header !== "SQLite format 3") throw new Error("This file is not a flashcard backup.");
 
-        const backup = await SQLite.deserializeDatabaseAsync(bytes);
+        const backup = await SQLite.deserializeDatabaseAsync(asRollbackJournal(bytes));
         let result: RestoreResult;
         try {
             result = await restoreFromBackup(backup);
