@@ -1,11 +1,12 @@
 import { useState, useMemo } from "react";
 import KeyboardInsetView from "@/components/KeyboardInsetView";
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, View } from "react-native";
 import Pressable from "../../components/Pressable";
 import { deleteAccount } from "../../services/account";
 import { useUser } from "../../hooks/useUser";
 import { signOut } from "../../services/auth";
 import { authErrorMessage } from "../../utils/authErrors";
+import Onboarding from "../../components/Onboarding";
 import ProgressSection from "../../components/ProgressSection";
 import DailyGoalSettings from "../../components/DailyGoalSettings";
 import ThemePicker from "../../components/ThemePicker";
@@ -18,6 +19,7 @@ export default function AccountScreen() {
     const user = useUser();
     const [busy, setBusy] = useState(false);
     const [message, setMessage] = useState("");
+    const [tour, setTour] = useState(false);
 
     const run = async (action: () => Promise<unknown>) => {
         if (busy) return;
@@ -63,6 +65,12 @@ export default function AccountScreen() {
 
                 <DailyGoalSettings />
                 <ThemePicker />
+                <Pressable onPress={() => setTour(true)} accessibilityRole="button">
+                    <Text style={s.link}>How the app works</Text>
+                </Pressable>
+                <Modal visible={tour} animationType="slide" onRequestClose={() => setTour(false)}>
+                    <Onboarding mode="replay" onDone={() => setTour(false)} />
+                </Modal>
                 <Pressable onPress={confirmDelete} disabled={busy}>
                     <Text style={s.danger}>Delete account</Text>
                 </Pressable>

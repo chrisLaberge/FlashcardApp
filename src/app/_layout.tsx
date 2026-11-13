@@ -1,7 +1,10 @@
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useEffect, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
+import Onboarding, { ONBOARDED_KEY } from "../components/Onboarding";
+import { getDecks } from "../database/database";
 import SignInScreen from "../components/SignInScreen";
 import { useUser } from "../hooks/useUser";
 import PdfImporter from "../components/pdf/PdfImporter";
@@ -19,6 +22,25 @@ function Navigator() {
   const t = useTheme();
   const { theme } = useThemeControls();
   const user = useUser();
+  const [onboarding, setOnboarding] = useState<"checking" | "show" | "done">("checking");
+  // The first time (and only for someone with no decks yet) a short tour and a first deck. Existing users never see it.
+  useEffect(() => {
+    if (!user) return;
+    let live = true;
+    (async () => {
+      try {
+        if (await AsyncStorage.getItem(ONBOARDED_KEY)) return live && setOnboarding("done");
+        if ((await getDecks()).length > 0) {
+          await AsyncStorage.setItem(ONBOARDED_KEY, "1");
+          return live && setOnboarding("done");
+        }
+        if (live) setOnboarding("show");
+      } catch {
+        if (live) setOnboarding("done");
+      }
+    })();
+    return () => { live = false; };
+  }, [user]);
   // Nothing in the app is reachable without an account. `undefined` is the moment before the saved sign-in is found.
   if (user === undefined) {
     return (
@@ -32,6 +54,17 @@ function Navigator() {
       <>
         <StatusBar style={theme.isDark ? "light" : "dark"} />
         <SignInScreen />
+      </>
+    );
+  }
+  if (onboarding === "checking") {
+    return <View style={{ flex: 1, backgroundColor: t.bg }} />;
+  }
+  if (onboarding === "show") {
+    return (
+      <>
+        <StatusBar style={theme.isDark ? "light" : "dark"} />
+        <Onboarding mode="first" onDone={() => setOnboarding("done")} />
       </>
     );
   }
