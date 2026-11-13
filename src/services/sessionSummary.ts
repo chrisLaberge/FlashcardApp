@@ -1,4 +1,5 @@
 import { getDecks, getReviewLog } from "../database/database";
+import { resetRun } from "./cheers";
 import { latestSession, SESSION_GAP_MS, type StudySession } from "../models/Stats";
 
 /** The study session in progress, from the review log; null if there is none right now. */
@@ -34,5 +35,6 @@ export function onStudyScreenLeft(listener: Listener): () => void {
 
 /** Called by the study screen when it is closed (not when another screen opens on top of it). */
 export function announceStudyScreenLeft(deckId: number | null): void {
+    resetRun(); // a run of right answers belongs to one sitting
     for (const listener of listeners) listener(deckId);
 }
