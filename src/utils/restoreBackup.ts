@@ -7,6 +7,31 @@ import { BUNDLE_MAGIC, bundleJsonLength, isBundle, parseBundleHeader } from "../
 
 const PIECE = 4 * 1024 * 1024;
 
+/** Something that hands out a file's bytes in order. */
+type Reader = { readBytes(length: number): Promise<Uint8Array>; close(): void };
+
+/**
+ * Opens the picked file piece by piece. Some phones will not give a handle on a picked file (the "read permission
+ * missing" error); then the whole file is read at once instead, which works everywhere, at the cost of memory.
+ */
+async function openReader(file: File): Promise<Reader> {
+    try {
+        const handle = file.open(FileMode.ReadOnly);
+        return { readBytes: async (n) => handle.readBytes(n), close: () => handle.close() };
+    } catch {
+        const all = new Uint8Array(await file.arrayBuffer());
+        let at = 0;
+        return {
+            readBytes: async (n) => {
+                const piece = all.slice(at, at + n);
+                at += piece.length;
+                return piece;
+            },
+            close: () => undefined,
+        };
+    }
+}
+
 export type RestoreOutcome = RestoreResult & { /** PDF files that came back with the backup. */ pdfs: number };
 
 /**
@@ -23,7 +48,7 @@ export async function pickAndRestoreBackup(): Promise<RestoreOutcome | null> {
     if (picked.canceled) return null;
 
     const source = new File(picked.assets[0].uri);
-    const input = source.open(FileMode.ReadOnly);
+    const input = await openReader(source);
     try {
         const start = await input.readBytes(BUNDLE_MAGIC.length + 4);
         let bytes: Uint8Array;
@@ -34,8 +59,8 @@ export async function pickAndRestoreBackup(): Promise<RestoreOutcome | null> {
             bytes = await input.readBytes(header.db);
             pdfs = header.pdfs;
         } else {
-            input.offset = 0;
-            bytes = await input.readBytes(source.size);
+            // A plain backup (the usual kind): read it the way it always was.
+            bytes = new Uint8Array(await source.arrayBuffer());
         }
         // SQLite files start with this text. Checked first so a wrong file gives a clear message.
         const header = String.fromCharCode(...bytes.slice(0, 15));
@@ -58,7 +83,7 @@ export async function pickAndRestoreBackup(): Promise<RestoreOutcome | null> {
 }
 
 /** Writes the PDFs that follow the database in a bundle back to the phone and points their books at them. A failure leaves that book to be added again. */
-async function restorePdfs(input: ReturnType<File["open"]>, pdfs: { id: number; size: number }[]): Promise<number> {
+async function restorePdfs(input: Reader, pdfs: { id: number; size: number }[]): Promise<number> {
     if (pdfs.length === 0) return 0;
     const folder = new Directory(Paths.document, "pdfs");
     if (!folder.exists) folder.create({ intermediates: true });
