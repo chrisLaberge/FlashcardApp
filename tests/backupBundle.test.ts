@@ -1,4 +1,4 @@
-import { bundleJsonLength, encodeBundleHeader, isBundle, parseBundleHeader } from "../src/models/BackupBundle";
+import { asRollbackJournal, bundleJsonLength, encodeBundleHeader, isBundle, parseBundleHeader } from "../src/models/BackupBundle";
 
 describe("backup bundle header", () => {
     it("round-trips", () => {
@@ -15,8 +15,6 @@ describe("backup bundle header", () => {
         expect(parseBundleHeader(new TextEncoder().encode("nope"))).toBeNull();
     });
 });
-
-import { asRollbackJournal } from "../src/models/BackupBundle";
 
 describe("asRollbackJournal", () => {
     it("turns a WAL-mode header into the normal one without touching the rest", () => {
