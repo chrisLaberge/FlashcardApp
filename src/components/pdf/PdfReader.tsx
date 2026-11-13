@@ -43,6 +43,8 @@ export default function PdfReader({ book, languageName, onAnalyzed }: Props) {
     const [lookup, setLookup] = useState<{ text: string; context: string } | null>(null);
     const [noText, setNoText] = useState(false);
     const [working, setWorking] = useState(false);
+    // What the reader is waiting on: the first page, then the highlights. Shown as a small badge so the pause is not a mystery.
+    const [stage, setStage] = useState<"opening" | "marking" | "done">("opening");
 
     const known = useRef<Set<string>>(new Set());
     const deck = useRef<Set<string>>(new Set());
@@ -89,6 +91,13 @@ export default function PdfReader({ book, languageName, onAnalyzed }: Props) {
 
     // Starts loading the word dictionary right away, while the PDF itself is still opening.
     useEffect(() => { ready().catch(() => undefined); }, [ready]);
+
+    // Never leave the badge up for good (a page with no text sends no words).
+    useEffect(() => {
+        if (stage === "done") return;
+        const timer = setTimeout(() => setStage("done"), 25000);
+        return () => clearTimeout(timer);
+    }, [stage]);
 
     const send = useCallback((message: object) => {
         web.current?.injectJavaScript(`window.onRN(${JSON.stringify(message)});true;`);
@@ -216,6 +225,7 @@ export default function PdfReader({ book, languageName, onAnalyzed }: Props) {
                 // The page is on screen; only now load the word dictionary, so opening is never held up by it.
                 if (!started.current) {
                     started.current = true;
+                    setStage((now) => (now === "opening" ? "marking" : now));
                     void ready();
                 }
                 if (saveTimer.current) clearTimeout(saveTimer.current);
@@ -231,6 +241,7 @@ export default function PdfReader({ book, languageName, onAnalyzed }: Props) {
                     learning: learningKeys(message.words, analyzer, deck.current),
                     replace: !!message.replace,
                 });
+                setStage("done");
                 settle(analyzer);
                 break;
             }
@@ -302,6 +313,12 @@ export default function PdfReader({ book, languageName, onAnalyzed }: Props) {
                 onRenderProcessGone={() => setFailure("The PDF reader stopped. Go back and open it again.")}
                 onContentProcessDidTerminate={() => setFailure("The PDF reader stopped. Go back and open it again.")}
             />
+            {!working && !noText && stage !== "done" ? (
+                <View style={s.badge} pointerEvents="none">
+                    <ActivityIndicator size="small" color={t.blue} />
+                    <Text style={s.badgeText}>{stage === "opening" ? "Opening…" : "Finding words you do not know…"}</Text>
+                </View>
+            ) : null}
             {working ? <View style={s.badge} pointerEvents="none"><ActivityIndicator size="small" color={t.blue} /><Text style={s.badgeText}>Counting words…</Text></View> : null}
             {noText ? <View style={s.badge} pointerEvents="none"><Text style={s.badgeText}>No text found (scanned PDF)</Text></View> : null}
 
