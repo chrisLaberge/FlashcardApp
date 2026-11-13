@@ -1,18 +1,18 @@
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState, useMemo } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
-import Pressable from "../../components/Pressable";
-import ActivityCalendar from "../../components/ActivityCalendar";
-import { getCardsAdded, getReviewLog, type CardsAdded } from "../../database/database";
-import { achievements, TIERS, tierSummary, type Achievement } from "../../models/Achievements";
-import { getBonusXp } from "../../services/achievementUnlocks";
-import { loadSaverDays } from "../../services/shop";
-import { countByDay } from "../../models/Calendar";
-import { streakWithFreezes } from "../../models/StreakFreeze";
-import { levelProgress, totalXp } from "../../models/Progression";
-import { dailyStats, localDay, totals, type DayStats, type LoggedReview } from "../../models/Stats";
-import { useTheme } from "../../theme/ThemeProvider";
-import type { Palette } from "../../theme/themes";
+import { StyleSheet, Text, View } from "react-native";
+import Pressable from "./Pressable";
+import ActivityCalendar from "./ActivityCalendar";
+import { getCardsAdded, getReviewLog, type CardsAdded } from "../database/database";
+import { achievements, TIERS, tierSummary, type Achievement } from "../models/Achievements";
+import { getBonusXp } from "../services/achievementUnlocks";
+import { loadSaverDays } from "../services/shop";
+import { countByDay } from "../models/Calendar";
+import { streakWithFreezes } from "../models/StreakFreeze";
+import { levelProgress, totalXp } from "../models/Progression";
+import { dailyStats, localDay, totals, type DayStats, type LoggedReview } from "../models/Stats";
+import { useTheme } from "../theme/ThemeProvider";
+import type { Palette } from "../theme/themes";
 
 type Summary = {
     xp: number;
@@ -56,7 +56,8 @@ function formatTime(ms: number): string {
     return `${Math.floor(minutes / 60)} h ${minutes % 60} min`;
 }
 
-export default function StatsScreen() {
+/** Level, streak, activity and achievements: the top of the Account tab. */
+export default function ProgressSection() {
     const t = useTheme();
     const s = useMemo(() => makeS(t), [t]);
     const [summary, setSummary] = useState<Summary | null>(null);
@@ -73,13 +74,13 @@ export default function StatsScreen() {
         }, []),
     );
 
-    if (!summary) return <View style={s.container} />;
+    if (!summary) return <View style={s.empty} />;
 
     const level = levelProgress(summary.xp);
     const tiers = tierSummary(summary.achievements);
 
     return (
-        <ScrollView style={s.container} contentContainerStyle={s.content}>
+        <View style={s.content}>
             <View style={s.card}>
                 <Text style={s.levelLabel}>Level {level.level}</Text>
                 <View style={s.track}>
@@ -121,7 +122,7 @@ export default function StatsScreen() {
                     <Text style={s.linkText}>Friends</Text>
                 </Pressable>
             </View>
-        </ScrollView>
+        </View>
     );
 }
 
@@ -138,8 +139,8 @@ function Tile({ label, value, note }: { label: string; value: string; note: stri
 }
 
 const makeS = (t: Palette) => StyleSheet.create({
-    container: { flex: 1, backgroundColor: t.bg },
-    content: { padding: 20, paddingBottom: 60, gap: 14 },
+    empty: { height: 160 },
+    content: { gap: 14 },
     card: { backgroundColor: t.surface, borderRadius: 12, padding: 16, gap: 10, borderWidth: StyleSheet.hairlineWidth, borderColor: t.surfaceHigh },
     levelLabel: { color: t.yellow, fontSize: 26, fontWeight: "600" },
     heading: { color: t.text, fontSize: 17, fontWeight: "600" },
