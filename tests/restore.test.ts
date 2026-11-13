@@ -289,3 +289,20 @@ describe("restoreFromBackup", () => {
         }
     });
 });
+
+describe("wipeAllData", () => {
+    test("empties every table, and the app works afterwards", async () => {
+        const db = startApp();
+        const deck = await db.addDeck("Russian", "ru");
+        await db.addCard("вода", "water", "", "voda", deck);
+        await db.setPetState("name", "Stompa");
+        expect(await db.hasLocalData()).toBe(true);
+        await db.wipeAllData();
+        expect(await db.hasLocalData()).toBe(false);
+        expect(await db.getPetState()).toEqual({});
+        expect(await db.getReviewLog()).toEqual([]);
+        const again = await db.addDeck("After", "es");
+        expect(again).toBe(1);
+        stopApp();
+    });
+});

@@ -896,6 +896,24 @@ export async function restoreFromBackup(source: RestoreSource): Promise<RestoreR
 }
 
 /** Returns a complete, consistent snapshot of the database as bytes (read-only). */
+/** True when this phone holds any decks, cards or books. */
+export async function hasLocalData(): Promise<boolean> {
+    const database = await getDatabase();
+    const row = await database.getFirstAsync<{ n: number }>("SELECT (SELECT COUNT(*) FROM decks) + (SELECT COUNT(*) FROM cards) + (SELECT COUNT(*) FROM my_texts) AS n");
+    return (row?.n ?? 0) > 0;
+}
+
+/** Empties every table (decks, cards, progress, history, pet, books, settings copy). The tables themselves stay. */
+export async function wipeAllData(): Promise<void> {
+    const database = await getDatabase();
+    const tables = (await database.getAllAsync<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")).map((r) => r.name);
+    await database.withTransactionAsync(async () => {
+        await database.execAsync("PRAGMA defer_foreign_keys = ON");
+        for (const table of tables) await database.execAsync(`DELETE FROM ${table}`);
+        await database.execAsync("DELETE FROM sqlite_sequence").catch(() => undefined);
+    });
+}
+
 /** Settings copied into the database so a backup carries them. */
 export async function saveAppSettings(entries: Record<string, string>): Promise<void> {
     const database = await getDatabase();
