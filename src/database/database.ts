@@ -7,6 +7,7 @@ import {
     serializeFsrsCard,
 } from "@/models/FsrsScheduler";
 import * as SQLite from "expo-sqlite";
+import { noteChange } from "./changes";
 import { Card } from "../models/Card";
 import { parseStoredExplanation, type Explanation } from "../models/Explanation";
 import type { AddedWord } from "../models/AddedWords";
@@ -229,7 +230,24 @@ async function openAndPrepareDatabase(): Promise<SQLite.SQLiteDatabase> {
         await db.closeAsync().catch(() => undefined);
         throw error;
     }
-    return db;
+    return trackWrites(db);
+}
+
+/** The same database, but every write tells `changes.ts`. Reads pass straight through. */
+function trackWrites(db: SQLite.SQLiteDatabase): SQLite.SQLiteDatabase {
+    return new Proxy(db, {
+        get(target, property) {
+            const value = Reflect.get(target, property, target);
+            if (typeof value !== "function") return value;
+            if (property === "runAsync" || property === "execAsync") {
+                return (...args: unknown[]) => {
+                    noteChange();
+                    return (value as (...a: unknown[]) => unknown).apply(target, args);
+                };
+            }
+            return value.bind(target);
+        },
+    });
 }
 
 type CardRow = {
@@ -813,13 +831,13 @@ async function columnNames(db: RestoreSource, table: string): Promise<string[]> 
  * Backups from older versions are accepted: columns they lack (study level, review log, ...)
  * are filled in with sensible values. All or nothing: if anything fails, nothing is restored.
  */
-export async function restoreFromBackup(source: RestoreSource): Promise<RestoreResult> {
+export async function restoreFromBackup(source: RestoreSource, options: { replace?: boolean } = {}): Promise<RestoreResult> {
     const database = await getDatabase();
 
     const existing = await database.getFirstAsync<{ n: number }>(
         "SELECT (SELECT COUNT(*) FROM decks) + (SELECT COUNT(*) FROM cards) AS n",
     );
-    if ((existing?.n ?? 0) > 0) {
+    if (!options.replace && (existing?.n ?? 0) > 0) {
         throw new RestoreError(
             "This app already has decks or cards. A backup can only be restored into an empty app, so nothing here is overwritten.",
         );
@@ -840,6 +858,11 @@ export async function restoreFromBackup(source: RestoreSource): Promise<RestoreR
     await database.withTransactionAsync(async () => {
         // Rows are copied table by table; references are checked once everything is in.
         await database.execAsync("PRAGMA defer_foreign_keys = ON");
+        // Loading the saved copy of an account: what is on the phone is replaced, all of it, inside this one transaction.
+        if (options.replace) {
+            const all = await database.getAllAsync<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'");
+            for (const { name } of all) await database.execAsync(`DELETE FROM ${name}`);
+        }
 
         // Every table the backup and this app share is copied, so nothing can be left behind (new tables included).
         const copyTables = (await database.getAllAsync<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'"))
