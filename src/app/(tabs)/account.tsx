@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
+import { getSyncState, resolveConflict, subscribeSync, syncNow, type SyncState } from "../../services/cloudSync";
 import KeyboardInsetView from "@/components/KeyboardInsetView";
 import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, View } from "react-native";
 import Pressable from "../../components/Pressable";
@@ -21,6 +22,26 @@ export default function AccountScreen() {
     const [busy, setBusy] = useState(false);
     const [message, setMessage] = useState("");
     const [tour, setTour] = useState(false);
+    const [sync, setSync] = useState<SyncState>(getSyncState());
+    useEffect(() => subscribeSync(setSync), []);
+
+    const syncText =
+        sync.status === "syncing" ? "Saving online…"
+        : sync.status === "error" ? `Not saved online: ${sync.message ?? "try again"}`
+        : sync.status === "conflict" ? "This phone and your account both have changes."
+        : sync.lastSynced ? `Saved online ${new Date(sync.lastSynced).toLocaleString()}`
+        : "Not saved online yet.";
+
+    const chooseCopy = () =>
+        Alert.alert(
+            "Which copy do you want to keep?",
+            `Your account has a copy saved ${sync.cloud?.updatedAt ? new Date(sync.cloud.updatedAt).toLocaleString() : "earlier"}, and this phone has different decks or progress. The one you do not keep is replaced.`,
+            [
+                { text: "Keep this phone's", onPress: () => void resolveConflict("phone") },
+                { text: "Keep the online copy", style: "destructive", onPress: () => void resolveConflict("cloud") },
+                { text: "Decide later", style: "cancel" },
+            ],
+        );
 
     const run = async (action: () => Promise<unknown>) => {
         if (busy) return;
@@ -57,7 +78,17 @@ export default function AccountScreen() {
                 <Text style={s.section}>Account</Text>
                 <View style={s.card}>
                     <Text style={s.email}>{user?.email ?? user?.displayName ?? "Your account"}</Text>
-                    <Text style={s.hint}>Your decks and progress stay on this phone.</Text>
+                    <Text style={s.hint}>Your decks and progress are saved to your account, so they follow you to other phones. PDF files stay on the phone they were added on.</Text>
+                    <Text style={s.hint}>{syncText}</Text>
+                    {sync.status === "conflict" ? (
+                        <Pressable style={({ pressed }) => [s.button, s.primary, pressed && s.pressed]} onPress={chooseCopy}>
+                            <Text style={s.primaryText}>Choose which copy to keep</Text>
+                        </Pressable>
+                    ) : (
+                        <Pressable style={({ pressed }) => [s.button, s.secondary, pressed && s.pressed]} onPress={() => void syncNow()} disabled={sync.status === "syncing"}>
+                            <Text style={s.secondaryText}>Save online now</Text>
+                        </Pressable>
+                    )}
                     <Pressable style={({ pressed }) => [s.button, s.secondary, pressed && s.pressed]} onPress={() => run(signOut)} disabled={busy}>
                         <Text style={s.secondaryText}>Sign out</Text>
                     </Pressable>
