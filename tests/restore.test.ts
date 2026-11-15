@@ -289,3 +289,47 @@ describe("restoreFromBackup", () => {
         }
     });
 });
+
+describe("wipeAllData", () => {
+    test("empties every table, and the app works afterwards", async () => {
+        const db = startApp();
+        const deck = await db.addDeck("Russian", "ru");
+        await db.addCard("вода", "water", "", "voda", deck);
+        await db.setPetState("name", "Stompa");
+        expect(await db.hasLocalData()).toBe(true);
+        await db.wipeAllData();
+        expect(await db.hasLocalData()).toBe(false);
+        expect(await db.getPetState()).toEqual({});
+        expect(await db.getReviewLog()).toEqual([]);
+        const again = await db.addDeck("After", "es");
+        expect(again).toBe(1);
+        stopApp();
+    });
+});
+
+describe("restoring into an app that already made a few things of its own", () => {
+    test("an unlock, a known word and a pet setting made before the restore do not block it", async () => {
+        const tmp = makeTempDir();
+        try {
+            const file = tmp.path("again.db");
+            const app = startApp(file);
+            const deck = await app.addDeck("Russian", "ru");
+            await app.addCard("вода", "water", "", "voda", deck);
+            await app.recordAchievementUnlocks([{ track: "cards", tier: 1 }], 7);
+            await app.setWordKnown("ru", "вода", true);
+            await app.setPetState("name", "Stompa");
+            stopApp();
+
+            const fresh = startApp();
+            await fresh.recordAchievementUnlocks([{ track: "cards", tier: 1 }], 99);
+            await fresh.setWordKnown("ru", "вода", true);
+            await fresh.setPetState("name", "New");
+            await fresh.restoreFromBackup(asSource(new DatabaseSync(file, { readOnly: true })));
+            expect((await fresh.getPetState()).name).toBe("Stompa");
+            expect(await fresh.getAchievementUnlocks()).toEqual([{ track: "cards", tier: 1, unlockedAt: 7 }]);
+        } finally {
+            stopApp();
+            tmp.cleanup();
+        }
+    });
+});

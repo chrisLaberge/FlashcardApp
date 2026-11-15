@@ -22,3 +22,12 @@ export const AVATAR_ICONS: Record<(typeof AVATARS)[number], string> = {
     "🐧": "penguin", "🦄": "unicorn", "🐢": "turtle", "🐳": "fish", "🦋": "butterfly", "🐝": "bee", "🦖": "snake", "🐺": "dog",
     "🐨": "koala", "🐰": "rabbit", "🦈": "shark", "🦜": "bird", "🐲": "bat", "🦅": "duck", "🐬": "dolphin", "🦔": "pig",
 };
+
+/** A profile picture can also be the person's Google account photo, saved as "photo:<address>". */
+export const PHOTO_PREFIX = "photo:";
+
+/** The saved value for a Google photo, or null if the address is not one the server accepts. */
+export function googlePhotoAvatar(photoUrl: string | null | undefined): string | null {
+    if (!photoUrl || !/^https:\/\/lh3\.googleusercontent\.com\/[A-Za-z0-9_\-./=%]{1,300}$/.test(photoUrl)) return null;
+    return PHOTO_PREFIX + photoUrl;
+}

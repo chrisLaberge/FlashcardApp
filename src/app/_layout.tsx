@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 import Onboarding, { ONBOARDED_KEY } from "../components/Onboarding";
 import { getDecks } from "../database/database";
+import ForeignDataScreen from "../components/ForeignDataScreen";
+import { claimLocalData } from "../services/localData";
 import SignInScreen from "../components/SignInScreen";
 import { useUser } from "../hooks/useUser";
 import PdfImporter from "../components/pdf/PdfImporter";
@@ -22,13 +24,15 @@ function Navigator() {
   const t = useTheme();
   const { theme } = useThemeControls();
   const user = useUser();
-  const [onboarding, setOnboarding] = useState<"checking" | "show" | "done">("checking");
+  const [onboarding, setOnboarding] = useState<"checking" | "show" | "done" | "foreign">("checking");
   // The first time (and only for someone with no decks yet) a short tour and a first deck. Existing users never see it.
   useEffect(() => {
     if (!user) return;
     let live = true;
     (async () => {
       try {
+        // Cards on this phone belong to the account that first signed in here.
+        if ((await claimLocalData(user.uid)) === "foreign") return live && setOnboarding("foreign");
         if (await AsyncStorage.getItem(ONBOARDED_KEY)) return live && setOnboarding("done");
         if ((await getDecks()).length > 0) {
           await AsyncStorage.setItem(ONBOARDED_KEY, "1");
@@ -59,6 +63,14 @@ function Navigator() {
   }
   if (onboarding === "checking") {
     return <View style={{ flex: 1, backgroundColor: t.bg }} />;
+  }
+  if (onboarding === "foreign") {
+    return (
+      <>
+        <StatusBar style={theme.isDark ? "light" : "dark"} />
+        <ForeignDataScreen uid={user.uid} onErased={() => setOnboarding("show")} />
+      </>
+    );
   }
   if (onboarding === "show") {
     return (

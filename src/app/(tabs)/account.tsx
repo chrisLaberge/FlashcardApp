@@ -3,6 +3,7 @@ import KeyboardInsetView from "@/components/KeyboardInsetView";
 import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, View } from "react-native";
 import Pressable from "../../components/Pressable";
 import { deleteAccount } from "../../services/account";
+import { eraseLocalData } from "../../services/localData";
 import { useUser } from "../../hooks/useUser";
 import { signOut } from "../../services/auth";
 import { authErrorMessage } from "../../utils/authErrors";
@@ -37,10 +38,10 @@ export default function AccountScreen() {
     const confirmDelete = () =>
         Alert.alert(
             "Delete account?",
-            "This permanently deletes your sign-in account, username, friends and uploaded stats from the server. Your decks and progress on this phone are kept.",
+            "This permanently deletes your sign-in account, username, friends and uploaded stats from the server, and erases the decks, progress and PDFs on this phone. Export a backup first if you want to keep them.",
             [
                 { text: "Cancel", style: "cancel" },
-                { text: "Delete", style: "destructive", onPress: () => void run(deleteAccount) },
+                { text: "Delete", style: "destructive", onPress: () => void run(async () => { await deleteAccount(); await eraseLocalData(); }) },
             ],
         );
 
