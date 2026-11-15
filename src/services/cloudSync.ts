@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as SQLite from "expo-sqlite";
-import { AsyncGzip, AsyncGunzip } from "fflate";
+import { Gunzip, Gzip } from "fflate";
 import { changeCount, onChange, untracked } from "../database/changes";
 import { hasLocalData, restoreFromBackup, serializeDatabase } from "../database/database";
 import { asRollbackJournal } from "../models/BackupBundle";
@@ -59,30 +59,29 @@ async function deviceId(): Promise<string> {
 
 const tick = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
-function compress(bytes: Uint8Array): Promise<Uint8Array> {
-    return new Promise((resolve, reject) => {
-        const parts: Uint8Array[] = [];
-        const gzip = new AsyncGzip({ level: 6 });
-        gzip.ondata = (error, data, final) => {
-            if (error) return reject(error);
-            parts.push(data);
-            if (final) resolve(concat(parts));
-        };
-        gzip.push(bytes, true);
-    });
+const SLICE = 256 * 1024;
+
+/** Compresses in slices, giving the screen a moment between them (phones have no background threads for this). */
+async function compress(bytes: Uint8Array): Promise<Uint8Array> {
+    const parts: Uint8Array[] = [];
+    const gzip = new Gzip({ level: 6 });
+    gzip.ondata = (data) => { parts.push(data); };
+    for (let at = 0; at < bytes.length; at += SLICE) {
+        gzip.push(bytes.subarray(at, at + SLICE), at + SLICE >= bytes.length);
+        await tick();
+    }
+    return concat(parts);
 }
 
-function decompress(bytes: Uint8Array): Promise<Uint8Array> {
-    return new Promise((resolve, reject) => {
-        const parts: Uint8Array[] = [];
-        const gunzip = new AsyncGunzip();
-        gunzip.ondata = (error, data, final) => {
-            if (error) return reject(error);
-            parts.push(data);
-            if (final) resolve(concat(parts));
-        };
-        gunzip.push(bytes, true);
-    });
+async function decompress(bytes: Uint8Array): Promise<Uint8Array> {
+    const parts: Uint8Array[] = [];
+    const gunzip = new Gunzip();
+    gunzip.ondata = (data) => { parts.push(data); };
+    for (let at = 0; at < bytes.length; at += SLICE) {
+        gunzip.push(bytes.subarray(at, at + SLICE), at + SLICE >= bytes.length);
+        await tick();
+    }
+    return concat(parts);
 }
 
 function concat(parts: Uint8Array[]): Uint8Array {
