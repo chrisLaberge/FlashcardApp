@@ -233,21 +233,13 @@ async function openAndPrepareDatabase(): Promise<SQLite.SQLiteDatabase> {
     return trackWrites(db);
 }
 
-/** The same database, but every write tells `changes.ts`. Reads pass straight through. */
+/** Every write through `runAsync` / `execAsync` tells `changes.ts`. Done by swapping two methods, so reads and everything else cost nothing extra. */
 function trackWrites(db: SQLite.SQLiteDatabase): SQLite.SQLiteDatabase {
-    return new Proxy(db, {
-        get(target, property) {
-            const value = Reflect.get(target, property, target);
-            if (typeof value !== "function") return value;
-            if (property === "runAsync" || property === "execAsync") {
-                return (...args: unknown[]) => {
-                    noteChange();
-                    return (value as (...a: unknown[]) => unknown).apply(target, args);
-                };
-            }
-            return value.bind(target);
-        },
-    });
+    const run = db.runAsync.bind(db) as (...args: unknown[]) => Promise<unknown>;
+    const exec = db.execAsync.bind(db);
+    (db as unknown as { runAsync: unknown }).runAsync = (...args: unknown[]) => { noteChange(); return run(...args); };
+    (db as unknown as { execAsync: unknown }).execAsync = (sql: string) => { noteChange(); return exec(sql); };
+    return db;
 }
 
 type CardRow = {

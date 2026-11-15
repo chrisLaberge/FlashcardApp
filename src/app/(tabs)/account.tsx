@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
-import { getSyncState, resolveConflict, subscribeSync, syncNow, type SyncState } from "../../services/cloudSync";
+import { getSyncState, saveBeforeSignOut, resolveConflict, subscribeSync, syncNow, type SyncState } from "../../services/cloudSync";
 import KeyboardInsetView from "@/components/KeyboardInsetView";
 import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, View } from "react-native";
 import Pressable from "../../components/Pressable";
@@ -56,6 +56,23 @@ export default function AccountScreen() {
         }
     };
 
+    const confirmSignOut = () => void run(async () => {
+        if (!(await saveBeforeSignOut())) {
+            const go = await new Promise<boolean>((resolve) =>
+                Alert.alert(
+                    "Your cards are not saved online",
+                    "They could not be saved to this account, so another account signing in on this phone will be asked to clear them. Sign out anyway?",
+                    [
+                        { text: "Stay signed in", style: "cancel", onPress: () => resolve(false) },
+                        { text: "Sign out", style: "destructive", onPress: () => resolve(true) },
+                    ],
+                ),
+            );
+            if (!go) return;
+        }
+        await signOut();
+    });
+
     const confirmDelete = () =>
         Alert.alert(
             "Delete account?",
@@ -84,12 +101,12 @@ export default function AccountScreen() {
                         <Pressable style={({ pressed }) => [s.button, s.primary, pressed && s.pressed]} onPress={chooseCopy}>
                             <Text style={s.primaryText}>Choose which copy to keep</Text>
                         </Pressable>
-                    ) : (
-                        <Pressable style={({ pressed }) => [s.button, s.secondary, pressed && s.pressed]} onPress={() => void syncNow()} disabled={sync.status === "syncing"}>
-                            <Text style={s.secondaryText}>Save online now</Text>
+                    ) : sync.status === "error" ? (
+                        <Pressable onPress={() => void syncNow()}>
+                            <Text style={s.link}>Try again</Text>
                         </Pressable>
-                    )}
-                    <Pressable style={({ pressed }) => [s.button, s.secondary, pressed && s.pressed]} onPress={() => run(signOut)} disabled={busy}>
+                    ) : null}
+                    <Pressable style={({ pressed }) => [s.button, s.secondary, pressed && s.pressed]} onPress={confirmSignOut} disabled={busy}>
                         <Text style={s.secondaryText}>Sign out</Text>
                     </Pressable>
                 </View>

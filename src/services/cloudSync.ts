@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as SQLite from "expo-sqlite";
-import { AsyncGzip, AsyncGunzip } from "fflate";
+import { Gunzip, Gzip } from "fflate";
 import { changeCount, onChange, untracked } from "../database/changes";
 import { hasLocalData, restoreFromBackup, serializeDatabase } from "../database/database";
 import { asRollbackJournal } from "../models/BackupBundle";
@@ -15,6 +15,8 @@ const BASE_KEY = "sync-base";
 const DIRTY_KEY = "sync-dirty";
 const DEVICE_KEY = "sync-device";
 const LAST_KEY = "sync-last";
+/** Set at sign-out once everything was saved; cleared by the first change after signing in again. */
+const SAVED_KEY = "sync-saved-at-signout";
 
 export type SyncState = {
     status: "idle" | "syncing" | "conflict" | "error";
@@ -59,30 +61,29 @@ async function deviceId(): Promise<string> {
 
 const tick = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
-function compress(bytes: Uint8Array): Promise<Uint8Array> {
-    return new Promise((resolve, reject) => {
-        const parts: Uint8Array[] = [];
-        const gzip = new AsyncGzip({ level: 6 });
-        gzip.ondata = (error, data, final) => {
-            if (error) return reject(error);
-            parts.push(data);
-            if (final) resolve(concat(parts));
-        };
-        gzip.push(bytes, true);
-    });
+const SLICE = 128 * 1024;
+
+/** Compresses in slices, giving the screen a moment between them (phones have no background threads for this). */
+async function compress(bytes: Uint8Array): Promise<Uint8Array> {
+    const parts: Uint8Array[] = [];
+    const gzip = new Gzip({ level: 1 });
+    gzip.ondata = (data) => { parts.push(data); };
+    for (let at = 0; at < bytes.length; at += SLICE) {
+        gzip.push(bytes.subarray(at, at + SLICE), at + SLICE >= bytes.length);
+        await tick();
+    }
+    return concat(parts);
 }
 
-function decompress(bytes: Uint8Array): Promise<Uint8Array> {
-    return new Promise((resolve, reject) => {
-        const parts: Uint8Array[] = [];
-        const gunzip = new AsyncGunzip();
-        gunzip.ondata = (error, data, final) => {
-            if (error) return reject(error);
-            parts.push(data);
-            if (final) resolve(concat(parts));
-        };
-        gunzip.push(bytes, true);
-    });
+async function decompress(bytes: Uint8Array): Promise<Uint8Array> {
+    const parts: Uint8Array[] = [];
+    const gunzip = new Gunzip();
+    gunzip.ondata = (data) => { parts.push(data); };
+    for (let at = 0; at < bytes.length; at += SLICE) {
+        gunzip.push(bytes.subarray(at, at + SLICE), at + SLICE >= bytes.length);
+        await tick();
+    }
+    return concat(parts);
 }
 
 function concat(parts: Uint8Array[]): Uint8Array {
@@ -231,17 +232,20 @@ export async function resolveConflict(keep: "phone" | "cloud"): Promise<void> {
 
 /** Starts watching: marks the phone as changed on any write, and saves a little after the writes stop. */
 export function startAutoSync(): () => void {
-    void loadLocal().then(() => syncNow());
+    // Not at the very start: let the screen finish drawing first.
+    const first = setTimeout(() => void loadLocal().then(() => syncNow()), 4000);
     const off = onChange(() => {
+        void AsyncStorage.removeItem(SAVED_KEY).catch(() => undefined);
         if (!dirty) {
             dirty = true;
             void AsyncStorage.setItem(DIRTY_KEY, "1").catch(() => undefined);
         }
         clearTimeout(timer);
-        timer = setTimeout(() => void syncNow(), 60_000);
+        timer = setTimeout(() => void syncNow(), 5 * 60_000);
     });
     return () => {
         off();
+        clearTimeout(first);
         clearTimeout(timer);
     };
 }
@@ -251,5 +255,29 @@ export async function forgetSyncState(): Promise<void> {
     dirty = false;
     loaded = false;
     state = { status: "idle", lastSynced: null };
-    await AsyncStorage.multiRemove([BASE_KEY, DIRTY_KEY, LAST_KEY]);
+    await AsyncStorage.multiRemove([BASE_KEY, DIRTY_KEY, LAST_KEY, SAVED_KEY]);
+}
+
+/** True when everything on this phone is also saved in the account it belongs to, so clearing the phone loses nothing. */
+export async function phoneIsSaved(): Promise<boolean> {
+    if ((await AsyncStorage.getItem(SAVED_KEY)) === "1") return true;
+    const [base, flag] = await Promise.all([AsyncStorage.getItem(BASE_KEY), AsyncStorage.getItem(DIRTY_KEY)]);
+    return Number(base) > 0 && flag !== "1" && !dirty;
+}
+
+/**
+ * Saves now, just before signing out, and remembers that the phone is fully saved so another account can use it.
+ * Gives up quietly after a while. Returns whether the phone is saved.
+ */
+export async function saveBeforeSignOut(): Promise<boolean> {
+    for (let attempt = 0; attempt < 3; attempt++) {
+        await Promise.race([syncNow(), new Promise((resolve) => setTimeout(resolve, 20000))]).catch(() => undefined);
+        await loadLocal();
+        if (state.status === "idle" && !dirty && (await baseVersion()) > 0) {
+            await AsyncStorage.setItem(SAVED_KEY, "1");
+            return true;
+        }
+        if (state.status === "error" || state.status === "conflict") break;
+    }
+    return false;
 }
