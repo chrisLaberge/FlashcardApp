@@ -56,6 +56,24 @@ export default function AccountScreen() {
         }
     };
 
+    const confirmSignOut = () => void run(async () => {
+        await saveBeforeSignOut();
+        if (getSyncState().status === "error" || getSyncState().status === "conflict") {
+            const go = await new Promise<boolean>((resolve) =>
+                Alert.alert(
+                    "Your cards are not saved online",
+                    "They could not be saved to this account, so another account signing in on this phone will be asked to clear them. Sign out anyway?",
+                    [
+                        { text: "Stay signed in", style: "cancel", onPress: () => resolve(false) },
+                        { text: "Sign out", style: "destructive", onPress: () => resolve(true) },
+                    ],
+                ),
+            );
+            if (!go) return;
+        }
+        await signOut();
+    });
+
     const confirmDelete = () =>
         Alert.alert(
             "Delete account?",
@@ -89,7 +107,7 @@ export default function AccountScreen() {
                             <Text style={s.link}>Try again</Text>
                         </Pressable>
                     ) : null}
-                    <Pressable style={({ pressed }) => [s.button, s.secondary, pressed && s.pressed]} onPress={() => run(async () => { await saveBeforeSignOut(); await signOut(); })} disabled={busy}>
+                    <Pressable style={({ pressed }) => [s.button, s.secondary, pressed && s.pressed]} onPress={confirmSignOut} disabled={busy}>
                         <Text style={s.secondaryText}>Sign out</Text>
                     </Pressable>
                 </View>
