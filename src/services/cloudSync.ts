@@ -15,6 +15,8 @@ const BASE_KEY = "sync-base";
 const DIRTY_KEY = "sync-dirty";
 const DEVICE_KEY = "sync-device";
 const LAST_KEY = "sync-last";
+/** Set at sign-out once everything was saved; cleared by the first change after signing in again. */
+const SAVED_KEY = "sync-saved-at-signout";
 
 export type SyncState = {
     status: "idle" | "syncing" | "conflict" | "error";
@@ -233,6 +235,7 @@ export function startAutoSync(): () => void {
     // Not at the very start: let the screen finish drawing first.
     const first = setTimeout(() => void loadLocal().then(() => syncNow()), 4000);
     const off = onChange(() => {
+        void AsyncStorage.removeItem(SAVED_KEY).catch(() => undefined);
         if (!dirty) {
             dirty = true;
             void AsyncStorage.setItem(DIRTY_KEY, "1").catch(() => undefined);
@@ -252,16 +255,29 @@ export async function forgetSyncState(): Promise<void> {
     dirty = false;
     loaded = false;
     state = { status: "idle", lastSynced: null };
-    await AsyncStorage.multiRemove([BASE_KEY, DIRTY_KEY, LAST_KEY]);
+    await AsyncStorage.multiRemove([BASE_KEY, DIRTY_KEY, LAST_KEY, SAVED_KEY]);
 }
 
 /** True when everything on this phone is also saved in the account it belongs to, so clearing the phone loses nothing. */
 export async function phoneIsSaved(): Promise<boolean> {
+    if ((await AsyncStorage.getItem(SAVED_KEY)) === "1") return true;
     const [base, flag] = await Promise.all([AsyncStorage.getItem(BASE_KEY), AsyncStorage.getItem(DIRTY_KEY)]);
     return Number(base) > 0 && flag !== "1" && !dirty;
 }
 
-/** Saves now (used just before signing out, so another account can use this phone). Gives up quietly after a while. */
-export async function saveBeforeSignOut(): Promise<void> {
-    await Promise.race([syncNow(), new Promise((resolve) => setTimeout(resolve, 20000))]).catch(() => undefined);
+/**
+ * Saves now, just before signing out, and remembers that the phone is fully saved so another account can use it.
+ * Gives up quietly after a while. Returns whether the phone is saved.
+ */
+export async function saveBeforeSignOut(): Promise<boolean> {
+    for (let attempt = 0; attempt < 3; attempt++) {
+        await Promise.race([syncNow(), new Promise((resolve) => setTimeout(resolve, 20000))]).catch(() => undefined);
+        await loadLocal();
+        if (state.status === "idle" && !dirty && (await baseVersion()) > 0) {
+            await AsyncStorage.setItem(SAVED_KEY, "1");
+            return true;
+        }
+        if (state.status === "error" || state.status === "conflict") break;
+    }
+    return false;
 }

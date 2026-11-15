@@ -57,8 +57,7 @@ export default function AccountScreen() {
     };
 
     const confirmSignOut = () => void run(async () => {
-        await saveBeforeSignOut();
-        if (getSyncState().status === "error" || getSyncState().status === "conflict") {
+        if (!(await saveBeforeSignOut())) {
             const go = await new Promise<boolean>((resolve) =>
                 Alert.alert(
                     "Your cards are not saved online",
