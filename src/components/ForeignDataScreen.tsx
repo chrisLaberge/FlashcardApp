@@ -16,7 +16,7 @@ export default function ForeignDataScreen({ uid, onErased }: { uid: string; onEr
     const erase = () =>
         Alert.alert(
             "Erase the cards on this phone?",
-            "The decks, progress, pet and books stored here will be deleted for good. If they matter, sign out and sign back in to the account they belong to, then export a backup first.",
+            "The decks, progress, pet and books stored here will be deleted from this phone. If they belong to an account that shows \"Saved online\" in its Account tab, they are safe and come back when you sign in to it. Otherwise sign out, sign back in to that account and let it save first. This account's own saved cards, if it has any, are loaded afterwards.",
             [
                 { text: "Cancel", style: "cancel" },
                 {
@@ -41,12 +41,12 @@ export default function ForeignDataScreen({ uid, onErased }: { uid: string; onEr
     return (
         <View style={s.page}>
             <Text style={s.title}>These cards belong to another account</Text>
-            <Text style={s.body}>This phone has decks and progress from a different account. They are not shown here, so they cannot get mixed with this account.</Text>
+            <Text style={s.body}>This phone still holds the decks and progress of a different account. They are kept apart so the two accounts never get mixed. Each account's cards are saved online, so you can switch: this account's saved cards load as soon as the other cards are cleared from the phone.</Text>
             <Pressable style={({ pressed }) => [s.button, s.primary, pressed && s.pressed]} onPress={() => void signOut()} disabled={busy} accessibilityRole="button">
                 <Text style={s.primaryText}>Sign out and use the other account</Text>
             </Pressable>
             <Pressable onPress={erase} disabled={busy} accessibilityRole="button">
-                <Text style={s.danger}>Erase them and start fresh</Text>
+                <Text style={s.danger}>Clear this phone and load this account's cards</Text>
             </Pressable>
         </View>
     );
