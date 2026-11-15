@@ -1,3 +1,4 @@
+import AdBanner from "../components/AdBanner";
 import LangBadge from "../components/LangBadge";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect } from "expo-router";
@@ -189,6 +190,7 @@ export default function DecksScreen() {
                     </Pressable>
                 </Pressable>
             </Modal>
+            <AdBanner />
         </View>
     );
 }
