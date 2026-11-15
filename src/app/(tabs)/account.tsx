@@ -84,11 +84,11 @@ export default function AccountScreen() {
                         <Pressable style={({ pressed }) => [s.button, s.primary, pressed && s.pressed]} onPress={chooseCopy}>
                             <Text style={s.primaryText}>Choose which copy to keep</Text>
                         </Pressable>
-                    ) : (
-                        <Pressable style={({ pressed }) => [s.button, s.secondary, pressed && s.pressed]} onPress={() => void syncNow()} disabled={sync.status === "syncing"}>
-                            <Text style={s.secondaryText}>Save online now</Text>
+                    ) : sync.status === "error" ? (
+                        <Pressable onPress={() => void syncNow()}>
+                            <Text style={s.link}>Try again</Text>
                         </Pressable>
-                    )}
+                    ) : null}
                     <Pressable style={({ pressed }) => [s.button, s.secondary, pressed && s.pressed]} onPress={() => run(signOut)} disabled={busy}>
                         <Text style={s.secondaryText}>Sign out</Text>
                     </Pressable>
