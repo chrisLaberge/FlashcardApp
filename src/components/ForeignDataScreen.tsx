@@ -41,12 +41,12 @@ export default function ForeignDataScreen({ uid, onErased }: { uid: string; onEr
     return (
         <View style={s.page}>
             <Text style={s.title}>These cards belong to another account</Text>
-            <Text style={s.body}>This phone still holds the decks and progress of a different account. They are kept apart so the two accounts never get mixed. Each account's cards are saved online, so you can switch: this account's saved cards load as soon as the other cards are cleared from the phone.</Text>
+            <Text style={s.body}>This phone still holds the decks and progress of a different account. They are kept apart so the two accounts never get mixed. Each account’s cards are saved online, so you can switch: this account’s saved cards load as soon as the other cards are cleared from the phone.</Text>
             <Pressable style={({ pressed }) => [s.button, s.primary, pressed && s.pressed]} onPress={() => void signOut()} disabled={busy} accessibilityRole="button">
                 <Text style={s.primaryText}>Sign out and use the other account</Text>
             </Pressable>
             <Pressable onPress={erase} disabled={busy} accessibilityRole="button">
-                <Text style={s.danger}>Clear this phone and load this account's cards</Text>
+                <Text style={s.danger}>Clear this phone and load this account’s cards</Text>
             </Pressable>
         </View>
     );
