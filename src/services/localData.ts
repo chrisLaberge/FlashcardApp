@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Directory, Paths } from "expo-file-system";
 import { hasLocalData, wipeAllData } from "../database/database";
+import { forgetSyncState } from "./cloudSync";
 
 const OWNER_KEY = "data-owner-uid";
 
@@ -31,4 +32,5 @@ export async function eraseLocalData(): Promise<void> {
     // Firebase keeps the sign-in in the same storage; those keys must stay or the person is signed out.
     const keys = (await AsyncStorage.getAllKeys()).filter((key) => !key.startsWith("firebase:"));
     await AsyncStorage.multiRemove(keys);
+    await forgetSyncState();
 }

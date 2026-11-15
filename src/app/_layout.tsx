@@ -2,7 +2,8 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, View } from "react-native";
+import { ActivityIndicator, AppState, View } from "react-native";
+import { startAutoSync, syncNow } from "../services/cloudSync";
 import Onboarding, { ONBOARDED_KEY } from "../components/Onboarding";
 import { getDecks } from "../database/database";
 import ForeignDataScreen from "../components/ForeignDataScreen";
@@ -25,6 +26,7 @@ function Navigator() {
   const { theme } = useThemeControls();
   const user = useUser();
   const [onboarding, setOnboarding] = useState<"checking" | "show" | "done" | "foreign">("checking");
+  const [attempt, setAttempt] = useState(0);
   // The first time (and only for someone with no decks yet) a short tour and a first deck. Existing users never see it.
   useEffect(() => {
     if (!user) return;
@@ -34,6 +36,10 @@ function Navigator() {
         // Cards on this phone belong to the account that first signed in here.
         if ((await claimLocalData(user.uid)) === "foreign") return live && setOnboarding("foreign");
         if (await AsyncStorage.getItem(ONBOARDED_KEY)) return live && setOnboarding("done");
+        // A phone with nothing on it may belong to someone whose cards are saved online: fetch them before offering the tour.
+        if ((await getDecks()).length === 0) {
+          await Promise.race([syncNow(), new Promise((resolve) => setTimeout(resolve, 12000))]);
+        }
         if ((await getDecks()).length > 0) {
           await AsyncStorage.setItem(ONBOARDED_KEY, "1");
           return live && setOnboarding("done");
@@ -44,7 +50,14 @@ function Navigator() {
       }
     })();
     return () => { live = false; };
-  }, [user]);
+  }, [user, attempt]);
+  // Keep the account's saved copy up to date: when the app opens, a while after changes, and as it goes to the background.
+  useEffect(() => {
+    if (!user || onboarding !== "done") return;
+    const stop = startAutoSync();
+    const watch = AppState.addEventListener("change", (next) => { if (next === "background") void syncNow(); });
+    return () => { stop(); watch.remove(); };
+  }, [user, onboarding]);
   // Nothing in the app is reachable without an account. `undefined` is the moment before the saved sign-in is found.
   if (user === undefined) {
     return (
@@ -68,7 +81,7 @@ function Navigator() {
     return (
       <>
         <StatusBar style={theme.isDark ? "light" : "dark"} />
-        <ForeignDataScreen uid={user.uid} onErased={() => setOnboarding("show")} />
+        <ForeignDataScreen uid={user.uid} onErased={() => { setOnboarding("checking"); setAttempt((n) => n + 1); }} />
       </>
     );
   }
