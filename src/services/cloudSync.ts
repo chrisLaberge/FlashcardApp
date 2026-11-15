@@ -252,3 +252,14 @@ export async function forgetSyncState(): Promise<void> {
     state = { status: "idle", lastSynced: null };
     await AsyncStorage.multiRemove([BASE_KEY, DIRTY_KEY, LAST_KEY]);
 }
+
+/** True when everything on this phone is also saved in the account it belongs to, so clearing the phone loses nothing. */
+export async function phoneIsSaved(): Promise<boolean> {
+    const [base, flag] = await Promise.all([AsyncStorage.getItem(BASE_KEY), AsyncStorage.getItem(DIRTY_KEY)]);
+    return Number(base) > 0 && flag !== "1" && !dirty;
+}
+
+/** Saves now (used just before signing out, so another account can use this phone). Gives up quietly after a while. */
+export async function saveBeforeSignOut(): Promise<void> {
+    await Promise.race([syncNow(), new Promise((resolve) => setTimeout(resolve, 20000))]).catch(() => undefined);
+}

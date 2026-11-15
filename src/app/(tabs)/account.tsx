@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
-import { getSyncState, resolveConflict, subscribeSync, syncNow, type SyncState } from "../../services/cloudSync";
+import { getSyncState, saveBeforeSignOut, resolveConflict, subscribeSync, syncNow, type SyncState } from "../../services/cloudSync";
 import KeyboardInsetView from "@/components/KeyboardInsetView";
 import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, View } from "react-native";
 import Pressable from "../../components/Pressable";
@@ -89,7 +89,7 @@ export default function AccountScreen() {
                             <Text style={s.link}>Try again</Text>
                         </Pressable>
                     ) : null}
-                    <Pressable style={({ pressed }) => [s.button, s.secondary, pressed && s.pressed]} onPress={() => run(signOut)} disabled={busy}>
+                    <Pressable style={({ pressed }) => [s.button, s.secondary, pressed && s.pressed]} onPress={() => run(async () => { await saveBeforeSignOut(); await signOut(); })} disabled={busy}>
                         <Text style={s.secondaryText}>Sign out</Text>
                     </Pressable>
                 </View>

@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Directory, Paths } from "expo-file-system";
 import { hasLocalData, wipeAllData } from "../database/database";
-import { forgetSyncState } from "./cloudSync";
+import { forgetSyncState, phoneIsSaved } from "./cloudSync";
 
 const OWNER_KEY = "data-owner-uid";
 
@@ -13,7 +13,11 @@ const OWNER_KEY = "data-owner-uid";
 export async function claimLocalData(uid: string): Promise<"mine" | "foreign"> {
     const owner = await AsyncStorage.getItem(OWNER_KEY);
     if (owner === uid) return "mine";
-    if (owner && (await hasLocalData())) return "foreign";
+    if (owner && (await hasLocalData())) {
+        // The other account's cards are safe online, so this phone can simply switch to the new account.
+        if (!(await phoneIsSaved())) return "foreign";
+        await eraseLocalData();
+    }
     await AsyncStorage.setItem(OWNER_KEY, uid);
     return "mine";
 }
