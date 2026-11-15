@@ -2,7 +2,7 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, AppState, View } from "react-native";
+import { ActivityIndicator, AppState, Text, View } from "react-native";
 import { startAutoSync, syncNow } from "../services/cloudSync";
 import Onboarding, { ONBOARDED_KEY } from "../components/Onboarding";
 import { getDecks } from "../database/database";
@@ -38,7 +38,7 @@ function Navigator() {
         if (await AsyncStorage.getItem(ONBOARDED_KEY)) return live && setOnboarding("done");
         // A phone with nothing on it may belong to someone whose cards are saved online: fetch them before offering the tour.
         if ((await getDecks()).length === 0) {
-          await Promise.race([syncNow(), new Promise((resolve) => setTimeout(resolve, 12000))]);
+          await Promise.race([syncNow(), new Promise((resolve) => setTimeout(resolve, 8000))]);
         }
         if ((await getDecks()).length > 0) {
           await AsyncStorage.setItem(ONBOARDED_KEY, "1");
@@ -75,7 +75,12 @@ function Navigator() {
     );
   }
   if (onboarding === "checking") {
-    return <View style={{ flex: 1, backgroundColor: t.bg }} />;
+    return (
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 12, backgroundColor: t.bg }}>
+        <ActivityIndicator color={t.blue} />
+        <Text style={{ color: t.muted, fontSize: 14 }}>Loading your cards…</Text>
+      </View>
+    );
   }
   if (onboarding === "foreign") {
     return (

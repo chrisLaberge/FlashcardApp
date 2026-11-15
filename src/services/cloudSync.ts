@@ -59,12 +59,12 @@ async function deviceId(): Promise<string> {
 
 const tick = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
-const SLICE = 256 * 1024;
+const SLICE = 128 * 1024;
 
 /** Compresses in slices, giving the screen a moment between them (phones have no background threads for this). */
 async function compress(bytes: Uint8Array): Promise<Uint8Array> {
     const parts: Uint8Array[] = [];
-    const gzip = new Gzip({ level: 6 });
+    const gzip = new Gzip({ level: 1 });
     gzip.ondata = (data) => { parts.push(data); };
     for (let at = 0; at < bytes.length; at += SLICE) {
         gzip.push(bytes.subarray(at, at + SLICE), at + SLICE >= bytes.length);
@@ -230,17 +230,19 @@ export async function resolveConflict(keep: "phone" | "cloud"): Promise<void> {
 
 /** Starts watching: marks the phone as changed on any write, and saves a little after the writes stop. */
 export function startAutoSync(): () => void {
-    void loadLocal().then(() => syncNow());
+    // Not at the very start: let the screen finish drawing first.
+    const first = setTimeout(() => void loadLocal().then(() => syncNow()), 4000);
     const off = onChange(() => {
         if (!dirty) {
             dirty = true;
             void AsyncStorage.setItem(DIRTY_KEY, "1").catch(() => undefined);
         }
         clearTimeout(timer);
-        timer = setTimeout(() => void syncNow(), 60_000);
+        timer = setTimeout(() => void syncNow(), 5 * 60_000);
     });
     return () => {
         off();
+        clearTimeout(first);
         clearTimeout(timer);
     };
 }
