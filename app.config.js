@@ -7,6 +7,9 @@ module.exports = ({ config }) => {
   if (realAppId) {
     plugins = plugins.map((p) => (Array.isArray(p) && p[0] === "react-native-google-mobile-ads" ? [p[0], { ...p[1], androidAppId: realAppId }] : p));
   }
-  if (process.env.ARM64_ONLY === "1") plugins = [...plugins, ["expo-build-properties", { android: { buildArchs: ["arm64-v8a"] } }]];
+  // ANDROID_ARCHS (comma separated) picks which phone types to build, e.g. "arm64-v8a,armeabi-v7a" for a lighter build that still
+  // keeps almost every real phone. ARM64_ONLY=1 means just arm64-v8a (test builds).
+  const archs = process.env.ANDROID_ARCHS ? process.env.ANDROID_ARCHS.split(",").map((a) => a.trim()).filter(Boolean) : process.env.ARM64_ONLY === "1" ? ["arm64-v8a"] : null;
+  if (archs) plugins = [...plugins, ["expo-build-properties", { android: { buildArchs: archs } }]];
   return { ...config, plugins };
 };
